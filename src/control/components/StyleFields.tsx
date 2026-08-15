@@ -1,4 +1,5 @@
 import type { TextStyle } from '../../../shared/types.ts';
+import { FontChainStatus } from './FontChainStatus.tsx';
 
 interface NumberFieldProps {
   label: string;
@@ -126,6 +127,9 @@ export function TextStyleFields({ title, style, onChange }: TextStyleFieldsProps
           spellCheck={false}
         />
       </div>
+
+      {/* 적어 넣은 이름이 실제로 잡히는지 재서 보여 준다 (설치했는데 안 잡히는 함정 방지) */}
+      <FontChainStatus value={style.fontFamily} />
 
       {/* 외곽선 — 밝은 영상 위에서 글자를 읽히게 하는 가장 효과적인 수단 */}
       <div className="row">

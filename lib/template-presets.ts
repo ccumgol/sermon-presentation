@@ -23,7 +23,8 @@ const FONT_EN = '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif';
  * (헬라어에서 겪은 문제와 같은 원리 — PLAN 3.4 참고).
  */
 const FONT_KO_SERIF =
-  '"BareunBatangOTFPro", "NanumMyeongjoExtraBold", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif';
+  '"Noto Serif KR", "Noto Serif CJK KR", "BareunBatangOTFPro", "NanumMyeongjoExtraBold", ' +
+  '"Nanum Myeongjo", "AppleMyungjo", "Batang", serif';
 /**
  * 다음절 그리스어(Ἐ ῇ ἦ — U+1F00 대역)는 총칭 `serif` 로 두면 글자마다 대체가
  * 일어나 심하게 벌어진다. 실측: 같은 구절이 `serif` 819.6px vs Times 526.6px.
