@@ -19,6 +19,7 @@ const ITEM_ICONS: Record<CueItem['type'], string> = {
   song: '🎵',
   text: '📝',
   blank: '⬛',
+  divider: '▾',
 };
 
 /** 오늘 날짜를 YYYY-MM-DD 로 (기본 순서표 이름에 쓴다) */

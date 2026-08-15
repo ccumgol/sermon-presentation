@@ -151,3 +151,48 @@ describe('removeItem', () => {
     expect(removeItem(items, 'zzz')).toHaveLength(1);
   });
 });
+
+describe('구분(divider) 처리', () => {
+  const divider = (label: string): CueItem => ({ id: `d-${label}`, type: 'divider', label });
+  const text = (content: string): CueItem => ({ id: `t-${content}`, type: 'text', content });
+
+  /** 텍스트 항목만 슬라이드 한 장으로 푸는 단순 리졸버 */
+  const resolve: ItemResolver = async (item) =>
+    item.type === 'text'
+      ? { slides: [{ kind: 'text', lines: [item.content] }], labels: [item.content] }
+      : { slides: [], labels: [], error: '이 테스트가 풀지 않는 종류' };
+
+  it('구분은 슬라이드를 만들지 않는다', async () => {
+    const result = await buildPlanDeck('테스트', [divider('찬양'), text('가')], resolve);
+    expect(result.deck.slides).toHaveLength(1);
+  });
+
+  it('구분은 실패로 잡히지 않는다', async () => {
+    // resolve 에 넘어가면 '표시할 내용이 없습니다' 로 실패 목록에 쌓인다
+    const result = await buildPlanDeck('테스트', [divider('찬양'), text('가')], resolve);
+    expect(result.failed).toHaveLength(0);
+  });
+
+  it('구분이 항목 경계(groups)를 어긋나게 하지 않는다', async () => {
+    // PgDn 이 빈 화면으로 점프하면 예배 중 사고다
+    const result = await buildPlanDeck(
+      '테스트',
+      [divider('예배 부름'), text('가'), divider('찬양'), text('나'), text('다')],
+      resolve,
+    );
+
+    expect(result.deck.groups).toHaveLength(3);
+    expect(result.deck.groups!.map((g) => g.startIndex)).toEqual([0, 1, 2]);
+    expect(result.deck.groups!.map((g) => g.label)).toEqual(['가', '나', '다']);
+  });
+
+  it('구분만 있으면 빈 덱이 된다', async () => {
+    const result = await buildPlanDeck('테스트', [divider('찬양')], resolve);
+    expect(result.deck.slides).toHaveLength(0);
+    expect(result.failed).toHaveLength(0);
+  });
+
+  it('describeItem 은 구분 이름을 그대로 준다', () => {
+    expect(describeItem(divider('말씀'))).toBe('말씀');
+  });
+});

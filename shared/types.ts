@@ -414,8 +414,26 @@ export type CueItem =
       templateId?: number;
       note?: string;
     }
-  | { id: string; type: 'text'; content: string; templateId?: number; note?: string }
-  | { id: string; type: 'blank'; note?: string };
+  | {
+      id: string;
+      type: 'text';
+      content: string;
+      /**
+       * 용도 구분 — 아이콘과 기본 템플릿만 달라진다. 저장 구조는 같다.
+       * 없으면 'notice'(광고)로 본다 — 기존 순서표의 하위 호환.
+       */
+      variant?: 'notice' | 'quote';
+      templateId?: number;
+      note?: string;
+    }
+  | { id: string; type: 'blank'; note?: string }
+  /**
+   * 그룹 머리글 — '예배 부름 / 찬양 / 말씀 / 광고' 처럼 순서를 구획한다.
+   *
+   * **슬라이드를 만들지 않는다.** 덱에 들어가지 않으므로 항목 경계(groups)의
+   * 인덱스에도 영향을 주지 않아야 한다 (lib/plan-deck.ts 참고).
+   */
+  | { id: string; type: 'divider'; label: string };
 
 export interface ServicePlan {
   id: number;

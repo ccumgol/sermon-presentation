@@ -37,6 +37,8 @@ export function describeItem(item: CueItem): string {
       return item.songTitle;
     case 'text':
       return item.content.split(/\r?\n/)[0]?.slice(0, 24) ?? '텍스트';
+    case 'divider':
+      return item.label;
     case 'blank':
       return '(공백)';
     default:
@@ -61,6 +63,12 @@ export async function buildPlanDeck(
   const failed: Array<{ item: CueItem; error: string }> = [];
 
   for (const item of items) {
+    // 구분(그룹 머리글)은 슬라이드를 만들지 않는다.
+    //
+    // resolve 에 넘기면 알 수 없는 종류로 떨어져 공백 슬라이드가 생기고,
+    // 항목 경계(groups)에도 잡혀 PgDn 이 빈 화면으로 점프하게 된다.
+    if (item.type === 'divider') continue;
+
     let resolved: ResolvedItem;
     try {
       resolved = await resolve(item);

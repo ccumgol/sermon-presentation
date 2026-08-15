@@ -317,3 +317,51 @@ describe('데이터 이전', () => {
     expect(body.data!.skipped.some((s) => s.includes('bad.exe'))).toBe(true);
   });
 });
+
+describe('구분·인용구 항목 저장', () => {
+  it('구분(divider)을 저장한다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '구분 테스트',
+      items: [
+        { type: 'divider', label: '예배 부름' },
+        { type: 'text', content: '광고입니다' },
+      ],
+    });
+    expect(created.status).toBe(200);
+
+    const plan = created.body.data!.plan;
+    expect(plan.items).toHaveLength(2);
+    expect(plan.items[0]).toMatchObject({ type: 'divider', label: '예배 부름' });
+  });
+
+  it('이름 없는 구분은 거부하고 알린다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '빈 구분',
+      items: [{ type: 'divider', label: '   ' }],
+    });
+    expect(created.body.data!.rejected?.length).toBeGreaterThan(0);
+    expect(created.body.data!.plan.items).toHaveLength(0);
+  });
+
+  it('인용구(quote)를 광고와 구분해 저장한다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: 'variant 테스트',
+      items: [
+        { type: 'text', content: '광고' },
+        { type: 'text', content: '인용구', variant: 'quote' },
+      ],
+    });
+
+    const items = created.body.data!.plan.items as Array<{ variant?: string }>;
+    expect(items[0]!.variant).toBeUndefined();
+    expect(items[1]!.variant).toBe('quote');
+  });
+
+  it('알 수 없는 variant 는 광고로 떨어뜨린다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: 'variant 방어',
+      items: [{ type: 'text', content: '내용', variant: '<script>' }],
+    });
+    expect((created.body.data!.plan.items[0] as { variant?: string }).variant).toBeUndefined();
+  });
+});

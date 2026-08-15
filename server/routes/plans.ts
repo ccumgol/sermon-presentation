@@ -39,7 +39,9 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
     const item = entry as Partial<CueItem> & { type?: string };
     const fields = entry as Record<string, unknown>;
     const id = typeof item.id === 'string' && item.id.length > 0 ? item.id : store.newItemId();
-    const note = typeof item.note === 'string' ? item.note : undefined;
+    // divider 에는 note 가 없어 유니온에서 사라진다 — 느슨한 객체로 읽는다
+    const loose = entry as Record<string, unknown>;
+    const note = typeof loose.note === 'string' ? loose.note : undefined;
     const templateId = typeof fields.templateId === 'number' ? fields.templateId : undefined;
 
     switch (item.type) {
@@ -87,10 +89,14 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           rejected.push(`${index + 1}번째 항목: 내용이 없습니다`);
           continue;
         }
+        // 광고(notice)와 인용구(quote)는 저장 구조가 같고 표시만 다르다
+        const variant = text.variant === 'quote' ? 'quote' : undefined;
+
         items.push({
           id,
           type: 'text',
           content: text.content,
+          ...(variant ? { variant } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
@@ -100,6 +106,17 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
       case 'blank':
         items.push({ id, type: 'blank', ...(note ? { note } : {}) });
         break;
+
+      case 'divider': {
+        const divider = item as Extract<CueItem, { type: 'divider' }>;
+        const label = typeof divider.label === 'string' ? divider.label.trim() : '';
+        if (label.length === 0) {
+          rejected.push(`${index + 1}번째 항목: 구분 이름이 없습니다`);
+          continue;
+        }
+        items.push({ id, type: 'divider', label });
+        break;
+      }
 
       default:
         rejected.push(`${index + 1}번째 항목: 알 수 없는 종류 '${String(item.type)}'`);
