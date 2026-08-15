@@ -324,12 +324,31 @@
   var RENDERERS = { bible: renderBible, song: renderSong, text: renderText, order: renderOrder };
 
   /**
+   * 슬라이드 내용을 실제로 비운다.
+   *
+   * '공백' 슬라이드와 '내용 없음' 이 같은 일을 하므로 한 곳에 둔다.
+   * **`blanked` 클래스는 건드리지 않는다** — 그것은 `B`(블랙)의 장치다.
+   */
+  function clearSlide() {
+    clearChildren(el.blocks);
+    setOptional(el.heading, null);
+    setOptional(el.reference, null);
+    setOptional(el.credit, null);
+    el.slide.dataset.empty = 'true';
+  }
+
+  /**
    * 슬라이드를 그린다. 렌더 중 예외가 나면 이전 화면을 그대로 둔다.
    * @returns {boolean} 성공 여부
    */
   function render(payload) {
     if (!payload || payload.kind === 'blank') {
-      el.body.classList.add('blanked');
+      // 내용을 **지운다**. 예전에는 blanked 클래스(투명도 0)만 켰는데,
+      // 곧이어 applyState 가 setBlank(live.blank=false) 로 그 클래스를 다시 꺼서
+      // 공백 항목을 송출해도 **이전 화면이 그대로 남았다**(2026-08-15 실사용에서 발견).
+      // 블랙(B)은 '내용을 남긴 채 숨기기'라 즉시 복구가 목적이고,
+      // 공백은 '내용이 없는 슬라이드'라 서로 다른 일이다.
+      clearSlide();
       diag.lastRender = 'blank';
       renderDebug();
       return true;
@@ -528,11 +547,7 @@
     if (live.slide === null || live.slide === undefined) {
       // 서버가 '내용 없음'을 알린 것이므로 비우는 것이 맞다.
       // 연결 끊김과는 다른 상황이다.
-      clearChildren(el.blocks);
-      setOptional(el.heading, null);
-      setOptional(el.reference, null);
-      setOptional(el.credit, null);
-      el.slide.dataset.empty = 'true';
+      clearSlide();
       diag.lastRender = 'empty';
     } else {
       lastSlide = live.slide;
