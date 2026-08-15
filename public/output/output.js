@@ -310,9 +310,17 @@
       var chars = Array.from(words[w]);
 
       for (var i = 0; i < chars.length; i++) {
-        // 어절 안에서 **양끝을 크게, 가운데를 작게**. 한 글자짜리는 흔들지 않는다.
-        // (실측: 붙임표 없이 이어 세면 4자 이상에서 끝없이 작아져 뒤가 쪼그라든다)
-        var wave = chars.length < 2 ? 1 : Math.cos((i / (chars.length - 1)) * 2 * Math.PI);
+        /*
+         * 세 글자 주기의 파도: 큰 · 작은 · 작은 · 큰 · 작은 · 작은 …
+         *
+         * 어절 **길이로 나누지 않는다**. 길이로 나눠 양끝을 크게 두면
+         * **2자 어절은 두 글자가 모두 '양끝'이 되어 크기가 같아진다** —
+         * '예배 부름' '축도' '광고' 처럼 흔한 2자 순서 이름에서 리듬이 통째로
+         * 사라졌다(2026-08-15 실사용에서 발견). 고정 주기는 길이와 무관하게 흔들린다.
+         *
+         * 4자에서 '큰·작은·작은·큰' 이 되어 신앙고백 캡처와도 맞는다.
+         */
+        var wave = Math.cos((i * 2 * Math.PI) / 3);
         var span = document.createElement('span');
         span.className = 'rhythm-char';
         span.style.fontSize = (1 + amount * wave).toFixed(3) + 'em';
