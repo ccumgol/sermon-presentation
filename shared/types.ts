@@ -551,6 +551,13 @@ export interface LiveState {
 export interface DeckGroup {
   label: string;
   startIndex: number;
+  /**
+   * 이 항목에 지정된 템플릿. 덱을 진행하다 이 경계를 넘으면 서버가 바꿔 적용한다.
+   *
+   * 없으면 **바꾸지 않는다** — 직전 템플릿을 그대로 쓴다. 지정하지 않은 항목에서
+   * 기본값으로 되돌리면, 앞 항목에서 고른 템플릿이 예고 없이 풀려 더 놀랍다.
+   */
+  templateId?: number;
 }
 
 export interface Deck {

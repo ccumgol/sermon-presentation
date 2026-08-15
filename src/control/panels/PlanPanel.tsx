@@ -15,7 +15,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
-  buildPlanDeck, describeItem, itemsInGroup, moveItem, newItemId, removeItem, splitOrderText,
+  buildPlanDeck, buildPlanRows, describeItem, isExpandable, itemsInGroup, moveItem, newItemId,
+  removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import {
@@ -90,6 +91,24 @@ function itemIcon(item: CueItem): string {
   return ITEM_ICONS[item.type];
 }
 
+/** 슬라이드 줄에 보여 줄 한 줄 요약 — 목록이 조밀해야 진행이 보인다 */
+function slideSummary(slide: SlidePayload): string {
+  switch (slide.kind) {
+    case 'song':
+      return slide.lines.map((group) => group.map((line) => line.text).join(' / ')).join(' · ');
+    case 'text':
+      return slide.lines.join(' · ');
+    case 'order':
+      return slide.presenter ? `${slide.title} — ${slide.presenter}` : slide.title;
+    case 'bible':
+      return slide.blocks
+        .flatMap((block) => block.verses.map((verse) => verse.text))
+        .join(' ');
+    default:
+      return '(공백)';
+  }
+}
+
 function textVariantLabel(variant: 'notice' | 'quote' | 'order' | undefined): string {
   if (variant === 'quote') return '인용구';
   if (variant === 'order') return '순서 표시';
@@ -131,14 +150,23 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  /** 선택(커서) — 화면에 나가지 않는다 */
+  /**
+   * 선택(커서) — **줄** 번호다. 펼친 슬라이드도 한 줄로 센다.
+   *
+   * 항목 번호가 아니라 줄 번호인 이유는 3차 재설계에서 오른쪽 열을 없애고
+   * 슬라이드를 목록 안으로 넣었기 때문이다(docs/plan-service-tab-3.md).
+   */
   const [cursor, setCursor] = useState(0);
-  const [focus, setFocus] = useState<'list' | 'slides'>('list');
 
-  /** 선택한 항목을 미리 푼 결과 (우측에 보여 준다) */
+  /** 펼친 항목 — 한 번에 하나만. 여러 개가 열리면 목록이 길어져 진행이 안 보인다. */
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  /** 펼친 항목을 푼 결과 */
   const [preview, setPreview] = useState<{ slides: SlidePayload[]; labels: string[] } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [slideCursor, setSlideCursor] = useState(0);
+
+  /** 항목마다 지정할 수 있는 **표시 템플릿** 목록 (예배 유형 templates 와 다른 것) */
+  const [styleTemplates, setStyleTemplates] = useState<Template[]>([]);
 
   /** 인용구를 띄우기 직전 화면 — '직전으로' 가 여기로 되돌린다 */
   const [before, setBefore] = useState<{ slide: SlidePayload; label: string } | null>(null);
@@ -172,8 +200,13 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
   const wantFocus = useRef(false);
   const measurer = useMeasure();
 
-  const current = items[cursor];
   const maxChars = template?.behavior.maxCharsPerLine;
+
+  /** 화면에 그릴 줄 목록 — 펼친 항목의 슬라이드가 그 아래에 들어간다 */
+  const rows = buildPlanRows(items, expandedId, preview?.slides.length ?? 0);
+  const currentRow = rows[Math.min(cursor, rows.length - 1)];
+  /** 커서가 가리키는 항목 (슬라이드 줄이면 그 슬라이드의 항목) */
+  const current = currentRow ? items[currentRow.itemIndex] : undefined;
 
   // ── 순서표 읽기·저장 ────────────────────────────────────────
 
@@ -342,9 +375,10 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     [measurer, template, maxChars],
   );
 
-  // 커서가 바뀌면 그 항목을 풀어 우측에 보여 준다. **송출하지 않는다.**
+  // 펼친 항목을 풀어 슬라이드 줄로 보여 준다. **송출하지 않는다.**
+  const expandedItem = items.find((item) => item.id === expandedId);
   useEffect(() => {
-    if (!current || current.type === 'divider') {
+    if (!expandedItem) {
       setPreview(null);
       setPreviewError(null);
       return;
@@ -352,12 +386,11 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
     let cancelled = false;
     setPreviewError(null);
-    void resolveItem(current)
+    void resolveItem(expandedItem)
       .then((result) => {
         if (cancelled) return;
         setPreview({ slides: result.slides, labels: result.labels });
         setPreviewError(result.error ?? null);
-        setSlideCursor(0);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -369,7 +402,15 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     return () => {
       cancelled = true;
     };
-  }, [current?.id, resolveItem]);
+  }, [expandedItem?.id, resolveItem]);
+
+  // 템플릿 목록 — 항목마다 지정할 수 있게 이름을 보여 준다
+  useEffect(() => {
+    void api
+      .templates()
+      .then(setStyleTemplates)
+      .catch(() => setStyleTemplates([]));
+  }, []);
 
   // ── 송출 ────────────────────────────────────────────────────
 
@@ -393,6 +434,12 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
       // 인용구를 띄우기 전 화면을 기억한다
       if (item.type === 'text' && item.variant === 'quote' && liveSlide) {
         setBefore({ slide: liveSlide, label: liveLabel ?? '' });
+      }
+
+      // 항목에 지정된 템플릿이 있으면 **슬라이드보다 먼저** 올린다.
+      // 순서가 반대면 옛 템플릿으로 한 번 그려졌다가 바뀌어 화면이 튄다.
+      if ('templateId' in item && typeof item.templateId === 'number') {
+        send({ t: 'template:set', id: item.templateId });
       }
 
       const groupIndex = items.filter((i) => i.type !== 'divider').findIndex((i) => i.id === item.id);
@@ -651,55 +698,80 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     insertItem({ id: newItemId(), type: 'song', songId, songTitle, langs: ['ko'], lines: '2' });
   }
 
+  // ── 줄을 눌렀을 때 ──────────────────────────────────────────
+
+  /**
+   * **이 프로젝트의 핵심 규칙**: 화면에 나가는 것은 언제나 '슬라이드'다.
+   *
+   * - 슬라이드 줄 → 송출
+   * - 여러 장짜리 항목(성경·찬양)의 머리 줄 → **펼치기만**. 화면은 그대로
+   * - 한 장짜리 항목(광고·순서 표시·공백) → 그 줄이 곧 슬라이드이므로 송출
+   * - 구분 → 아무것도 나가지 않는다
+   *
+   * 1차 재설계의 "항목을 눌러도 안 나간다"를 "슬라이드를 눌러야 나간다"로 다듬은 것이다
+   * (docs/plan-service-tab-3.md). 한 장짜리는 항목과 슬라이드가 같은 것이라 헛걸음만 없앤다.
+   */
+  const activateRow = useCallback(
+    (row: PlanRow | undefined) => {
+      if (!row) return;
+      const item = items[row.itemIndex];
+      if (!item || item.type === 'divider') return;
+
+      if (row.kind === 'slide') {
+        void sendItem(item, row.slideIndex);
+        return;
+      }
+      if (isExpandable(item)) {
+        setExpandedId((prev) => (prev === item.id ? null : item.id));
+        return;
+      }
+      void sendItem(item, 0);
+    },
+    [items, sendItem],
+  );
+
   // ── 키보드 ──────────────────────────────────────────────────
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
 
+      // Tab 으로 펼치고 Shift+Tab 으로 접는다 (2026-08-15 사용자 결정).
+      // ←→ 는 건드리지 않는다 — 송출 중인 덱을 움직이는 손에 익은 조작이다.
       if (event.key === 'Tab') {
         event.preventDefault();
-        setFocus((prev) => (prev === 'list' ? 'slides' : 'list'));
-        return;
-      }
-
-      if (focus === 'list') {
-        if (event.key === 'ArrowDown' || event.key === 'j') {
-          event.preventDefault();
-          setCursor((prev) => Math.min(prev + 1, items.length - 1));
-        } else if (event.key === 'ArrowUp' || event.key === 'k') {
-          event.preventDefault();
-          setCursor((prev) => Math.max(prev - 1, 0));
-        } else if (event.key === 'Enter' && current) {
-          event.preventDefault();
-          void sendItem(current);
+        if (!currentRow) return;
+        if (event.shiftKey) {
+          setExpandedId(null);
+          return;
         }
-        // ←→ 는 가로채지 않는다 — 전역(슬라이드 이동)이 처리한다
+        const item = items[currentRow.itemIndex];
+        if (item && isExpandable(item)) setExpandedId(item.id);
         return;
       }
 
-      // 슬라이드 영역 포커스
-      const total = preview?.slides.length ?? 0;
-      if (event.key === 'ArrowRight') {
+      if (event.key === 'ArrowDown' || event.key === 'j') {
         event.preventDefault();
-        setSlideCursor((prev) => Math.min(prev + 1, Math.max(0, total - 1)));
-      } else if (event.key === 'ArrowLeft') {
+        setCursor((prev) => Math.min(prev + 1, rows.length - 1));
+      } else if (event.key === 'ArrowUp' || event.key === 'k') {
         event.preventDefault();
-        setSlideCursor((prev) => Math.max(prev - 1, 0));
-      } else if (event.key === 'Enter' && current) {
+        setCursor((prev) => Math.max(prev - 1, 0));
+      } else if (event.key === 'Enter') {
         event.preventDefault();
-        void sendItem(current, slideCursor);
+        activateRow(currentRow);
       }
+      // ←→ 는 가로채지 않는다 — 전역(송출 덱 이동)이 처리한다
     };
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focus, items.length, current, preview, slideCursor, sendItem]);
+  }, [rows.length, currentRow, items, activateRow]);
 
   // 커서가 화면 밖으로 나가지 않게
   useEffect(() => {
-    listRef.current?.querySelector('.cue-row.current')?.scrollIntoView({ block: 'nearest' });
+    listRef.current?.querySelector('.cue-row.current, .cue-divider.current')?.scrollIntoView({ block: 'nearest' });
   }, [cursor]);
 
   // ── 렌더 ────────────────────────────────────────────────────
@@ -721,6 +793,20 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     const withoutDividers = items.filter((item) => item.type !== 'divider');
     const target = withoutDividers[found];
     return target ? items.findIndex((item) => item.id === target.id) : -1;
+  })();
+
+  /**
+   * 송출 중인 슬라이드가 그 항목의 몇 번째인지 — 펼친 목록에서 빨간 점을 찍을 자리.
+   * 순서표 전체를 올린 경우에는 항목 시작 위치를 빼서 구한다.
+   */
+  const liveSlideIndexInItem = (() => {
+    if (!deck) return -1;
+    if (liveItemId) return currentIndex; // 항목 하나만 올린 경우 덱이 곧 그 항목이다
+    if (!deck.groups || liveItemIndex < 0) return -1;
+    const withoutDividers = items.filter((item) => item.type !== 'divider');
+    const groupIndex = withoutDividers.findIndex((item) => item.id === items[liveItemIndex]?.id);
+    const start = deck.groups[groupIndex]?.startIndex;
+    return start === undefined ? -1 : currentIndex - start;
   })();
 
   const kindHint = ADD_KINDS.find((option) => option.kind === addKind)?.hint ?? '';
@@ -753,12 +839,9 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
         </div>
       )}
 
-      <div className="plan-split">
-        {/* ── 좌: 순서 목록 ── */}
-        <div
-          className={`card plan-list${focus === 'list' ? ' focused' : ''}`}
-          onMouseDown={() => setFocus('list')}
-        >
+      {/* 한 열 목록 — 3차 재설계에서 오른쪽 열을 없애고 슬라이드를 이 안으로 넣었다 */}
+      <div className="plan-single">
+        <div className="card plan-list">
           <div className="plan-head">
             <select
               className="grow"
@@ -898,14 +981,19 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
             <div className="cue-list" ref={listRef}>
               {items.length === 0 && <p className="hintline muted">아래에서 항목을 추가하세요.</p>}
 
-              {items.map((item, index) => {
-                if (item.type === 'divider') {
+              {rows.map((row, rowIndex) => {
+                const item = items[row.itemIndex];
+                if (!item) return null;
+                const isCursor = rowIndex === cursor;
+
+                // ── 구분(그룹 머리글) ──
+                if (row.kind === 'divider' && item.type === 'divider') {
                   const running = auto?.dividerId === item.id;
                   return (
                     <div
                       key={item.id}
-                      className={`cue-divider${index === cursor ? ' current' : ''}${running ? ' auto' : ''}`}
-                      onClick={() => setCursor(index)}
+                      className={`cue-divider${isCursor ? ' current' : ''}${running ? ' auto' : ''}`}
+                      onClick={() => setCursor(rowIndex)}
                     >
                       <span className="label">
                         {item.label}
@@ -933,19 +1021,63 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                   );
                 }
 
-                const isLive = index === liveItemIndex;
+                // ── 펼친 항목의 슬라이드 줄 ──
+                if (row.kind === 'slide') {
+                  const slide = preview?.slides[row.slideIndex];
+                  const isLiveSlide =
+                    row.itemIndex === liveItemIndex && liveSlideIndexInItem === row.slideIndex;
+                  return (
+                    <div
+                      key={`${item.id}-s${row.slideIndex}`}
+                      className={`cue-slide-row${isCursor ? ' current' : ''}${isLiveSlide ? ' live' : ''}`}
+                      onClick={() => { setCursor(rowIndex); void sendItem(item, row.slideIndex); }}
+                      title="눌러서 송출"
+                    >
+                      <span className="live-dot" title={isLiveSlide ? '송출 중' : undefined} />
+                      <span className="num">{preview?.labels[row.slideIndex] || row.slideIndex + 1}</span>
+                      <span className="text">{slide ? slideSummary(slide) : ''}</span>
+                    </div>
+                  );
+                }
+
+                // ── 항목 줄 ──
+                const isLive = row.itemIndex === liveItemIndex;
+                const expandable = isExpandable(item);
+                const expanded = expandedId === item.id;
                 return (
                   <div
                     key={item.id}
-                    className={`cue-row${index === cursor ? ' current' : ''}${isLive ? ' live' : ''}`}
-                    onClick={() => setCursor(index)}
+                    className={`cue-row${isCursor ? ' current' : ''}${isLive ? ' live' : ''}${expanded ? ' expanded' : ''}`}
+                    onClick={() => { setCursor(rowIndex); activateRow(row); }}
+                    title={expandable ? '눌러서 펼치기 (Tab)' : '눌러서 송출'}
                   >
                     <span className="live-dot" title={isLive ? '송출 중' : undefined} />
+                    <span className="twisty">{expandable ? (expanded ? '▾' : '▸') : ''}</span>
                     <span className="icon">{itemIcon(item)}</span>
                     <span className="body">
                       <span className="title">{describeItem(item)}</span>
                       <span className="meta">{itemMeta(item)}</span>
                     </span>
+
+                    {/* 이 항목이 어느 템플릿으로 나가는지 — 여기서 바로 바꾼다 */}
+                    <select
+                      className="row-template"
+                      value={'templateId' in item && item.templateId !== undefined ? item.templateId : ''}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? undefined : Number(e.target.value);
+                        patchItems(
+                          items.map((i) => (i.id === item.id ? { ...i, templateId: value } : i)),
+                        );
+                      }}
+                      title="이 항목을 송출할 때 쓸 템플릿"
+                    >
+                      <option value="">템플릿 그대로</option>
+                      {styleTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+
                     <span className="actions">
                       <button
                         type="button"
@@ -956,13 +1088,15 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                       >
                         ▶
                       </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, index, index - 1)); }} disabled={index === 0} title="위로">↑</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, index, index + 1)); }} disabled={index === items.length - 1} title="아래로">↓</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex - 1)); }} disabled={row.itemIndex === 0} title="위로">↑</button>
+                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex + 1)); }} disabled={row.itemIndex === items.length - 1} title="아래로">↓</button>
                       <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(removeItem(items, item.id)); }} title="삭제">✕</button>
                     </span>
                   </div>
                 );
               })}
+
+              {previewError && <p className="hintline error">{previewError}</p>}
             </div>
           )}
 
@@ -1047,18 +1181,30 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
             </div>
           )}
         </div>
+      </div>
 
-        {/* ── 우: 선택한 항목의 슬라이드 ── */}
-        <div
-          className={`card plan-detail${focus === 'slides' ? ' focused' : ''}`}
-          onMouseDown={() => setFocus('slides')}
-        >
-          {!current && <p className="hintline muted">왼쪽에서 항목을 고르세요.</p>}
+      {/*
+        선택한 항목의 설정. 오른쪽 열을 없앴으므로 목록 **아래**에 한 덩어리로 둔다.
+        목록 안에 끼워 넣으면 줄을 옮길 때마다 목록이 출렁여 진행이 보이지 않는다.
+      */}
+      {plan && current && (
+        <div className="card plan-settings">
+          <h2 className="plan-detail-title">
+            <span className="icon">{itemIcon(current)}</span>
+            {describeItem(current)}
+            {liveItemIndex === (currentRow?.itemIndex ?? -1) && <span className="live-tag">송출 중</span>}
+          </h2>
 
-          {current && current.type === 'divider' && (
+          {before && (
+            <div className="row" style={{ marginBottom: 8 }}>
+              <button type="button" onClick={restoreBefore} disabled={!connected}>
+                ↩ 직전으로 ({before.label || '이전 화면'})
+              </button>
+            </div>
+          )}
+
+          {current.type === 'divider' && (
             <>
-              <p className="hintline muted">구분선입니다 — 화면에 나가지 않습니다.</p>
-
               <div className="row detail-controls">
                 <label className="check">
                   <input
@@ -1081,189 +1227,123 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
               </div>
 
               {current.auto && (
-                <>
-                  <div className="row detail-controls">
-                    <label>한 장에 머무는 시간</label>
+                <div className="row detail-controls">
+                  <label>한 장에 머무는 시간</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={600}
+                    value={Math.round((current.auto.holdMs ?? AUTO_HOLD_MS_DEFAULT) / 1000)}
+                    onChange={(e) => {
+                      const seconds = Math.min(Math.max(Number(e.target.value) || 1, 1), 600);
+                      patchItems(
+                        items.map((i) =>
+                          i.id === current.id && i.type === 'divider' && i.auto
+                            ? { ...i, auto: { ...i.auto, holdMs: seconds * 1000 } }
+                            : i,
+                        ),
+                      );
+                    }}
+                    style={{ width: 72 }}
+                  />
+                  <span className="muted">초</span>
+                  <label className="check">
                     <input
-                      type="number"
-                      min={1}
-                      max={600}
-                      step={1}
-                      value={Math.round((current.auto.holdMs ?? AUTO_HOLD_MS_DEFAULT) / 1000)}
-                      onChange={(e) => {
-                        const seconds = Math.min(Math.max(Number(e.target.value) || 1, 1), 600);
+                      type="checkbox"
+                      checked={current.auto.loop !== false}
+                      onChange={(e) =>
                         patchItems(
                           items.map((i) =>
                             i.id === current.id && i.type === 'divider' && i.auto
-                              ? { ...i, auto: { ...i.auto, holdMs: seconds * 1000 } }
+                              ? { ...i, auto: { ...i.auto, loop: e.target.checked } }
                               : i,
                           ),
-                        );
-                      }}
-                      style={{ width: 72 }}
+                        )
+                      }
                     />
-                    <span className="muted">초</span>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={current.auto.loop !== false}
-                        onChange={(e) =>
-                          patchItems(
-                            items.map((i) =>
-                              i.id === current.id && i.type === 'divider' && i.auto
-                                ? { ...i, auto: { ...i.auto, loop: e.target.checked } }
-                                : i,
-                            ),
-                          )
-                        }
-                      />
-                      마지막에서 처음으로
-                    </label>
-                  </div>
-
-                  <p className="hintline muted">
-                    이 구분 아래 항목 {itemsInGroup(items, current.id).length}개를 자동으로 넘깁니다.
-                    목록에서 <b>▶</b> 로 시작하고, 다른 항목을 송출하거나 순서표를 올리면 멈춥니다.
-                  </p>
-                </>
+                    마지막에서 처음으로
+                  </label>
+                  <span className="muted">아래 항목 {itemsInGroup(items, current.id).length}개</span>
+                </div>
               )}
             </>
           )}
 
-          {current && current.type !== 'divider' && (
+          {current.type === 'song' && (
+            <div className="row detail-controls">
+              <label>화면 넘김</label>
+              <select
+                value={current.lines ?? '2'}
+                onChange={(e) =>
+                  patchItems(items.map((i) => (i.id === current.id ? { ...i, lines: e.target.value } : i)))
+                }
+              >
+                <option value="1">1줄씩</option>
+                <option value="2">2줄씩</option>
+                <option value="4">4줄씩</option>
+                <option value="section">섹션 전체</option>
+              </select>
+            </div>
+          )}
+
+          {current.type === 'bible' && (
+            <div className="row detail-controls">
+              <label>화면 넘김</label>
+              <select
+                value={current.paging ?? 'verse'}
+                onChange={(e) =>
+                  patchItems(items.map((i) => (i.id === current.id ? { ...i, paging: e.target.value } : i)))
+                }
+              >
+                <option value="verse">1절씩</option>
+                <option value="auto">자동 (화면에 맞춰)</option>
+                <option value="pair">2절씩</option>
+                <option value="all">구간 전체</option>
+              </select>
+            </div>
+          )}
+
+          {current.type === 'text' && current.variant === 'order' && (
+            <div className="row detail-controls">
+              <label>배치</label>
+              <select
+                value={current.layout ?? 'split'}
+                onChange={(e) =>
+                  patchItems(
+                    items.map((i) =>
+                      i.id === current.id ? { ...i, layout: e.target.value === 'stack' ? 'stack' : undefined } : i,
+                    ),
+                  )
+                }
+              >
+                <option value="split">좌우 (순서 이름 · 담당자 + 밑줄)</option>
+                <option value="stack">쌓기 (줄을 그대로)</option>
+              </select>
+            </div>
+          )}
+
+          {current.type === 'text' && (
             <>
-              <h2 className="plan-detail-title">
-                <span className="icon">{itemIcon(current)}</span>
-                {describeItem(current)}
-                {liveItemIndex === cursor && <span className="live-tag">송출 중</span>}
-              </h2>
-
-              {previewError && <p className="hintline error">{previewError}</p>}
-
-              {before && (
-                <div className="row" style={{ marginBottom: 8 }}>
-                  <button type="button" onClick={restoreBefore} disabled={!connected}>
-                    ↩ 직전으로 ({before.label || '이전 화면'})
-                  </button>
-                </div>
+              {current.variant === 'order' && (
+                <p className="hintline muted">첫 줄 = 순서 이름, 다음 줄 = 담당자</p>
               )}
-
-              <div className="cue-slides">
-                {preview?.slides.map((slide, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    className={`cue-slide${index === slideCursor ? ' current' : ''}`}
-                    onClick={() => { setSlideCursor(index); void sendItem(current, index); }}
-                    title="눌러서 송출"
-                  >
-                    <span className="num">{preview.labels[index] || index + 1}</span>
-                    <span className="text">
-                      {slide.kind === 'song'
-                        ? slide.lines.map((group, gi) => (
-                            <span key={gi} className="line">{group.map((line) => line.text).join(' / ')}</span>
-                          ))
-                        : slide.kind === 'text'
-                          ? slide.lines.map((line, li) => <span key={li} className="line">{line}</span>)
-                          : slide.kind === 'bible'
-                            ? slide.blocks.map((block, bi) => (
-                                <span key={bi} className="line">
-                                  {block.verses.map((verse) => verse.text).join(' ')}
-                                </span>
-                              ))
-                            : slide.kind === 'order'
-                              ? (
-                                  <span className="line">
-                                    {slide.title}
-                                    {slide.presenter ? ` — ${slide.presenter}` : ''}
-                                  </span>
-                                )
-                              : <span className="line muted">(공백)</span>}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* 항목별 설정 — 여기서 바로 고친다 */}
-              {current.type === 'song' && (
-                <div className="row detail-controls">
-                  <label>화면 넘김</label>
-                  <select
-                    value={current.lines ?? '2'}
-                    onChange={(e) =>
-                      patchItems(items.map((i) => (i.id === current.id ? { ...i, lines: e.target.value } : i)))
-                    }
-                  >
-                    <option value="1">1줄씩</option>
-                    <option value="2">2줄씩</option>
-                    <option value="4">4줄씩</option>
-                    <option value="section">섹션 전체</option>
-                  </select>
-                </div>
-              )}
-
-              {current.type === 'bible' && (
-                <div className="row detail-controls">
-                  <label>화면 넘김</label>
-                  <select
-                    value={current.paging ?? 'verse'}
-                    onChange={(e) =>
-                      patchItems(items.map((i) => (i.id === current.id ? { ...i, paging: e.target.value } : i)))
-                    }
-                  >
-                    <option value="verse">1절씩</option>
-                    <option value="auto">자동 (화면에 맞춰)</option>
-                    <option value="pair">2절씩</option>
-                    <option value="all">구간 전체</option>
-                  </select>
-                </div>
-              )}
-
-              {current.type === 'text' && current.variant === 'order' && (
-                <div className="row detail-controls">
-                  <label>배치</label>
-                  <select
-                    value={current.layout ?? 'split'}
-                    onChange={(e) =>
-                      patchItems(
-                        items.map((i) =>
-                          i.id === current.id
-                            ? { ...i, layout: e.target.value === 'stack' ? 'stack' : undefined }
-                            : i,
-                        ),
-                      )
-                    }
-                  >
-                    <option value="split">좌우 (순서 이름 · 담당자 + 밑줄)</option>
-                    <option value="stack">쌓기 (줄을 그대로)</option>
-                  </select>
-                </div>
-              )}
-
-              {current.type === 'text' && (
-                <>
-                  {current.variant === 'order' && (
-                    <p className="hintline muted">첫 줄 = 순서 이름, 다음 줄 = 담당자</p>
-                  )}
-                  <textarea
-                    className="detail-text"
-                    rows={4}
-                    value={current.content}
-                    onChange={(e) =>
-                      patchItems(items.map((i) => (i.id === current.id ? { ...i, content: e.target.value } : i)))
-                    }
-                    spellCheck={false}
-                  />
-                </>
-              )}
+              <textarea
+                className="detail-text"
+                rows={3}
+                value={current.content}
+                onChange={(e) =>
+                  patchItems(items.map((i) => (i.id === current.id ? { ...i, content: e.target.value } : i)))
+                }
+                spellCheck={false}
+              />
             </>
           )}
         </div>
-      </div>
+      )}
 
       <p className="hintline muted plan-keys">
-        <b>Tab</b> 영역 이동 · <b>↑↓</b> 항목 · <b>←→</b> 슬라이드 · <b>Enter</b> 송출 ·
-        <b> Space</b> 다음 · <b>B</b> 블랙 · <b>Esc</b> 복구
+        <b>↑↓</b> 줄 이동 · <b>Tab</b> 펼치기 · <b>Shift+Tab</b> 접기 · <b>Enter</b> 송출 ·
+        <b> ←→</b> 송출 중 이동 · <b>Space</b> 다음 · <b>B</b> 블랙 · <b>Esc</b> 복구
       </p>
     </div>
   );

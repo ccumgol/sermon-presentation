@@ -10,7 +10,7 @@
  */
 
 import { DEFAULT_TEMPLATE_ID } from '../lib/template-presets.ts';
-import type { Deck, LiveState, SlidePayload } from '../shared/types.ts';
+import type { Deck, DeckGroup, LiveState, SlidePayload } from '../shared/types.ts';
 import { getJsonSetting, setJsonSetting } from './db/app.ts';
 
 const STATE_KEY = 'live_state';
@@ -114,16 +114,36 @@ export function show(payload: SlidePayload): void {
 export function loadDeck(deck: Deck): void {
   const index = clampIndex(deck.index, deck.slides.length);
   const slide = deck.slides[index] ?? null;
+  const templateId = groupTemplateAt(deck, index);
 
   commit({
     state: {
       slide,
       blank: false,
       cursor: { planItemIndex: 0, slideIndex: index },
+      ...(templateId !== undefined ? { templateId } : {}),
     },
     deck: { ...deck, index },
     ...(slide ? { lastSlide: slide } : {}),
   });
+}
+
+/**
+ * 그 위치가 속한 항목의 템플릿. 지정이 없으면 undefined(= 바꾸지 않는다).
+ *
+ * 순서표를 통째로 올린 뒤 화살표로 진행할 때, 항목마다 다른 템플릿이 따라오게 하는
+ * 유일한 지점이다. 컨트롤 패널이 항목을 단독 송출할 때는 자기가 직접 바꾼다.
+ */
+export function groupTemplateAt(deck: Deck | null, index: number): number | undefined {
+  const groups = deck?.groups;
+  if (!groups || groups.length === 0) return undefined;
+
+  let found: DeckGroup | undefined;
+  for (const group of groups) {
+    if (group.startIndex <= index) found = group;
+    else break;
+  }
+  return found?.templateId;
 }
 
 function clampIndex(index: number, length: number): number {
@@ -141,11 +161,14 @@ export function goto(index: number): boolean {
   if (next === deck.index && current.state.slide !== null && !current.state.blank) return false;
 
   const slide = deck.slides[next]!;
+  const templateId = groupTemplateAt(deck, next);
   commit({
     state: {
       slide,
       blank: false,
       cursor: { planItemIndex: 0, slideIndex: next },
+      // 항목에 템플릿이 지정돼 있으면 경계를 넘을 때 함께 바뀐다
+      ...(templateId !== undefined ? { templateId } : {}),
     },
     deck: { ...deck, index: next },
     lastSlide: slide,

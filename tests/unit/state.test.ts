@@ -221,3 +221,42 @@ describe('불변성', () => {
     expect(before.blank).toBe(false);
   });
 });
+
+describe('항목별 템플릿 (덱 경계에서 따라오기)', () => {
+  /** 항목 셋: 0~1번 슬라이드 = 템플릿 7, 2~3번 = 지정 없음, 4번 = 템플릿 9 */
+  function grouped(): Deck {
+    return {
+      ...deck(5),
+      groups: [
+        { label: '찬양', startIndex: 0, templateId: 7 },
+        { label: '본문', startIndex: 2 },
+        { label: '광고', startIndex: 4, templateId: 9 },
+      ],
+    };
+  }
+
+  it('올릴 때 첫 항목의 템플릿이 적용된다', () => {
+    state.loadDeck(grouped());
+    expect(state.getState().templateId).toBe(7);
+  });
+
+  it('경계를 넘으면 그 항목의 템플릿으로 바뀐다', () => {
+    state.loadDeck(grouped());
+    state.goto(4);
+    expect(state.getState().templateId).toBe(9);
+  });
+
+  it('지정이 없는 항목에서는 바꾸지 않는다 — 앞 항목 것을 그대로 쓴다', () => {
+    // 지정 없는 항목에서 기본값으로 되돌리면, 앞에서 고른 템플릿이 예고 없이 풀린다
+    state.loadDeck(grouped());
+    state.goto(3);
+    expect(state.getState().templateId).toBe(7);
+  });
+
+  it('groups 가 없는 덱(단일 본문 조회)은 템플릿을 건드리지 않는다', () => {
+    const before = state.getState().templateId;
+    state.loadDeck(deck(3));
+    state.goto(2);
+    expect(state.getState().templateId).toBe(before);
+  });
+});

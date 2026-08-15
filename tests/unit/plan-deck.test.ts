@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildPlanDeck, describeItem, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
+import {
+  buildPlanDeck, buildPlanRows, describeItem, isExpandable, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
 import type { CueItem, SlidePayload } from '../../shared/types.ts';
 
 function bible(id: string, ref: string): CueItem {
@@ -242,5 +243,44 @@ describe('splitOrderText — 순서 이름과 담당자', () => {
 
   it('앞뒤 공백을 떼어 낸다', () => {
     expect(splitOrderText('  봉헌  \n   김집사  ')).toEqual({ title: '봉헌', presenter: '김집사' });
+  });
+});
+
+describe('buildPlanRows — 한 열 목록', () => {
+  const divider = (label: string): CueItem => ({ id: `d-${label}`, type: 'divider', label });
+  const notice = (content: string): CueItem => ({ id: `t-${content}`, type: 'text', content });
+  const bible = (ref: string): CueItem =>
+    ({ id: `b-${ref}`, type: 'bible', ref, primary: 'nkrv', secondary: [] });
+
+  it('펼치지 않으면 항목마다 한 줄', () => {
+    const rows = buildPlanRows([divider('찬양'), notice('광고'), bible('요 3:16')], null, 0);
+    expect(rows.map((r) => r.kind)).toEqual(['divider', 'item', 'item']);
+  });
+
+  it('광고·순서 표시·공백은 펼칠 수 없다 (언제나 한 장)', () => {
+    expect(isExpandable(notice('광고'))).toBe(false);
+    expect(isExpandable({ id: 'x', type: 'blank' })).toBe(false);
+    expect(isExpandable(bible('요 3:16'))).toBe(true);
+    expect(isExpandable({ id: 's', type: 'song', songId: 1, songTitle: '찬송', langs: ['ko'] })).toBe(true);
+  });
+
+  it('펼친 항목의 슬라이드가 그 항목 바로 아래 들어간다', () => {
+    const rows = buildPlanRows([notice('광고'), bible('요 3:16'), notice('뒤')], 'b-요 3:16', 3);
+    expect(rows.map((r) => r.kind)).toEqual(['item', 'item', 'slide', 'slide', 'slide', 'item']);
+    // 슬라이드는 자기 항목을 가리켜야 송출할 때 무엇을 올릴지 알 수 있다
+    expect(rows.slice(2, 5).every((r) => r.itemId === 'b-요 3:16')).toBe(true);
+    expect(rows[3]).toMatchObject({ kind: 'slide', slideIndex: 1, itemIndex: 1 });
+  });
+
+  it('펼칠 수 없는 항목은 펼침 지정을 받아도 펼쳐지지 않는다', () => {
+    const rows = buildPlanRows([notice('광고')], 't-광고', 5);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'item', expanded: false, expandable: false });
+  });
+
+  it('장수를 아직 모르면(0) 머리 줄만 남는다 — 불러오는 중에도 목록이 깨지지 않는다', () => {
+    const rows = buildPlanRows([bible('요 3:16')], 'b-요 3:16', 0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'item', expanded: true });
   });
 });

@@ -86,8 +86,14 @@ export async function buildPlanDeck(
       continue;
     }
 
-    // 경계는 슬라이드를 담기 **전에** 기록해야 시작 위치가 맞는다
-    groups.push({ label: describeItem(item), startIndex: slides.length });
+    // 경계는 슬라이드를 담기 **전에** 기록해야 시작 위치가 맞는다.
+    // 항목에 지정된 템플릿을 함께 실어, 진행 중 경계를 넘을 때 서버가 바꿔 준다.
+    const templateId = 'templateId' in item ? item.templateId : undefined;
+    groups.push({
+      label: describeItem(item),
+      startIndex: slides.length,
+      ...(typeof templateId === 'number' ? { templateId } : {}),
+    });
 
     for (const [index, slide] of resolved.slides.entries()) {
       slides.push(slide);
@@ -136,6 +142,59 @@ export function itemsInGroup(items: readonly CueItem[], dividerId: string): CueI
     group.push(item);
   }
   return group;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 한 열 목록 (예배 순서 화면)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 펼칠 수 있는 항목인가 — **여러 장이 나올 수 있는** 항목이다.
+ *
+ * 성경·찬양은 장수가 내용에 따라 달라지므로 펼쳐서 골라야 한다.
+ * 광고·순서 표시·공백은 언제나 한 장이라, 그 줄이 곧 슬라이드다
+ * (그래서 한 번 클릭으로 바로 송출한다).
+ */
+export function isExpandable(item: CueItem): boolean {
+  return item.type === 'bible' || item.type === 'song';
+}
+
+/** 목록의 한 줄 */
+export type PlanRow =
+  | { kind: 'divider'; itemIndex: number; itemId: string }
+  | { kind: 'item'; itemIndex: number; itemId: string; expandable: boolean; expanded: boolean }
+  | { kind: 'slide'; itemIndex: number; itemId: string; slideIndex: number };
+
+/**
+ * 항목 배열을 화면에 그릴 줄 목록으로 편다.
+ *
+ * 펼친 항목의 슬라이드가 그 항목 **바로 아래** 줄로 들어간다. 오른쪽 열을 없애고
+ * 한 열로 합친 것이 이 구조다(3차 재설계). 커서는 이 줄 단위로 움직인다.
+ */
+export function buildPlanRows(
+  items: readonly CueItem[],
+  expandedId: string | null,
+  expandedSlideCount: number,
+): PlanRow[] {
+  const rows: PlanRow[] = [];
+
+  for (const [itemIndex, item] of items.entries()) {
+    if (item.type === 'divider') {
+      rows.push({ kind: 'divider', itemIndex, itemId: item.id });
+      continue;
+    }
+
+    const expandable = isExpandable(item);
+    const expanded = expandable && item.id === expandedId;
+    rows.push({ kind: 'item', itemIndex, itemId: item.id, expandable, expanded });
+
+    if (!expanded) continue;
+    for (let slideIndex = 0; slideIndex < expandedSlideCount; slideIndex += 1) {
+      rows.push({ kind: 'slide', itemIndex, itemId: item.id, slideIndex });
+    }
+  }
+
+  return rows;
 }
 
 /** 항목 배열에서 한 항목을 옮긴다 (불변 — 새 배열을 만든다) */

@@ -90,7 +90,20 @@ export function createWsHub(server: Server, log: Logger): WsHub {
 
   // 상태가 바뀌면 모두에게 스냅샷을, 컨트롤에는 묶음까지 보낸다.
   // 부분 패치보다 전체 스냅샷이 단순하고, localhost 에서는 비용도 무시할 만하다.
+  /**
+   * 마지막으로 내보낸 템플릿 id.
+   *
+   * 항목마다 다른 템플릿을 쓰면, 덱을 진행하다 경계를 넘을 때 **상태의 templateId 가
+   * 스스로 바뀐다**(state.goto). 그때 스타일을 함께 보내지 않으면 슬라이드만 바뀌고
+   * 글자 크기·위치는 앞 템플릿 그대로 남는다.
+   */
+  let lastTemplateId = state.getState().templateId;
+
   const unsubscribe = state.subscribe((live: LiveState, deck: Deck | null) => {
+    if (live.templateId !== lastTemplateId) {
+      lastTemplateId = live.templateId;
+      broadcastTemplate(getTemplateOrDefault(live.templateId));
+    }
     broadcast({ t: 'state', payload: live });
     broadcast({ t: 'deck', payload: deck }, ['control']);
   });

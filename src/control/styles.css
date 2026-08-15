@@ -1224,28 +1224,37 @@ button.link-inline {
   overflow: hidden;
 }
 
-.plan-split {
-  display: grid;
-  grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.15fr);
-  gap: 12px;
+/*
+ * 한 열 구조 (3차 재설계).
+ *
+ * 오른쪽 '항목 내용' 열을 없앴다. 성경·찬양은 목록 안에서 펼쳐 슬라이드를 고르고,
+ * 광고·순서 표시처럼 한 장짜리는 그 줄이 곧 슬라이드다.
+ * 두 열일 때는 한 장짜리 항목도 두 번 눌러야 나가 헛걸음이 생겼다.
+ */
+.plan-single {
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
 }
 
-.plan-list,
-.plan-detail {
+.plan-list {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  width: 100%;
   padding: 12px;
-  /* 포커스 표시를 위한 자리 — 항상 같은 두께라 눌러도 레이아웃이 안 흔들린다 */
-  border: 1px solid transparent;
 }
 
-/* 지금 키보드가 움직이는 영역 */
-.plan-list.focused,
-.plan-detail.focused {
-  border-color: var(--accent, #4a9eff);
+/* 선택한 항목의 설정 — 목록 아래에 접히지 않고 붙는다 */
+.plan-settings {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+.plan-settings .plan-detail-title {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
 }
 
 .plan-head {
@@ -1357,6 +1366,70 @@ button.link-inline {
 }
 
 .cue-row .actions .go { color: var(--live, #ef4444); }
+
+/* 펼침 표시(▸▾) — 자리를 늘 차지해 줄이 흔들리지 않게 한다 */
+.cue-row .twisty {
+  flex: 0 0 0.8rem;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+/* 항목마다 지정하는 표시 템플릿 */
+.cue-row .row-template {
+  flex: 0 0 auto;
+  max-width: 140px;
+  min-height: 26px;
+  padding: 1px 4px;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+.cue-row:hover .row-template,
+.cue-row.current .row-template { opacity: 1; }
+
+/*
+ * 펼친 항목의 슬라이드 줄.
+ *
+ * 항목 줄보다 들여쓰고 낮은 대비로 둔다 — 목록을 훑을 때 항목 경계가 먼저 보여야
+ * '지금 어디까지 왔는지'가 읽힌다.
+ */
+.cue-slide-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 30px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.cue-slide-row:hover { background: rgba(255, 255, 255, 0.05); }
+.cue-slide-row.current {
+  outline: 1px solid var(--accent, #4a9eff);
+  color: var(--fg);
+}
+.cue-slide-row.live { background: rgba(239, 68, 68, 0.12); color: var(--fg); }
+
+.cue-slide-row .num {
+  flex: 0 0 2.2rem;
+  text-align: right;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.cue-slide-row .text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cue-slide-row .live-dot {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+.cue-slide-row.live .live-dot { background: var(--live, #ef4444); }
 
 /*
  * 예배 전 안내가 자동으로 돌고 있음을 알리는 띠.
