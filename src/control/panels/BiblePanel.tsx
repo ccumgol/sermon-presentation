@@ -7,9 +7,9 @@ import { SlideList } from '../components/SlideList.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
 
 const PAGING_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'verse', label: '1절씩' },
   // '자동'은 실제 출력 페이지를 1920×1080 으로 재서 넘치기 직전까지 담는다
   { value: 'auto', label: '자동 (화면에 맞춰)' },
-  { value: 'verse', label: '1절씩' },
   { value: 'pair', label: '2절씩' },
   { value: 'all', label: '구간 전체' },
 ];
@@ -62,7 +62,9 @@ export function BiblePanel({
   const [parsePending, setParsePending] = useState(false);
   const [primary, setPrimary] = useState(defaultTranslation);
   const [secondary, setSecondary] = useState<string[]>([]);
-  const [paging, setPaging] = useState('auto');
+  // 기본은 '1절씩'. 자동은 화면을 채우려고 여러 절을 묶는데, 설교 본문은 한 절씩
+  // 짚어 가며 읽는 경우가 많아 절 단위가 예측 가능하다.
+  const [paging, setPaging] = useState('verse');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
