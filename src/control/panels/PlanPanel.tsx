@@ -29,16 +29,36 @@ interface Props {
 }
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
-type AddKind = 'bible' | 'song' | 'notice' | 'quote' | 'blank' | 'divider';
+type AddKind = 'bible' | 'song' | 'order' | 'notice' | 'quote' | 'blank' | 'divider';
 
 const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hint: string }> = [
   { kind: 'bible', icon: '📖', label: '성경', hint: '요 3:16 · 시 23 · 롬 8:28-30' },
   { kind: 'song', icon: '🎵', label: '찬양', hint: '새 305 · 나 같은 죄인 · 은혜' },
+  { kind: 'order', icon: '📋', label: '순서 표시', hint: '대표기도 · 설교 제목(둘째 줄에 설교자)' },
   { kind: 'notice', icon: '📝', label: '광고', hint: '여러 줄로 쓰면 그대로 나갑니다' },
   { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 잠깐 띄울 내용' },
   { kind: 'blank', icon: '⬛', label: '공백', hint: '화면을 비웁니다' },
   { kind: 'divider', icon: '▾', label: '구분', hint: '예배 부름 · 찬양 · 말씀 …' },
 ];
+
+/**
+ * 순서 표시의 빠른 선택 — 매주 같은 이름을 다시 타이핑하지 않게 한다.
+ *
+ * 예배 순서 이름은 교회마다 다르므로 **고정 목록이 아니라 시작점**이다.
+ * 여기 없는 순서는 입력창에 직접 쓴다.
+ */
+const ORDER_PRESETS = [
+  '예배 부름',
+  '대표기도',
+  '주기도문',
+  '사도신경',
+  '성경 봉독',
+  '봉헌',
+  '성찬',
+  '설교 제목',
+  '광고',
+  '축도',
+] as const;
 
 const ITEM_ICONS: Record<CueItem['type'], string> = {
   bible: '📖',
@@ -56,8 +76,18 @@ function today(): string {
 }
 
 function itemIcon(item: CueItem): string {
-  if (item.type === 'text') return item.variant === 'quote' ? '💬' : '📝';
+  if (item.type === 'text') {
+    if (item.variant === 'quote') return '💬';
+    if (item.variant === 'order') return '📋';
+    return '📝';
+  }
   return ITEM_ICONS[item.type];
+}
+
+function textVariantLabel(variant: 'notice' | 'quote' | 'order' | undefined): string {
+  if (variant === 'quote') return '인용구';
+  if (variant === 'order') return '순서 표시';
+  return '광고';
 }
 
 /** 항목의 부가 설명 — 한 줄에 들어가야 하므로 짧게 */
@@ -67,8 +97,12 @@ function itemMeta(item: CueItem): string {
       return item.secondary.length > 0 ? `${item.primary} +${item.secondary.length}` : item.primary;
     case 'song':
       return `${item.langs.join('/')} · ${item.lines ?? 2}줄씩`;
-    case 'text':
-      return item.variant === 'quote' ? '인용구' : '광고';
+    case 'text': {
+      const label = textVariantLabel(item.variant);
+      // 순서 표시는 둘째 줄(설교자 등)이 있으면 함께 보여 준다
+      const rest = item.content.split(/\r?\n/).slice(1).join(' ').trim();
+      return rest ? `${label} · ${rest}` : label;
+    }
     default:
       return '';
   }
@@ -208,7 +242,7 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
       if (item.type === 'text') {
         const lines = item.content.split(/\r?\n/).filter((line) => line.trim().length > 0);
-        return { slides: [{ kind: 'text', lines }], labels: [item.variant === 'quote' ? '인용구' : '광고'] };
+        return { slides: [{ kind: 'text', lines }], labels: [textVariantLabel(item.variant)] };
       }
 
       if (item.type === 'blank') return { slides: [{ kind: 'blank' }], labels: ['공백'] };
@@ -411,17 +445,24 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
       insertItem({ id: newItemId(), type: 'divider', label: text });
       return;
     }
-    if (addKind === 'notice' || addKind === 'quote') {
-      insertItem({
-        id: newItemId(),
-        type: 'text',
-        content: addInput,
-        ...(addKind === 'quote' ? { variant: 'quote' as const } : {}),
-      });
+    if (addKind === 'notice' || addKind === 'quote' || addKind === 'order') {
+      // 앞뒤 공백만 떼고 가운데 줄바꿈은 그대로 둔다 (여러 줄 광고를 한 항목으로)
+      addText(text, addKind);
       return;
     }
     // 찬양은 검색 결과에서 고른다
     if (addKind === 'song' && songHits[0]) addSong(songHits[0].id, songHits[0].title);
+  }
+
+  /** 광고·인용구·순서 표시는 저장 구조가 같고 variant 만 다르다 */
+  function addText(content: string, kind: 'notice' | 'quote' | 'order'): void {
+    if (content.trim().length === 0) return;
+    insertItem({
+      id: newItemId(),
+      type: 'text',
+      content,
+      ...(kind === 'notice' ? {} : { variant: kind }),
+    });
   }
 
   function addSong(songId: number, songTitle: string): void {
@@ -501,7 +542,8 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
   })();
 
   const kindHint = ADD_KINDS.find((option) => option.kind === addKind)?.hint ?? '';
-  const isMultiline = addKind === 'notice' || addKind === 'quote';
+  // 순서 표시도 여러 줄이다 — '설교 제목' 아래 줄에 설교자를 넣는다
+  const isMultiline = addKind === 'notice' || addKind === 'quote' || addKind === 'order';
 
   return (
     <div className="plan-panel">
@@ -640,10 +682,15 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                   value={addInput}
                   onChange={(e) => setAddInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      addFromInput();
-                    }
+                    if (e.key !== 'Enter') return;
+                    // Enter = 항목 추가(성경·찬양과 같은 동작). 줄바꿈은 Shift+Enter.
+                    //
+                    // 이전에는 ⌘Enter 만 추가라서, 광고를 입력하고 Enter 를 눌러도
+                    // 줄만 바뀌고 아무것도 추가되지 않았다. 광고는 한 줄짜리 항목을
+                    // 여러 개 넣는 경우가 대부분이라 Enter 를 추가로 둔다.
+                    if (e.shiftKey) return;
+                    e.preventDefault();
+                    addFromInput();
                   }}
                   placeholder={kindHint}
                   spellCheck={false}
@@ -667,7 +714,17 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
               {addKind === 'bible' && parseOk && (
                 <p className={`hintline ${parseOk.ok ? 'ok' : 'error'}`}>{parseOk.text}</p>
               )}
-              {isMultiline && <p className="hintline muted">⌘Enter 로 추가</p>}
+              {isMultiline && <p className="hintline muted">Enter 로 추가 · Shift+Enter 줄바꿈</p>}
+
+              {addKind === 'order' && (
+                <div className="candidates">
+                  {ORDER_PRESETS.map((preset) => (
+                    <button key={preset} type="button" onClick={() => addText(preset, 'order')}>
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {addKind === 'song' && songHits.length > 0 && (
                 <div className="candidates">

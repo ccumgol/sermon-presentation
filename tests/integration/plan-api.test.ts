@@ -357,6 +357,21 @@ describe('구분·인용구 항목 저장', () => {
     expect(items[1]!.variant).toBe('quote');
   });
 
+  it('순서 표시(order)를 저장한다 — 둘째 줄(설교자)까지 보존', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '순서 표시 테스트',
+      items: [
+        { type: 'text', content: '대표기도', variant: 'order' },
+        { type: 'text', content: '설교 제목\n박기현 목사', variant: 'order' },
+      ],
+    });
+
+    const items = created.body.data!.plan.items as Array<{ variant?: string; content?: string }>;
+    expect(items[0]!.variant).toBe('order');
+    // 순서 이름 아래 줄은 화면에 함께 나가야 하므로 줄바꿈을 지우지 않는다
+    expect(items[1]!.content).toBe('설교 제목\n박기현 목사');
+  });
+
   it('알 수 없는 variant 는 광고로 떨어뜨린다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: 'variant 방어',

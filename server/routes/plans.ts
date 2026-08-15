@@ -89,8 +89,10 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           rejected.push(`${index + 1}번째 항목: 내용이 없습니다`);
           continue;
         }
-        // 광고(notice)와 인용구(quote)는 저장 구조가 같고 표시만 다르다
-        const variant = text.variant === 'quote' ? 'quote' : undefined;
+        // 광고(notice)·인용구(quote)·순서 표시(order)는 저장 구조가 같고 표시만 다르다.
+        // 아는 값만 통과시킨다 — 모르는 값은 기본(광고)으로 떨어뜨린다.
+        const variant =
+          text.variant === 'quote' || text.variant === 'order' ? text.variant : undefined;
 
         items.push({
           id,

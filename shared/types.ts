@@ -421,8 +421,13 @@ export type CueItem =
       /**
        * 용도 구분 — 아이콘과 기본 템플릿만 달라진다. 저장 구조는 같다.
        * 없으면 'notice'(광고)로 본다 — 기존 순서표의 하위 호환.
+       *
+       * - `notice` 광고 · `quote` 설교 중 인용구
+       * - `order`  **순서 표시** — 대표기도·주기도문·사도신경·설교 제목·설교자·
+       *   축도처럼 '지금 무슨 순서인지'를 화면에 띄우는 항목.
+       *   첫 줄이 순서 이름, 다음 줄부터가 부가 설명(설교자 이름 등)이다.
        */
-      variant?: 'notice' | 'quote';
+      variant?: 'notice' | 'quote' | 'order';
       templateId?: number;
       note?: string;
     }
