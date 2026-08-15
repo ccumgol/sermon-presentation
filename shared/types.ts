@@ -477,6 +477,12 @@ export type CueItem =
        * 이름이 길어 한 줄에 안 들어갈 때 이 항목만 줄일 수 있어야 한다.
        */
       presenterScale?: number;
+      /**
+       * 외곽선 두께(px) — 지정하면 템플릿 값 대신 이 값을 쓴다.
+       * `0` 은 '테두리 없음' 이라는 뜻이므로 지정으로 친다(undefined 와 다르다).
+       */
+      titleStroke?: number;
+      presenterStroke?: number;
       templateId?: number;
       note?: string;
     }
@@ -574,6 +580,9 @@ export type SlidePayload =
       charStyles?: OrderCharStyle[];
       /** 담당자 글자 크기 배수 (1 = 템플릿의 보조 텍스트 크기) */
       presenterScale?: number;
+      /** 외곽선 두께(px). 없으면 템플릿 값을 쓴다 */
+      titleStroke?: number;
+      presenterStroke?: number;
     }
   | { kind: 'blank' };
 

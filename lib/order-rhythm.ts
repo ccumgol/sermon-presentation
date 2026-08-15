@@ -38,6 +38,10 @@ export const CHAR_SIZE_MAX = 2.5;
 export const CHAR_DY_MIN = -0.6;
 export const CHAR_DY_MAX = 0.6;
 
+/** 외곽선 두께(px) 범위 — 너무 굵으면 글자 속이 메워져 읽히지 않는다 */
+export const STROKE_MIN = 0;
+export const STROKE_MAX = 20;
+
 /** 담당자 글자 크기 배수의 범위 */
 export const PRESENTER_SCALE_MIN = 0.3;
 export const PRESENTER_SCALE_MAX = 2.5;
@@ -82,6 +86,17 @@ export function normalizePresenterScale(raw: unknown): number | undefined {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
   const value = clamp(raw, PRESENTER_SCALE_MIN, PRESENTER_SCALE_MAX);
   return value === 1 ? undefined : value;
+}
+
+/**
+ * 외곽선 두께를 검증한다.
+ *
+ * `0`(테두리 없음)도 뜻이 있는 값이라 버리지 않는다 — 기본값이 아니라
+ * '이 항목은 테두리를 끈다' 는 지정이다. 값이 없어야 템플릿을 따른다.
+ */
+export function normalizeStroke(raw: unknown): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
+  return clamp(raw, STROKE_MIN, STROKE_MAX);
 }
 
 /**

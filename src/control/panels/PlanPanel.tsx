@@ -25,7 +25,7 @@ import {
   type SlidePayload, type Template,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
-import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN } from '../../../lib/order-rhythm.ts';
+import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
 import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
 
@@ -370,6 +370,8 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 ...splitOrderText(item.content),
                 ...(item.charStyles ? { charStyles: item.charStyles } : {}),
                 ...(item.presenterScale !== undefined ? { presenterScale: item.presenterScale } : {}),
+                ...(item.titleStroke !== undefined ? { titleStroke: item.titleStroke } : {}),
+                ...(item.presenterStroke !== undefined ? { presenterStroke: item.presenterStroke } : {}),
               },
             ],
             labels: ['순서 표시'],
@@ -1363,6 +1365,57 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                   <span className="muted">{Math.round((current.presenterScale ?? 1) * 100)}%</span>
                 </>
               )}
+            </div>
+          )}
+
+          {current.type === 'text' && current.variant === 'order' && (
+            <div className="row detail-controls">
+              <label title="지정하지 않으면 템플릿의 외곽선 두께를 씁니다">테두리</label>
+              {([
+                ['순서', 'titleStroke', 'primary'],
+                ['담당자', 'presenterStroke', 'secondary'],
+              ] as const)
+                .filter(([, key]) => key !== 'presenterStroke' || current.layout !== 'stack')
+                .map(([label, key, role]) => {
+                  // 지정이 없으면 템플릿 값에서 출발한다 — 0 에서 시작하면 조금만 건드려도 튄다
+                  const fallback = itemTemplateFor(current)?.text[role].stroke?.width ?? 0;
+                  const value = current[key] ?? fallback;
+                  return (
+                    <span className="knob" key={key}>
+                      <span className="tag">{label}</span>
+                      <input
+                        type="range"
+                        min={STROKE_MIN}
+                        max={12}
+                        step={0.5}
+                        value={value}
+                        onChange={(e) => {
+                          const width = Number(e.target.value);
+                          const next = items.map((i) => (i.id === current.id ? { ...i, [key]: width } : i));
+                          patchItems(next);
+                          const updated = next.find((i) => i.id === current.id);
+                          if (updated && liveItemId === current.id) void sendItem(updated);
+                        }}
+                      />
+                      <span className="num">{value}px</span>
+                    </span>
+                  );
+                })}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = items.map((i) =>
+                    i.id === current.id ? { ...i, titleStroke: undefined, presenterStroke: undefined } : i,
+                  );
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated && liveItemId === current.id) void sendItem(updated);
+                }}
+                disabled={current.titleStroke === undefined && current.presenterStroke === undefined}
+                title="템플릿 두께로 되돌리기"
+              >
+                ↺
+              </button>
             </div>
           )}
 

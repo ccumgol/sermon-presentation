@@ -11,7 +11,8 @@ import { describe, expect, it } from 'vitest';
 import {
   adjustableChars, autoDy, autoScale, CHAR_DY_MAX, CHAR_SIZE_MAX, CHAR_SIZE_MIN,
   normalizeCharStyles, normalizePresenterScale,
-  PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, rhythmWave,
+  normalizeStroke, PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN,
+  rhythmWave, STROKE_MAX, STROKE_MIN,
 } from '../../lib/order-rhythm.ts';
 
 describe('rhythmWave — 세 글자 주기', () => {
@@ -77,6 +78,23 @@ describe('normalizePresenterScale', () => {
     expect(normalizePresenterScale('1.5')).toBeUndefined();
     expect(normalizePresenterScale(Number.NaN)).toBeUndefined();
     expect(normalizePresenterScale(undefined)).toBeUndefined();
+  });
+});
+
+describe('normalizeStroke', () => {
+  it('0 은 버리지 않는다 — 이 항목만 테두리를 끄겠다는 지정이다', () => {
+    expect(normalizeStroke(0)).toBe(0);
+  });
+
+  it('범위를 넘으면 자른다', () => {
+    expect(normalizeStroke(-5)).toBe(STROKE_MIN);
+    expect(normalizeStroke(999)).toBe(STROKE_MAX);
+  });
+
+  it('값이 없으면 템플릿을 따른다 (undefined)', () => {
+    expect(normalizeStroke(undefined)).toBeUndefined();
+    expect(normalizeStroke('3')).toBeUndefined();
+    expect(normalizeStroke(Number.NaN)).toBeUndefined();
   });
 });
 

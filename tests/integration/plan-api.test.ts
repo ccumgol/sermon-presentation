@@ -503,6 +503,23 @@ describe('구분·인용구 항목 저장', () => {
     expect(items[2]!.presenterScale).toBe(2.5);
   });
 
+  it('테두리 두께를 저장한다 — 0 도 지정으로 남긴다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '테두리',
+      items: [
+        { type: 'text', content: '대표기도\n박기현 목사', variant: 'order', titleStroke: 6, presenterStroke: 0 },
+        { type: 'text', content: '축도', variant: 'order' },
+      ],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const items = created.body.data!.plan.items as Array<{ titleStroke?: number; presenterStroke?: number }>;
+    expect(items[0]!.titleStroke).toBe(6);
+    // 0 = '이 항목은 테두리 없음'. 지정이 없는 것(undefined)과 다르다
+    expect(items[0]!.presenterStroke).toBe(0);
+    expect(items[1]!.titleStroke).toBeUndefined();
+  });
+
   it('알 수 없는 variant 는 광고로 떨어뜨린다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: 'variant 방어',

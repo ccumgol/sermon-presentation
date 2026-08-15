@@ -357,6 +357,22 @@
    * 담당자가 없으면 오른쪽 칸을 아예 만들지 않는다. 빈 밑줄만 떠 있으면
    * 이름을 못 넣은 것처럼 보인다.
    */
+  /**
+   * 템플릿의 외곽선에서 **색만 가져와** 두께를 바꾼 값을 만든다.
+   *
+   * `-webkit-text-stroke-width` 만 인라인으로 덮으면, 템플릿이 외곽선을 끈 상태
+   * (`none`)에서는 색이 글자색으로 잡혀 글자가 굵어진 것처럼 보인다.
+   * 그래서 색을 함께 지정한다. 템플릿에 색이 없으면 검정으로 둔다 —
+   * 이 프로젝트의 외곽선은 밝은 영상 위에서 글자를 읽히게 하는 장치다.
+   */
+  function strokeWithWidth(varName, widthPx) {
+    var current = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    var color = current.split(/\s+/).slice(1).join(' ') || '#000000';
+    // 0 도 '0px' 로 적는다. 'none' 은 이 속성에 유효한 값이 아니라 선언이 통째로
+    // 버려지고, 그러면 스타일시트의 템플릿 값으로 되돌아간다(실측으로 확인).
+    return Math.max(widthPx, 0) + 'px ' + color;
+  }
+
   function renderOrder(payload) {
     clearChildren(el.blocks);
 
@@ -365,6 +381,9 @@
 
     var title = document.createElement('div');
     title.className = 'order-title line-primary';
+    if (typeof payload.titleStroke === 'number') {
+      title.style.webkitTextStroke = strokeWithWidth('--primary-stroke', payload.titleStroke);
+    }
     fillRhythmicText(title, payload.title || '', payload.charStyles);
     row.appendChild(title);
 
@@ -375,6 +394,9 @@
       // em 으로 두면 부모(.order-row) 크기를 따라가 템플릿 설정과 어긋난다.
       if (typeof payload.presenterScale === 'number' && payload.presenterScale > 0) {
         presenter.style.fontSize = 'calc(var(--secondary-size) * ' + payload.presenterScale + ')';
+      }
+      if (typeof payload.presenterStroke === 'number') {
+        presenter.style.webkitTextStroke = strokeWithWidth('--secondary-stroke', payload.presenterStroke);
       }
       presenter.textContent = payload.presenter;
       row.appendChild(presenter);
