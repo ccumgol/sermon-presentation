@@ -25,6 +25,7 @@ import {
   type SlidePayload, type Template,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
+import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN } from '../../../lib/order-rhythm.ts';
 import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
 
@@ -368,6 +369,7 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 kind: 'order',
                 ...splitOrderText(item.content),
                 ...(item.charStyles ? { charStyles: item.charStyles } : {}),
+                ...(item.presenterScale !== undefined ? { presenterScale: item.presenterScale } : {}),
               },
             ],
             labels: ['순서 표시'],
@@ -1336,6 +1338,31 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 <option value="split">좌우 (순서 이름 · 담당자 + 밑줄)</option>
                 <option value="stack">쌓기 (줄을 그대로)</option>
               </select>
+
+              {/* 좌우 배치일 때만 — 쌓기에는 '오른쪽' 이 없다 */}
+              {current.layout !== 'stack' && (
+                <>
+                  <label title="템플릿의 보조 텍스트 크기를 기준으로 한 배수입니다">담당자 크기</label>
+                  <input
+                    type="range"
+                    min={PRESENTER_SCALE_MIN}
+                    max={PRESENTER_SCALE_MAX}
+                    step={0.05}
+                    value={current.presenterScale ?? 1}
+                    onChange={(e) => {
+                      const scale = Number(e.target.value);
+                      const next = items.map((i) =>
+                        i.id === current.id ? { ...i, presenterScale: scale === 1 ? undefined : scale } : i,
+                      );
+                      patchItems(next);
+                      // 단독 송출 중이면 바로 다시 보내 눈으로 보며 맞춘다 (글자 조정과 같은 규칙)
+                      const updated = next.find((i) => i.id === current.id);
+                      if (updated && liveItemId === current.id) void sendItem(updated);
+                    }}
+                  />
+                  <span className="muted">{Math.round((current.presenterScale ?? 1) * 100)}%</span>
+                </>
+              )}
             </div>
           )}
 

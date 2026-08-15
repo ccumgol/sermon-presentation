@@ -309,6 +309,8 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
         fontFamily: FONT_KO_SERIF,
         fontSize: 96,
         fontWeight: 700,
+        // 담당자도 흰색 — 기본 보조색(노랑)은 역본 대조용이라 순서 표시에는 튄다
+        color: '#ffffff',
         stroke: { width: 3, color: '#000000' },
       },
     },

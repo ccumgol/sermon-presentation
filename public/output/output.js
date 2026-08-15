@@ -371,6 +371,11 @@
     if (payload.presenter) {
       var presenter = document.createElement('div');
       presenter.className = 'order-presenter line-secondary';
+      // 담당자 크기는 템플릿의 보조 텍스트 크기를 기준으로 한 **배수**다.
+      // em 으로 두면 부모(.order-row) 크기를 따라가 템플릿 설정과 어긋난다.
+      if (typeof payload.presenterScale === 'number' && payload.presenterScale > 0) {
+        presenter.style.fontSize = 'calc(var(--secondary-size) * ' + payload.presenterScale + ')';
+      }
       presenter.textContent = payload.presenter;
       row.appendChild(presenter);
     }

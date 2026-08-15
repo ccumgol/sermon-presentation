@@ -472,6 +472,11 @@ export type CueItem =
        * 슬라이더로 만진 글자만 값이 차고, 나머지는 자동 리듬을 따른다.
        */
       charStyles?: OrderCharStyle[];
+      /**
+       * 담당자(오른쪽) 글자 크기 배수 — `1` 이면 템플릿의 보조 텍스트 크기 그대로.
+       * 이름이 길어 한 줄에 안 들어갈 때 이 항목만 줄일 수 있어야 한다.
+       */
+      presenterScale?: number;
       templateId?: number;
       note?: string;
     }
@@ -562,7 +567,14 @@ export type SlidePayload =
    * `text` 로 두지 않는 이유는 두 값의 **자리가 다르기 때문**이다. 줄 배열로는
    * "이건 왼쪽, 저건 오른쪽"을 표현할 수 없어 출력 페이지가 알 방법이 없다.
    */
-  | { kind: 'order'; title: string; presenter?: string; charStyles?: OrderCharStyle[] }
+  | {
+      kind: 'order';
+      title: string;
+      presenter?: string;
+      charStyles?: OrderCharStyle[];
+      /** 담당자 글자 크기 배수 (1 = 템플릿의 보조 텍스트 크기) */
+      presenterScale?: number;
+    }
   | { kind: 'blank' };
 
 export interface LiveState {

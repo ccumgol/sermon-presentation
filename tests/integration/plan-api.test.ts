@@ -486,6 +486,23 @@ describe('구분·인용구 항목 저장', () => {
     expect(items[1]!.charStyles).toBeUndefined();
   });
 
+  it('담당자 크기를 저장한다 — 기본값(1)은 남기지 않는다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '담당자 크기',
+      items: [
+        { type: 'text', content: '대표기도\n박기현 목사', variant: 'order', presenterScale: 0.7 },
+        { type: 'text', content: '축도\n김목사', variant: 'order', presenterScale: 1 },
+        { type: 'text', content: '광고\n이집사', variant: 'order', presenterScale: 99 },
+      ],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const items = created.body.data!.plan.items as Array<{ presenterScale?: number }>;
+    expect(items[0]!.presenterScale).toBe(0.7);
+    expect(items[1]!.presenterScale).toBeUndefined();
+    expect(items[2]!.presenterScale).toBe(2.5);
+  });
+
   it('알 수 없는 variant 는 광고로 떨어뜨린다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: 'variant 방어',

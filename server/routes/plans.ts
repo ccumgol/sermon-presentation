@@ -7,7 +7,7 @@
 
 import type { FastifyInstance } from 'fastify';
 
-import { normalizeCharStyles } from '../../lib/order-rhythm.ts';
+import { normalizeCharStyles, normalizePresenterScale } from '../../lib/order-rhythm.ts';
 
 import {
   AUTO_HOLD_MS_DEFAULT,
@@ -123,6 +123,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         const layout = variant === 'order' && text.layout === 'stack' ? 'stack' : undefined;
         // 글자별 수동 조정도 순서 표시에만 뜻이 있다
         const charStyles = variant === 'order' ? normalizeCharStyles(fields.charStyles) : undefined;
+        const presenterScale = variant === 'order' ? normalizePresenterScale(fields.presenterScale) : undefined;
 
         items.push({
           id,
@@ -131,6 +132,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           ...(variant ? { variant } : {}),
           ...(layout ? { layout } : {}),
           ...(charStyles ? { charStyles } : {}),
+          ...(presenterScale !== undefined ? { presenterScale } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });

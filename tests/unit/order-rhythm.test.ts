@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   adjustableChars, autoDy, autoScale, CHAR_DY_MAX, CHAR_SIZE_MAX, CHAR_SIZE_MIN,
-  normalizeCharStyles, rhythmWave,
+  normalizeCharStyles, normalizePresenterScale,
+  PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, rhythmWave,
 } from '../../lib/order-rhythm.ts';
 
 describe('rhythmWave — 세 글자 주기', () => {
@@ -59,6 +60,23 @@ describe('normalizeCharStyles', () => {
     expect(normalizeCharStyles([{}, {}, {}])).toBeUndefined();
     expect(normalizeCharStyles([])).toBeUndefined();
     expect(normalizeCharStyles('x')).toBeUndefined();
+  });
+});
+
+describe('normalizePresenterScale', () => {
+  it('범위를 넘으면 자른다', () => {
+    expect(normalizePresenterScale(99)).toBe(PRESENTER_SCALE_MAX);
+    expect(normalizePresenterScale(0)).toBe(PRESENTER_SCALE_MIN);
+  });
+
+  it('기본값(1)은 저장하지 않는다 — 나중에 기본을 바꿀 수 있어야 한다', () => {
+    expect(normalizePresenterScale(1)).toBeUndefined();
+  });
+
+  it('숫자가 아니면 버린다', () => {
+    expect(normalizePresenterScale('1.5')).toBeUndefined();
+    expect(normalizePresenterScale(Number.NaN)).toBeUndefined();
+    expect(normalizePresenterScale(undefined)).toBeUndefined();
   });
 });
 

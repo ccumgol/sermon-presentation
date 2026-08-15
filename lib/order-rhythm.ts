@@ -38,6 +38,10 @@ export const CHAR_SIZE_MAX = 2.5;
 export const CHAR_DY_MIN = -0.6;
 export const CHAR_DY_MAX = 0.6;
 
+/** 담당자 글자 크기 배수의 범위 */
+export const PRESENTER_SCALE_MIN = 0.3;
+export const PRESENTER_SCALE_MAX = 2.5;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -68,6 +72,16 @@ export function normalizeCharStyles(raw: unknown, maxLength = 40): OrderCharStyl
 
   // 아무도 만지지 않았으면 저장하지 않는다 — 순서표에 빈 배열이 쌓이지 않게
   return out.some((style) => style.size !== undefined || style.dy !== undefined) ? out : undefined;
+}
+
+/**
+ * 담당자 크기 배수를 검증한다. 기본값(1)은 저장하지 않는다 —
+ * 순서표에 기본값이 박히면 나중에 기본을 바꿀 수 없다.
+ */
+export function normalizePresenterScale(raw: unknown): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
+  const value = clamp(raw, PRESENTER_SCALE_MIN, PRESENTER_SCALE_MAX);
+  return value === 1 ? undefined : value;
 }
 
 /**
