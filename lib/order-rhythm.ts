@@ -12,24 +12,40 @@
 import type { OrderCharStyle } from '../shared/types.ts';
 
 /**
- * 자동 리듬의 파도값 (-1 ~ 1).
+ * 자동 리듬의 **네 글자 표** (2026-08-15 사용자 지정).
  *
- * 세 글자 주기 — 큰 · 작은 · 작은. 어절 길이로 나누지 않는 이유는, 길이로 나눠
- * 양끝을 크게 두면 **2자 어절은 두 글자가 모두 양끝이라 크기가 같아지기** 때문이다
- * ('예배 부름'·'축도'·'광고' 에서 리듬이 통째로 사라졌다 — 2026-08-15 실사용 발견).
+ * 계산식(파도)이 아니라 표인 이유는, 사용자가 실제 예배 화면을 보고 고른 값이기
+ * 때문이다. 식으로 근사하면 그 값이 그대로 나오지 않는다.
+ * 어절이 네 글자를 넘으면 **처음으로 돌아가 되풀이**한다.
+ *
+ * `dy` 는 음수가 위, 양수가 아래다(컨트롤 패널의 ↑↓ 표시와 같다).
  */
-export function rhythmWave(indexInWord: number): number {
-  return Math.cos((indexInWord * 2 * Math.PI) / 3);
+export const AUTO_PATTERN: ReadonlyArray<{ size: number; dy: number }> = [
+  { size: 1.0, dy: 0 },
+  { size: 0.96, dy: -0.19 },
+  { size: 0.9, dy: 0.1 },
+  { size: 0.9, dy: -0.05 },
+];
+
+function patternAt(indexInWord: number): { size: number; dy: number } {
+  return AUTO_PATTERN[((indexInWord % AUTO_PATTERN.length) + AUTO_PATTERN.length) % AUTO_PATTERN.length]!;
 }
 
-/** 자동 크기 배수 */
-export function autoScale(indexInWord: number, amount: number): number {
-  return 1 + amount * rhythmWave(indexInWord);
+/**
+ * 자동 크기 배수.
+ *
+ * `strength` 는 표를 얼마나 강하게 적용할지를 뜻하는 **배율**이다.
+ * `1` 이면 표 그대로, `0` 이면 모두 같은 크기(리듬 끔), `2` 면 편차가 두 배.
+ */
+export function autoScale(indexInWord: number, strength: number): number {
+  return 1 + (patternAt(indexInWord).size - 1) * strength;
 }
 
-/** 자동 내림 폭(em). 값은 '가장 많이 내려간 글자가 몇 em 내려가는지'로 읽힌다. */
-export function autoDy(indexInWord: number, amountY: number): number {
-  return amountY * ((1 - rhythmWave(indexInWord)) / 2);
+/** 자동 높낮이(em). 음수가 위, 양수가 아래. */
+export function autoDy(indexInWord: number, strength: number): number {
+  const dy = patternAt(indexInWord).dy * strength;
+  // 음수 × 0 = -0 이라 화면에 'translateY(-0.000em)' 으로 나간다. 0 으로 정리한다.
+  return dy === 0 ? 0 : dy;
 }
 
 /** 사람이 만질 수 있는 범위 — 벗어나면 글자가 화면 밖으로 나가거나 겹친다 */

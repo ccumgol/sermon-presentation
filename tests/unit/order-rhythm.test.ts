@@ -11,34 +11,35 @@ import { describe, expect, it } from 'vitest';
 import {
   adjustableChars, autoDy, autoScale, CHAR_DY_MAX, CHAR_SIZE_MAX, CHAR_SIZE_MIN,
   normalizeCharStyles, normalizePresenterScale,
-  normalizeStroke, PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN,
-  rhythmWave, STROKE_MAX, STROKE_MIN,
+  normalizeStroke, PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MAX, STROKE_MIN,
 } from '../../lib/order-rhythm.ts';
 
-describe('rhythmWave — 세 글자 주기', () => {
-  it('큰 · 작은 · 작은 이 되풀이된다', () => {
-    expect(rhythmWave(0)).toBeCloseTo(1, 6);
-    expect(rhythmWave(1)).toBeCloseTo(-0.5, 6);
-    expect(rhythmWave(2)).toBeCloseTo(-0.5, 6);
-    expect(rhythmWave(3)).toBeCloseTo(1, 6);
+describe('AUTO_PATTERN — 사용자가 정한 네 글자 표', () => {
+  it('배율 1 이면 정한 값이 그대로 나온다', () => {
+    // 2026-08-15 사용자 지정: 100% / 96%·↑19% / 90%·↓10% / 90%·↑5%
+    expect([0, 1, 2, 3].map((i) => autoScale(i, 1))).toEqual([1, 0.96, 0.9, 0.9]);
+    expect([0, 1, 2, 3].map((i) => autoDy(i, 1))).toEqual([0, -0.19, 0.1, -0.05]);
   });
 
-  it('2자 어절에서도 크기가 달라진다 — 길이로 나누면 여기서 리듬이 사라졌다', () => {
-    expect(autoScale(0, 0.18)).not.toBeCloseTo(autoScale(1, 0.18), 6);
+  it('다섯째 글자부터 처음으로 돌아가 되풀이된다', () => {
+    expect(autoScale(4, 1)).toBe(autoScale(0, 1));
+    expect(autoDy(5, 1)).toBe(autoDy(1, 1));
   });
-});
 
-describe('autoScale / autoDy', () => {
-  it('리듬이 0 이면 모두 기준 크기이고 내려가지 않는다', () => {
+  it('2자 어절에서도 크기가 달라진다', () => {
+    expect(autoScale(0, 1)).not.toBe(autoScale(1, 1));
+  });
+
+  it('배율 0 이면 모두 기준 크기이고 움직이지 않는다', () => {
     for (const i of [0, 1, 2, 3]) {
       expect(autoScale(i, 0)).toBe(1);
       expect(autoDy(i, 0)).toBe(0);
     }
   });
 
-  it('큰 글자는 내려가지 않고, 작은 글자가 내려간다', () => {
-    expect(autoDy(0, 0.2)).toBeCloseTo(0, 6);
-    expect(autoDy(1, 0.2)).toBeCloseTo(0.15, 6);
+  it('배율 2 면 편차가 두 배', () => {
+    expect(autoScale(1, 2)).toBeCloseTo(0.92, 6);
+    expect(autoDy(1, 2)).toBeCloseTo(-0.38, 6);
   });
 });
 

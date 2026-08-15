@@ -291,6 +291,20 @@
    * 걸음(0.9)을 유리수로 딱 떨어지지 않게 둬서 2~5글자에서 기계적인 반복이
    * 보이지 않게 했다. 작아진 글자는 그만큼 아래로 내려 아랫선을 흔든다.
    */
+  /*
+   * 자동 리듬의 네 글자 표 (2026-08-15 사용자 지정).
+   *
+   * ⚠️ lib/order-rhythm.ts 의 AUTO_PATTERN 과 **같은 값이어야 한다.**
+   * 출력 페이지는 의존성 0 원칙 때문에 그 모듈을 가져다 쓸 수 없다(ANCHOR_MAP 과 같은 사정).
+   * 어긋나면 컨트롤 패널의 슬라이더 눈금과 실제 화면이 달라진다.
+   */
+  var AUTO_PATTERN = [
+    { size: 1.0, dy: 0 },
+    { size: 0.96, dy: -0.19 },
+    { size: 0.9, dy: 0.1 },
+    { size: 0.9, dy: -0.05 },
+  ];
+
   function fillRhythmicText(node, text, charStyles) {
     clearChildren(node);
     var manual = charStyles || [];
@@ -322,24 +336,12 @@
       var chars = Array.from(words[w]);
 
       for (var i = 0; i < chars.length; i++) {
-        /*
-         * 세 글자 주기의 파도: 큰 · 작은 · 작은 · 큰 · 작은 · 작은 …
-         *
-         * 어절 **길이로 나누지 않는다**. 길이로 나눠 양끝을 크게 두면
-         * **2자 어절은 두 글자가 모두 '양끝'이 되어 크기가 같아진다** —
-         * '예배 부름' '축도' '광고' 처럼 흔한 2자 순서 이름에서 리듬이 통째로
-         * 사라졌다(2026-08-15 실사용에서 발견). 고정 주기는 길이와 무관하게 흔들린다.
-         *
-         * 4자에서 '큰·작은·작은·큰' 이 되어 신앙고백 캡처와도 맞는다.
-         */
-        var wave = Math.cos((i * 2 * Math.PI) / 3);
+        var pattern = AUTO_PATTERN[i % AUTO_PATTERN.length];
         // 사람이 슬라이더로 만진 글자는 그 값이 이긴다. 만지지 않은 글자만 자동 리듬.
         var style = manual[manualIndex] || {};
         manualIndex += 1;
-        var size = typeof style.size === 'number' ? style.size : 1 + amount * wave;
-        // 파도가 아래로 갈수록 글자를 내린다. (1-wave)/2 는 0~1 이라
-        // 값이 곧 '가장 많이 내려간 글자가 몇 em 내려가는지' 가 된다.
-        var dy = typeof style.dy === 'number' ? style.dy : amountY * ((1 - wave) / 2);
+        var size = typeof style.size === 'number' ? style.size : 1 + (pattern.size - 1) * amount;
+        var dy = typeof style.dy === 'number' ? style.dy : pattern.dy * amountY;
 
         var span = document.createElement('span');
         span.className = 'rhythm-char';

@@ -246,6 +246,18 @@ body.blanked .slide {
   padding-bottom: var(--order-line-gap, 8px);
 }
 
+/*
+ * 담당자 크기 = 보조 크기 × 템플릿이 정한 배수.
+ *
+ * 클래스를 둘 겹쳐 쓴 이유는 우선순위 때문이다. `.line-secondary` 가 이 파일에서
+ * **더 뒤에** 선언돼 있어, 한 겹짜리 `.order-presenter` 로는 font-size 가 밀린다
+ * (실측으로 발견 — 배수를 0.8 로 줘도 화면은 100% 였다).
+ * 항목에서 지정한 값은 인라인 스타일이라 이 규칙도 덮는다.
+ */
+.order-presenter.line-secondary {
+  font-size: calc(var(--secondary-size) * var(--presenter-scale, 1));
+}
+
 /* ── 역할별 텍스트 ── */
 
 .block {

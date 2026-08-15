@@ -286,8 +286,8 @@ describe('순서 표시 리듬', () => {
   });
 
   it('지정한 값을 CSS 변수로 내보낸다 (편집 중에도 미리보기에 반영되도록)', () => {
-    const template: Template = { ...base(), behavior: { ...base().behavior, titleRhythm: 0.18 } };
-    expect(templateToCssVars(template)['--title-rhythm']).toBe('0.18');
+    const template: Template = { ...base(), behavior: { ...base().behavior, titleRhythm: 1 } };
+    expect(templateToCssVars(template)['--title-rhythm']).toBe('1');
   });
 
   it('크기와 높낮이를 따로 내보낸다', () => {
@@ -316,6 +316,11 @@ describe('순서 표시 리듬', () => {
     const preset = BUILTIN_TEMPLATES.find((t) => t.kind === 'order')!;
     expect(preset.behavior.titleRhythm).toBeGreaterThan(0);
     expect(preset.behavior.titleRhythmY).toBeGreaterThan(0);
+    // 2026-08-15 사용자가 정한 기본값
+    expect(preset.behavior.titleRhythm).toBe(1);
+    expect(preset.behavior.presenterScale).toBe(0.8);
+    expect(preset.text.primary.stroke?.width).toBe(12);
+    expect(preset.text.secondary.stroke?.width).toBe(10);
     // 총칭 serif 앞에 실제 폰트가 있어야 글자별 대체가 일어나지 않는다 (PLAN 3.4)
     expect(preset.text.primary.fontFamily).toMatch(/Batang|Myeongjo|Myungjo/);
     expect(preset.text.primary.fontFamily.endsWith('serif')).toBe(true);

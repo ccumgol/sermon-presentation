@@ -398,6 +398,14 @@ export interface TemplateBehavior {
    * 값은 글자 크기에 대한 비율(em)이고 `0` 이면 아랫선이 가지런해진다.
    */
   titleRhythmY?: number;
+  /**
+   * 순서 표시 **담당자(오른쪽) 글자 크기 배수의 기본값**.
+   *
+   * 보조 텍스트 크기에 곱한다. 항목에서 따로 지정하면 그 값이 이긴다.
+   * 템플릿에 두는 이유는, 담당자를 제목보다 얼마나 작게 둘지가 대개
+   * 화면 전체의 성격이지 항목마다 다른 값이 아니기 때문이다.
+   */
+  presenterScale?: number;
   transition: { type: 'none' | 'fade' | 'slide-up'; durationMs: number };
   showVerseNumbers: boolean;
   showReference: 'none' | 'top' | 'bottom' | 'inline';

@@ -303,7 +303,8 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
         fontFamily: FONT_KO_SERIF,
         fontSize: 120,
         fontWeight: 700,
-        stroke: { width: 3, color: '#000000' },
+        // 테두리 두께는 2026-08-15 사용자가 실제 화면을 보고 정한 값
+        stroke: { width: 12, color: '#000000' },
       },
       secondary: {
         fontFamily: FONT_KO_SERIF,
@@ -311,7 +312,7 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
         fontWeight: 700,
         // 담당자도 흰색 — 기본 보조색(노랑)은 역본 대조용이라 순서 표시에는 튄다
         color: '#ffffff',
-        stroke: { width: 3, color: '#000000' },
+        stroke: { width: 10, color: '#000000' },
       },
     },
     behavior: {
@@ -320,9 +321,12 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
       showHeadings: false,
       showCredit: false,
       autoFit: true,
-      // 글자마다 크기·높이를 달리해 붓글씨 같은 리듬을 준다 (둘은 따로 조절한다)
-      titleRhythm: 0.18,
-      titleRhythmY: 0.06,
+      // 글자마다 크기·높이를 달리해 붓글씨 같은 리듬을 준다 (둘은 따로 조절한다).
+      // 1 = 정해 둔 표 그대로 (lib/order-rhythm.ts 의 AUTO_PATTERN)
+      titleRhythm: 1,
+      titleRhythmY: 1,
+      // 담당자는 보조 크기의 80% (사용자 지정)
+      presenterScale: 0.8,
     },
   }),
 

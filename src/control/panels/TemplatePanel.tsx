@@ -375,8 +375,8 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           <input
             type="range"
             min={0}
-            max={0.4}
-            step={0.02}
+            max={2}
+            step={0.05}
             value={draft.behavior.titleRhythm ?? 0}
             onChange={(e) =>
               patchDraft((c) => ({ ...c, behavior: { ...c.behavior, titleRhythm: Number(e.target.value) } }))
@@ -389,12 +389,12 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           </span>
         </div>
         <div className="field">
-          <label title="작아진 글자를 얼마나 내릴지 — 0 이면 아랫선이 가지런해집니다">글자 높낮이</label>
+          <label title="정해 둔 높낮이를 얼마나 강하게 적용할지 — 0 이면 아랫선이 가지런해집니다">글자 높낮이</label>
           <input
             type="range"
             min={0}
-            max={0.4}
-            step={0.01}
+            max={2}
+            step={0.05}
             value={draft.behavior.titleRhythmY ?? 0}
             onChange={(e) =>
               patchDraft((c) => ({ ...c, behavior: { ...c.behavior, titleRhythmY: Number(e.target.value) } }))
@@ -403,14 +403,15 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           <span className="muted">
             {(draft.behavior.titleRhythmY ?? 0) === 0
               ? '끔 (아랫선 가지런히)'
-              : `↓ ${Math.round((draft.behavior.titleRhythmY ?? 0) * 100)}%`}
+              : `${Math.round((draft.behavior.titleRhythmY ?? 0) * 100)}%`}
           </span>
         </div>
 
         <p className="hintline muted">
-          <b>큰 · 작은 · 작은</b> 이 세 글자마다 되풀이되고, 띄어쓰기를 만나면 처음부터 다시
-          시작합니다. 크기와 높낮이는 <b>따로</b> 조절합니다 — 크기만 흔들거나, 크기는 두고
-          높낮이만 흔들 수 있습니다. 같은 글자는 언제나 같은 모양이라 예배마다 화면이 달라지지 않습니다.
+          어절의 <b>첫 글자부터 100% · 96%(↑) · 90%(↓) · 90%(↑)</b> 가 되풀이되고,
+          띄어쓰기를 만나면 처음부터 다시 시작합니다. 위 값은 <b>배율</b>이라
+          <b>100%</b> 면 이 표 그대로, 0% 면 끔, 200% 면 편차가 두 배입니다.
+          같은 글자는 언제나 같은 모양이라 예배마다 화면이 달라지지 않습니다.
         </p>
 
         <div className="row">

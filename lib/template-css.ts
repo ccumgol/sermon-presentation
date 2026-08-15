@@ -141,12 +141,12 @@ function backdropOpacity(background: CanvasBackground): string {
 }
 
 /**
- * 리듬 폭을 안전한 범위로 자른다.
+ * 리듬 **배율**을 안전한 범위로 자른다.
  *
+ * `1` 이 기준(정해 둔 표 그대로), `0` 은 끔, `2` 면 편차가 두 배다.
  * 너무 크면 글자가 화면 밖으로 튀고 줄 높이가 들쭉날쭉해져 읽히지 않는다.
- * 0.4 를 넘길 이유가 없어 경계에서 자른다.
  */
-export const MAX_TITLE_RHYTHM = 0.4;
+export const MAX_TITLE_RHYTHM = 3;
 
 export function clampRhythm(value: number | undefined): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
@@ -193,6 +193,12 @@ export function templateToCssVars(template: Template): CssVars {
     // 미리보기에 반영된다 — behavior 는 저장해야 출력 페이지로 가기 때문이다.
     '--title-rhythm': String(clampRhythm(behavior.titleRhythm)),
     '--title-rhythm-y': String(clampRhythm(behavior.titleRhythmY)),
+    // 담당자 기본 크기 배수 — 항목에서 지정하면 그 값이 인라인으로 덮는다
+    '--presenter-scale': String(
+      typeof behavior.presenterScale === 'number' && behavior.presenterScale > 0
+        ? Math.min(behavior.presenterScale, 3)
+        : 1,
+    ),
 
     // 전환
     '--transition-duration': `${behavior.transition.type === 'none' ? 0 : behavior.transition.durationMs}ms`,
