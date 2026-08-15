@@ -357,6 +357,58 @@ describe('구분·인용구 항목 저장', () => {
     expect(items[1]!.variant).toBe('quote');
   });
 
+  it('예배 유형(template)과 저장된 순서(plan)를 나눠 목록으로 준다', async () => {
+    const template = await send<PlanResponse>('POST', '/api/plans', {
+      name: '유형 테스트',
+      kind: 'template',
+      items: [{ type: 'text', content: '대표기도', variant: 'order' }],
+    });
+    const savedPlan = await send<PlanResponse>('POST', '/api/plans', {
+      name: '2026-08-16 유형 테스트',
+      items: [{ type: 'text', content: '광고' }],
+    });
+    createdPlanIds.push(template.body.data!.plan.id, savedPlan.body.data!.plan.id);
+
+    expect(template.body.data!.plan.kind).toBe('template');
+    // kind 를 주지 않으면 저장된 순서다 — 유형이 함부로 늘어나면 안 된다
+    expect(savedPlan.body.data!.plan.kind).toBe('plan');
+
+    const templates = await get<ServicePlan[]>('/api/plans?kind=template');
+    const plans = await get<ServicePlan[]>('/api/plans?kind=plan');
+    expect(templates.body.data!.some((p) => p.name === '유형 테스트')).toBe(true);
+    expect(templates.body.data!.some((p) => p.name === '2026-08-16 유형 테스트')).toBe(false);
+    expect(plans.body.data!.some((p) => p.name === '2026-08-16 유형 테스트')).toBe(true);
+  });
+
+  it('알 수 없는 kind 는 저장된 순서로 떨어뜨린다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: 'kind 방어',
+      kind: 'builtin',
+      items: [],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+    expect(created.body.data!.plan.kind).toBe('plan');
+  });
+
+  it('유형을 갱신해도 유형으로 남는다 (템플릿 업데이트)', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '갱신 유형',
+      kind: 'template',
+      items: [{ type: 'text', content: '대표기도', variant: 'order' }],
+    });
+    const id = created.body.data!.plan.id;
+    createdPlanIds.push(id);
+
+    const updated = await send<PlanResponse>('PUT', `/api/plans/${id}`, {
+      items: [
+        { type: 'text', content: '대표기도', variant: 'order' },
+        { type: 'text', content: '축도', variant: 'order' },
+      ],
+    });
+    expect(updated.body.data!.plan.kind).toBe('template');
+    expect(updated.body.data!.plan.items).toHaveLength(2);
+  });
+
   it('순서 표시(order)를 저장한다 — 둘째 줄(설교자)까지 보존', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: '순서 표시 테스트',
@@ -378,5 +430,41 @@ describe('구분·인용구 항목 저장', () => {
       items: [{ type: 'text', content: '내용', variant: '<script>' }],
     });
     expect((created.body.data!.plan.items[0] as { variant?: string }).variant).toBeUndefined();
+  });
+});
+
+describe('예배 유형 기본값 시딩', () => {
+  it('유형이 하나도 없을 때만 넣는다 — 지운 유형이 되살아나지 않는다', () => {
+    for (const plan of planStore.listPlans()) planStore.deletePlan(plan.id);
+
+    planStore.seedDefaultTemplates();
+    const first = planStore.listPlans('template');
+    // 만든 순으로 나온다 — 자주 쓰는 주일예배가 맨 위 (가나다 순이면 부흥회가 올라온다)
+    expect(first.map((p) => p.name)).toEqual(['주일예배', '수요예배', '새벽기도회', '부흥회']);
+
+    // 이미 유형이 있으면 다시 넣지 않는다
+    planStore.seedDefaultTemplates();
+    expect(planStore.listPlans('template')).toHaveLength(first.length);
+
+    // 하나만 남겨도 되살아나지 않는다 (사용자가 지운 유형이 다시 생기면 안 된다)
+    for (const plan of first.slice(1)) planStore.deletePlan(plan.id);
+    planStore.seedDefaultTemplates();
+    expect(planStore.listPlans('template')).toHaveLength(1);
+
+    for (const plan of planStore.listPlans()) planStore.deletePlan(plan.id);
+  });
+
+  it('기본 유형은 순서 표시와 구분으로만 이뤄져 바로 송출할 수 있다', () => {
+    for (const plan of planStore.listPlans()) planStore.deletePlan(plan.id);
+    planStore.seedDefaultTemplates();
+
+    const sunday = planStore.listPlans('template').find((p) => p.name === '주일예배')!;
+    expect(sunday.items.length).toBeGreaterThan(0);
+    for (const item of sunday.items) {
+      expect(['divider', 'text']).toContain(item.type);
+      if (item.type === 'text') expect(item.variant).toBe('order');
+    }
+
+    for (const plan of planStore.listPlans()) planStore.deletePlan(plan.id);
   });
 });

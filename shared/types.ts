@@ -440,12 +440,25 @@ export type CueItem =
    */
   | { id: string; type: 'divider'; label: string };
 
+/**
+ * 순서표의 성격.
+ *
+ * - `template` **예배 유형** — 주일예배·수요예배·새벽기도회·부흥회처럼 매주 고쳐 쓰는 원본
+ * - `plan`     **저장된 순서** — 특정 회차를 남겨 둔 것 (지난주 순서를 다시 열 때)
+ *
+ * 두 성격이 저장 구조가 같아 한 테이블에 둔다. 유형에서 시작해 고친 뒤,
+ * 그대로 다음에도 쓰려면 '템플릿 업데이트', 이번 회차만 남기려면 '순서 저장하기'.
+ */
+export type PlanKind = 'template' | 'plan';
+
 export interface ServicePlan {
   id: number;
   name: string;
   serviceDate?: string; // ISO date
   items: CueItem[];
   updatedAt?: string;
+  /** 없으면 'plan' 으로 본다 — 유형 개념 도입 전 순서표의 하위 호환 */
+  kind?: PlanKind;
 }
 
 // ─────────────────────────────────────────────────────────────

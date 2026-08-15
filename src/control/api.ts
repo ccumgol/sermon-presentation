@@ -1,7 +1,7 @@
 /** 컨트롤 패널의 REST 호출. 모든 오류를 명시적으로 다룬다. */
 
 import type {
-  ApiResponse, BookMeta, Deck, LangCode, Passage, ParseResult, ReviewQueue,
+  ApiResponse, BookMeta, Deck, LangCode, Passage, ParseResult, PlanKind, ReviewQueue,
   ServicePlan, Song, Songbook, SongEntry, SongSearchHit, SongSearchResult, Template, Translation,
 } from '../../shared/types.ts';
 
@@ -141,9 +141,14 @@ export const api = {
   saveLyrics: (id: number, text: string) =>
     send<{ song: Song; availableLangs: LangCode[] }>('PUT', `/api/songs/${id}/lyrics`, { text }),
 
-  plans: () => get<ServicePlan[]>('/api/plans'),
-  createPlan: (name: string, serviceDate: string, items: unknown[]) =>
-    send<{ plan: ServicePlan; rejected?: string[] }>('POST', '/api/plans', { name, serviceDate, items }),
+  plans: (kind?: PlanKind) => get<ServicePlan[]>('/api/plans' + (kind ? `?kind=${kind}` : '')),
+  createPlan: (name: string, serviceDate: string, items: unknown[], kind?: PlanKind) =>
+    send<{ plan: ServicePlan; rejected?: string[] }>('POST', '/api/plans', {
+      name,
+      serviceDate,
+      items,
+      ...(kind ? { kind } : {}),
+    }),
   updatePlan: (id: number, patch: { name?: string; items?: unknown[] }) =>
     send<{ plan: ServicePlan; rejected?: string[] }>('PUT', `/api/plans/${id}`, patch),
   deletePlan: (id: number) => send<{ deleted: number }>('DELETE', `/api/plans/${id}`),

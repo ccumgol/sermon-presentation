@@ -16,7 +16,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { buildPlanDeck, describeItem, moveItem, newItemId, removeItem } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
-import type { ClientMsg, CueItem, Deck, ServicePlan, SlidePayload, Template } from '../../../shared/types.ts';
+import type {
+  ClientMsg, CueItem, Deck, PlanKind, ServicePlan, SlidePayload, Template,
+} from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { useMeasure } from '../hooks/useMeasure.ts';
 
@@ -109,9 +111,17 @@ function itemMeta(item: CueItem): string {
 }
 
 export function PlanPanel({ deck, currentIndex, connected, template, send }: Props): React.JSX.Element {
-  const [plans, setPlans] = useState<ServicePlan[]>([]);
+  /** 예배 유형(주일예배·수요예배 …) — 매주 고쳐 쓰는 원본 */
+  const [templates, setTemplates] = useState<ServicePlan[]>([]);
+  /** 저장해 둔 회차 — 지난주 순서를 다시 열 때 */
+  const [saved, setSaved] = useState<ServicePlan[]>([]);
+  /** 지금 편집 중인 것이 어디서 왔는지 */
   const [plan, setPlan] = useState<ServicePlan | null>(null);
   const [items, setItems] = useState<CueItem[]>([]);
+
+  /** 이름을 받아야 하는 저장 동작 (유형 만들기 / 순서 저장하기) */
+  const [nameBar, setNameBar] = useState<{ kind: PlanKind; value: string } | null>(null);
+  const [loadOpen, setLoadOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +165,9 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
   const reload = useCallback(async () => {
     try {
-      setPlans(await api.plans());
+      const [templateList, savedList] = await Promise.all([api.plans('template'), api.plans('plan')]);
+      setTemplates(templateList);
+      setSaved(savedList);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '예배 순서를 불러오지 못했습니다');
     }
@@ -165,31 +177,38 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     void reload();
   }, [reload]);
 
+  /**
+   * 아무것도 열지 않았으면 첫 유형을 연다.
+   *
+   * 빈 화면에서 시작하면 매번 '무엇을 골라야 하는지' 부터 판단해야 한다.
+   * 편집 중인 것이 있으면(=plan) 건드리지 않는다.
+   */
+  useEffect(() => {
+    if (plan || templates.length === 0) return;
+    const first = templates[0];
+    if (first) {
+      setPlan(first);
+      setItems(first.items);
+      setDirty(false);
+      setCursor(0);
+    }
+  }, [templates, plan]);
+
+  /** 편집 중인 변경을 잃는 자리에는 반드시 확인을 받는다 */
   function openPlan(target: ServicePlan): void {
+    if (dirty && !window.confirm('저장하지 않은 변경이 있습니다. 그래도 여시겠습니까?')) return;
     setPlan(target);
     setItems(target.items);
     setDirty(false);
     setCursor(0);
     setNotice(null);
+    setLoadOpen(false);
+    setNameBar(null);
   }
 
-  async function createPlan(): Promise<void> {
-    setBusy(true);
-    try {
-      // 기본 그룹을 넣어 둔다 — 필요 없으면 한 줄씩 지우면 된다
-      const starter: CueItem[] = DEFAULT_GROUPS.map((label) => ({ id: newItemId(), type: 'divider', label }));
-      const created = await api.createPlan(`${today()} 예배`, today(), starter);
-      await reload();
-      openPlan(created.plan);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '만들지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function savePlan(): Promise<void> {
-    if (!plan) return;
+  /** '템플릿 업데이트' — 지금 고친 내용을 이 유형의 원본으로 굳힌다 */
+  async function updateTemplate(): Promise<void> {
+    if (!plan || plan.kind !== 'template') return;
     setBusy(true);
     setError(null);
     try {
@@ -200,13 +219,65 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
       await reload();
       setNotice(
         result.rejected && result.rejected.length > 0
-          ? `저장했지만 ${result.rejected.length}개 항목을 버렸습니다: ${result.rejected.join(', ')}`
-          : '저장했습니다',
+          ? `유형을 갱신했지만 ${result.rejected.length}개 항목을 버렸습니다: ${result.rejected.join(', ')}`
+          : `'${result.plan.name}' 유형을 갱신했습니다`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '갱신하지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 같은 이름이 이미 있는지 — 있으면 버튼이 '덮어쓰기' 로 바뀐다 */
+  const nameBarTarget = nameBar
+    ? (nameBar.kind === 'template' ? templates : saved).find((p) => p.name === nameBar.value.trim())
+    : undefined;
+
+  /** 이름 입력 바 확정 — 새로 만들거나, 같은 이름이 있으면 덮어쓴다 */
+  async function commitNameBar(): Promise<void> {
+    if (!nameBar) return;
+    const name = nameBar.value.trim();
+    if (name.length === 0) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      // 빈 상태에서 유형을 만들면 뼈대를 넣어 준다 — 빈 목록은 무엇을 할 수 있는지 알려주지 못한다
+      const payload: CueItem[] =
+        items.length === 0 && nameBar.kind === 'template'
+          ? DEFAULT_GROUPS.map((label) => ({ id: newItemId(), type: 'divider', label }))
+          : items;
+
+      const result = nameBarTarget
+        ? await api.updatePlan(nameBarTarget.id, { name, items: payload })
+        : (await api.createPlan(name, nameBar.kind === 'plan' ? today() : '', payload, nameBar.kind));
+
+      setPlan(result.plan);
+      setItems(result.plan.items);
+      setDirty(false);
+      setNameBar(null);
+      await reload();
+      setNotice(
+        `${nameBar.kind === 'template' ? '유형' : '순서'} '${name}' 을(를) ` +
+          `${nameBarTarget ? '덮어썼습니다' : '저장했습니다'}`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** 저장된 순서 삭제 — 되돌릴 수 없으므로 확인을 받는다 */
+  async function removeSaved(target: ServicePlan): Promise<void> {
+    if (!window.confirm(`저장된 순서 '${target.name}' 을(를) 지웁니다. 되돌릴 수 없습니다.`)) return;
+    try {
+      await api.deletePlan(target.id);
+      if (plan?.id === target.id) setPlan(null);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
     }
   }
 
@@ -569,40 +640,135 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
           <div className="plan-head">
             <select
               className="grow"
-              value={plan?.id ?? ''}
+              value={plan?.kind === 'template' ? plan.id : ''}
               onChange={(e) => {
-                const found = plans.find((p) => p.id === Number(e.target.value));
+                const found = templates.find((p) => p.id === Number(e.target.value));
                 if (found) openPlan(found);
               }}
+              title="예배 유형 — 골라서 고쳐 쓰는 원본입니다"
             >
-              <option value="">— 순서 선택 —</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.serviceDate ? `${p.serviceDate} · ` : ''}{p.name}
-                </option>
+              <option value="">— 예배 유형 —</option>
+              {templates.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <button type="button" onClick={() => void createPlan()} disabled={busy} title="새 순서표">＋</button>
+            <button
+              type="button"
+              onClick={() => { setLoadOpen(false); setNameBar({ kind: 'template', value: '' }); }}
+              disabled={busy}
+              title="지금 항목으로 새 예배 유형 만들기"
+            >
+              ＋
+            </button>
           </div>
 
           {plan && (
+            <>
+              <div className="plan-head">
+                <button
+                  type="button"
+                  className="primary grow"
+                  onClick={() => void loadForService()}
+                  disabled={!connected || busy || items.length === 0}
+                  title="순서표 전체를 하나로 올립니다. 이후 화살표로 끝까지 진행합니다."
+                >
+                  예배용으로 올리기
+                </button>
+              </div>
+
+              <div className="plan-head">
+                <button
+                  type="button"
+                  className="grow"
+                  onClick={() => void updateTemplate()}
+                  disabled={busy || plan.kind !== 'template'}
+                  title={
+                    plan.kind === 'template'
+                      ? '지금 고친 내용을 이 유형의 원본으로 굳힙니다'
+                      : '저장된 순서를 열었습니다 — 유형은 ＋ 로 새로 만드세요'
+                  }
+                >
+                  템플릿 업데이트
+                </button>
+                <button
+                  type="button"
+                  className="grow"
+                  onClick={() => {
+                    setLoadOpen(false);
+                    setNameBar({ kind: 'plan', value: `${today()} ${plan.name}` });
+                  }}
+                  disabled={busy}
+                  title="이번 회차를 따로 남깁니다"
+                >
+                  순서 저장하기
+                </button>
+                <button
+                  type="button"
+                  className="grow"
+                  onClick={() => { setNameBar(null); setLoadOpen((prev) => !prev); }}
+                  disabled={busy}
+                  title="저장해 둔 순서를 엽니다"
+                >
+                  순서 불러오기
+                </button>
+              </div>
+            </>
+          )}
+
+          {nameBar && (
             <div className="plan-head">
+              <input
+                className="grow"
+                autoFocus
+                value={nameBar.value}
+                onChange={(e) => setNameBar({ ...nameBar, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); void commitNameBar(); }
+                  if (e.key === 'Escape') { e.preventDefault(); setNameBar(null); }
+                }}
+                placeholder={nameBar.kind === 'template' ? '새 예배 유형 이름' : '저장할 순서 이름'}
+                spellCheck={false}
+              />
               <button
                 type="button"
-                className="primary grow"
-                onClick={() => void loadForService()}
-                disabled={!connected || busy || items.length === 0}
-                title="순서표 전체를 하나로 올립니다. 이후 화살표로 끝까지 진행합니다."
+                className="primary"
+                onClick={() => void commitNameBar()}
+                disabled={busy || nameBar.value.trim().length === 0}
               >
-                예배용으로 올리기
+                {nameBarTarget ? '덮어쓰기' : '저장'}
               </button>
-              <button type="button" onClick={() => void savePlan()} disabled={busy || !dirty}>
-                {dirty ? '저장' : '저장됨'}
-              </button>
+              <button type="button" onClick={() => setNameBar(null)}>취소</button>
             </div>
           )}
 
-          {!plan && <p className="hintline muted">순서를 고르거나 ＋ 로 새로 만드세요.</p>}
+          {nameBar && nameBarTarget && (
+            <p className="hintline warn">
+              같은 이름이 이미 있습니다 — 누르면 그 {nameBar.kind === 'template' ? '유형' : '순서'}를 덮어씁니다.
+            </p>
+          )}
+
+          {loadOpen && (
+            <div className="candidates plan-saved">
+              {saved.length === 0 && <span className="hintline muted">저장된 순서가 없습니다.</span>}
+              {saved.map((p) => (
+                <span key={p.id} className="saved-row">
+                  <button type="button" onClick={() => openPlan(p)}>
+                    {p.serviceDate ? `${p.serviceDate} · ` : ''}{p.name}
+                  </button>
+                  <button type="button" className="del" onClick={() => void removeSaved(p)} title="삭제">✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {plan && (
+            <p className="hintline muted">
+              {plan.kind === 'template' ? '유형' : '저장된 순서'} · {plan.name}
+              {dirty && <b> · 저장 안 됨</b>}
+            </p>
+          )}
+
+          {!plan && <p className="hintline muted">예배 유형을 고르거나 ＋ 로 새로 만드세요.</p>}
 
           {plan && (
             <div className="cue-list" ref={listRef}>

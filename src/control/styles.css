@@ -272,6 +272,10 @@ select:focus {
 .hintline.muted {
   color: var(--muted);
 }
+/* 되돌릴 수 없는 동작(덮어쓰기 등) 직전의 경고 */
+.hintline.warn {
+  color: var(--warn, #fbbf24);
+}
 
 .candidates {
   display: flex;
@@ -1353,6 +1357,29 @@ button.link-inline {
 }
 
 .cue-row .actions .go { color: var(--live, #ef4444); }
+
+/* 저장된 순서 목록 — '순서 불러오기' 를 눌렀을 때만 펼쳐진다 */
+.plan-saved {
+  flex: 0 0 auto;
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.plan-saved .saved-row {
+  display: inline-flex;
+  gap: 0;
+}
+
+/* 삭제는 되돌릴 수 없으므로 열기 버튼과 붙여 두되 색으로 구분한다 */
+.plan-saved .saved-row .del {
+  color: var(--muted);
+  padding: 6px 8px;
+  min-height: 36px;
+}
+.plan-saved .saved-row .del:hover {
+  color: #f87171;
+}
 
 /* 추가 바 — 타입을 고르면 입력창의 동작이 바뀐다 */
 .add-bar {

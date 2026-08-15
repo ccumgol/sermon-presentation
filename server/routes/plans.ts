@@ -7,7 +7,7 @@
 
 import type { FastifyInstance } from 'fastify';
 
-import type { ApiResponse, CueItem, ServicePlan } from '../../shared/types.ts';
+import type { ApiResponse, CueItem, PlanKind, ServicePlan } from '../../shared/types.ts';
 import * as store from '../db/plans.ts';
 
 function ok<T>(data: T): ApiResponse<T> {
@@ -128,15 +128,23 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
   return { items, rejected };
 }
 
+/** 알 수 없는 값은 유형이 아니라 저장된 순서로 본다 — 유형이 함부로 늘어나면 안 된다 */
+function readKind(value: unknown): PlanKind | undefined {
+  if (value === 'template' || value === 'plan') return value;
+  return undefined;
+}
+
 export async function registerPlanRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/api/plans', async () => ok(store.listPlans()));
+  app.get<{ Querystring: { kind?: string } }>('/api/plans', async (request) =>
+    ok(store.listPlans(readKind(request.query?.kind))),
+  );
 
   app.get<{ Params: { id: string } }>('/api/plans/:id', async (request, reply) => {
     const plan = store.getPlan(Number(request.params.id));
     return plan ? ok(plan) : reply.code(404).send(fail('예배 순서를 찾을 수 없습니다'));
   });
 
-  app.post<{ Body: { name?: string; serviceDate?: string; items?: unknown } }>(
+  app.post<{ Body: { name?: string; serviceDate?: string; items?: unknown; kind?: string } }>(
     '/api/plans',
     async (request, reply) => {
       const name = request.body?.name;
@@ -145,10 +153,12 @@ export async function registerPlanRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const { items, rejected } = normalizeItems(request.body?.items ?? []);
+      const kind = readKind(request.body?.kind);
       const plan = store.createPlan({
         name: name.trim(),
         ...(request.body?.serviceDate ? { serviceDate: request.body.serviceDate } : {}),
         items,
+        ...(kind ? { kind } : {}),
       });
 
       // 버린 항목이 있으면 조용히 넘기지 않고 알린다
