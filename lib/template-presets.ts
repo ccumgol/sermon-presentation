@@ -5,15 +5,53 @@
  * 사용자가 편집해 저장하면 별도 템플릿이 되고 프리셋은 그대로 남는다.
  *
  * 폰트는 언어별 폴백 체인(§5.6)을 문자열로 넣는다. 시스템에 없는 폰트는
- * 다음 후보로 넘어가고, 출력 페이지가 실제 사용된 폰트를 측정해 경고한다.
+ * 다음 후보로 넘어간다. 체인 끝을 `serif` 같은 총칭 키워드로만 두면 안 된다 —
+ * 총칭 폰트가 해당 문자를 덮지 못하면 브라우저가 **글자마다** 다른 폰트로
+ * 대체해 자간이 들쭉날쭉해진다. 그래서 총칭 앞에 실제로 존재하는 폰트를 둔다.
  */
 
 import type { Anchor, Template, TemplateKind, TextStyle } from '../shared/types.ts';
 
 const FONT_KO = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
 const FONT_EN = '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif';
-const FONT_GRC = '"SBL Greek", "Cardo", "Gentium Plus", serif';
-const FONT_HEB = '"SBL Hebrew", "Ezra SIL", "Taamey Frank CLM", serif';
+/**
+ * 다음절 그리스어(Ἐ ῇ ἦ — U+1F00 대역)는 총칭 `serif` 로 두면 글자마다 대체가
+ * 일어나 심하게 벌어진다. 실측: 같은 구절이 `serif` 819.6px vs Times 526.6px.
+ *
+ * 전용 폰트(SBL Greek 등)가 없는 PC 에서도 한 폰트로 그려지도록, 윈도우·맥에
+ * 모두 있는 Times New Roman 을 총칭 앞에 둔다.
+ */
+const FONT_GRC =
+  '"SBL Greek", "Cardo", "Gentium Plus", "Times New Roman", "Baskerville", serif';
+
+/**
+ * 예전 체인 — 총칭 `serif` 로만 끝나 글자별 대체가 일어났다.
+ *
+ * 프리셋을 고쳐도 이미 저장된 사본에는 옛 문자열이 굳어 있어, 저장소 초기화 때
+ * **이 문자열과 정확히 같을 때만** 새 체인으로 바꾼다. 사용자가 직접 고른 폰트는
+ * 문자열이 다르므로 건드리지 않는다.
+ */
+
+
+/**
+ * 히브리어는 모음·악센트가 자음 위에 얹혀 폭이 늘지 않아 대체가 일어나도 티가
+ * 덜 나지만(실측 비율 1.00), 같은 이유로 실제 폰트를 앞에 둔다.
+ */
+const FONT_HEB =
+  '"SBL Hebrew", "Ezra SIL", "Taamey Frank CLM", "Arial Hebrew", "Times New Roman", serif';
+
+
+/**
+ * 예전 폰트 체인 — 총칭 `serif` 로만 끝나 글자별 대체가 일어났다.
+ *
+ * 프리셋을 고쳐도 이미 저장된 사본에는 옛 문자열이 굳어 있다. 저장소 초기화 때
+ * **이 문자열과 정확히 같을 때만** 새 체인으로 바꾼다 — 사용자가 직접 고른 폰트는
+ * 문자열이 다르므로 건드리지 않는다.
+ */
+export const LEGACY_FONT_CHAINS: ReadonlyArray<{ from: string; to: string }> = [
+  { from: '"SBL Greek", "Cardo", "Gentium Plus", serif', to: FONT_GRC },
+  { from: '"SBL Hebrew", "Ezra SIL", "Taamey Frank CLM", serif', to: FONT_HEB },
+];
 
 /** 밝은 영상 위에서도 읽히도록 검은 외곽선을 기본으로 둔다 */
 const STROKE_DARK = { width: 3, color: '#000000' };

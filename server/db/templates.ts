@@ -6,7 +6,12 @@
  * 프리셋을 고치고 싶으면 '복제' 해서 사용자 템플릿으로 만든다.
  */
 
-import { BUILTIN_TEMPLATES, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
+import {
+  BUILTIN_TEMPLATES,
+  DEFAULT_TEMPLATE_ID,
+  getBuiltinTemplate,
+  LEGACY_FONT_CHAINS,
+} from '../../lib/template-presets.ts';
 import type { Template } from '../../shared/types.ts';
 import { getConnection } from './app.ts';
 
@@ -22,6 +27,53 @@ CREATE TABLE IF NOT EXISTS templates (
 
 export function initTemplateStore(): void {
   getConnection().exec(SCHEMA);
+  upgradeLegacyFontChains();
+}
+
+/**
+ * 저장된 템플릿의 옛 폰트 체인을 새 체인으로 올린다.
+ *
+ * 프리셋은 코드에서 만들어지므로 고치면 바로 반영되지만, 사용자가 저장한 사본은
+ * 그때의 값이 JSON 으로 굳어 있다. 옛 체인은 총칭 `serif` 로만 끝나 다음절
+ * 그리스어에서 글자별 폰트 대체가 일어났다 (같은 구절이 819.6px vs 526.6px).
+ *
+ * **문자열이 정확히 같을 때만** 바꾼다 — 사용자가 직접 고른 폰트는 건드리지 않는다.
+ */
+function upgradeLegacyFontChains(): number {
+  const rows = getConnection().prepare('SELECT id, config FROM templates').all() as unknown as Array<{
+    id: number;
+    config: string;
+  }>;
+
+  const update = getConnection().prepare('UPDATE templates SET config = ? WHERE id = ?');
+  let changed = 0;
+
+  for (const row of rows) {
+    let config: Template;
+    try {
+      config = JSON.parse(row.config) as Template;
+    } catch {
+      continue; // 깨진 JSON 은 parseRow 가 이미 걸러낸다
+    }
+
+    const byLang = config.overridesByLang;
+    if (!byLang) continue;
+
+    let touched = false;
+    const next = { ...byLang };
+    for (const [lang, style] of Object.entries(byLang)) {
+      const replacement = LEGACY_FONT_CHAINS.find((chain) => chain.from === style?.fontFamily);
+      if (!replacement) continue;
+      next[lang] = { ...style, fontFamily: replacement.to };
+      touched = true;
+    }
+
+    if (!touched) continue;
+    update.run(JSON.stringify({ ...config, overridesByLang: next }), row.id);
+    changed++;
+  }
+
+  return changed;
 }
 
 interface TemplateRow {

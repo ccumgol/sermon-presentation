@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { BUILTIN_TEMPLATES, DEFAULT_TEMPLATE_ID } from '../../lib/template-presets.ts';
 import { buildApp } from '../../server/app.ts';
+import * as store from '../../server/db/templates.ts';
 import type { ApiResponse, Template } from '../../shared/types.ts';
 
 let app: FastifyInstance;
@@ -168,5 +169,41 @@ describe('GET /api/template/current', () => {
     const { body } = await get<Template>('/api/template/current');
     expect(body.data?.id).toBeDefined();
     expect(body.data?.canvas.width).toBe(1920);
+  });
+});
+
+describe('옛 폰트 체인 자동 갱신', () => {
+  it('저장된 사본의 옛 체인을 새 체인으로 올린다', async () => {
+    const OLD = '"SBL Greek", "Cardo", "Gentium Plus", serif';
+
+    // 옛 체인을 가진 사본을 직접 만들어 둔다
+    const created = store.createTemplate({
+      ...BUILTIN_TEMPLATES[0]!,
+      name: '옛 체인 사본',
+      overridesByLang: { grc: { fontFamily: OLD } },
+    } as never);
+
+    // 초기화를 다시 돌리면 갱신된다 (앱 시작 때마다 도는 경로)
+    store.initTemplateStore();
+
+    const after = store.getTemplate(created.id)!;
+    expect(after.overridesByLang?.grc?.fontFamily).not.toBe(OLD);
+    expect(after.overridesByLang?.grc?.fontFamily).toContain('Times New Roman');
+
+    store.deleteTemplate(created.id);
+  });
+
+  it('사용자가 직접 고른 폰트는 건드리지 않는다', () => {
+    const MINE = '"내가 고른 폰트", serif';
+    const created = store.createTemplate({
+      ...BUILTIN_TEMPLATES[0]!,
+      name: '직접 고른 폰트',
+      overridesByLang: { grc: { fontFamily: MINE } },
+    } as never);
+
+    store.initTemplateStore();
+    expect(store.getTemplate(created.id)!.overridesByLang?.grc?.fontFamily).toBe(MINE);
+
+    store.deleteTemplate(created.id);
   });
 });

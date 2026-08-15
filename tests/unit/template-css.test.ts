@@ -199,3 +199,39 @@ describe('내장 프리셋', () => {
     for (const t of BUILTIN_TEMPLATES) expect(t.canvas.background.mode).toBe('transparent');
   });
 });
+
+describe('언어별 폰트 체인', () => {
+  const presets = BUILTIN_TEMPLATES;
+
+  it('원어 폰트 체인이 총칭 키워드로만 끝나지 않는다', () => {
+    // 총칭(serif)만 두면 그 폰트가 다음절 그리스어를 못 덮을 때 브라우저가
+    // 글자마다 다른 폰트로 대체해 자간이 벌어진다 (실측 819.6px vs 526.6px)
+    for (const preset of presets) {
+      for (const lang of ['grc', 'heb'] as const) {
+        const chain = preset.overridesByLang?.[lang]?.fontFamily;
+        if (!chain) continue;
+
+        const families = chain.split(',').map((f) => f.trim().replace(/^["']|["']$/g, ''));
+        const generics = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy']);
+        const concrete = families.filter((f) => !generics.has(f));
+
+        // 총칭 바로 앞에 실제 폰트가 최소 하나는 있어야 한다
+        const lastGenericIndex = families.findIndex((f) => generics.has(f));
+        expect(lastGenericIndex, `${preset.name}/${lang}`).toBeGreaterThan(0);
+        expect(concrete.length, `${preset.name}/${lang}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('어느 PC 에나 있는 폰트를 폴백으로 둔다', () => {
+    // 전용 폰트가 설치되지 않은 볼런티어 PC 에서도 한 폰트로 그려져야 한다
+    const common = ['Times New Roman', 'Arial', 'Georgia', 'Baskerville', 'Arial Hebrew'];
+    for (const preset of presets) {
+      for (const lang of ['grc', 'heb'] as const) {
+        const chain = preset.overridesByLang?.[lang]?.fontFamily;
+        if (!chain) continue;
+        expect(common.some((f) => chain.includes(f)), `${preset.name}/${lang}: ${chain}`).toBe(true);
+      }
+    }
+  });
+});
