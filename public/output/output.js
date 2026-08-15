@@ -282,6 +282,49 @@
   }
 
   /**
+   * 순서 이름을 **글자마다 크기와 높이를 달리해** 채운다 (붓글씨 같은 리듬).
+   *
+   * 규칙은 파도(cos) 하나다. 무작위를 쓰지 않는 이유가 중요하다 —
+   * 무작위면 새로고침하거나 다시 그릴 때마다 글자 배치가 달라져, 예배 중
+   * 같은 순서가 매번 다른 모양으로 나간다. 정해진 규칙이라 언제나 같다.
+   *
+   * 걸음(0.9)을 유리수로 딱 떨어지지 않게 둬서 2~5글자에서 기계적인 반복이
+   * 보이지 않게 했다. 작아진 글자는 그만큼 아래로 내려 아랫선을 흔든다.
+   */
+  function fillRhythmicText(node, text) {
+    clearChildren(node);
+
+    var amount = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--title-rhythm'),
+    );
+    if (!(amount > 0)) {
+      node.textContent = text;
+      return;
+    }
+
+    // 어절 단위로 나눈다. 띄어쓰기를 넘어가면 리듬을 처음부터 다시 탄다 —
+    // '찬양과 경배' 처럼 **뒤 어절의 첫 글자가 다시 커져야** 캡처의 리듬이 된다.
+    var words = text.split(' ');
+    for (var w = 0; w < words.length; w++) {
+      if (w > 0) node.appendChild(document.createTextNode(' ')); // 공백은 감싸지 않는다(줄바꿈 기회 유지)
+      var chars = Array.from(words[w]);
+
+      for (var i = 0; i < chars.length; i++) {
+        // 어절 안에서 **양끝을 크게, 가운데를 작게**. 한 글자짜리는 흔들지 않는다.
+        // (실측: 붙임표 없이 이어 세면 4자 이상에서 끝없이 작아져 뒤가 쪼그라든다)
+        var wave = chars.length < 2 ? 1 : Math.cos((i / (chars.length - 1)) * 2 * Math.PI);
+        var span = document.createElement('span');
+        span.className = 'rhythm-char';
+        span.style.fontSize = (1 + amount * wave).toFixed(3) + 'em';
+        // 작아진 글자는 그만큼 내려 아랫선을 흔든다
+        span.style.transform = 'translateY(' + (amount * (1 - wave) * 0.18).toFixed(3) + 'em)';
+        span.textContent = chars[i];
+        node.appendChild(span);
+      }
+    }
+  }
+
+  /**
    * 순서 표시 — 왼쪽 순서 이름, 오른쪽 담당자(밑줄).
    *
    * 담당자가 없으면 오른쪽 칸을 아예 만들지 않는다. 빈 밑줄만 떠 있으면
@@ -295,7 +338,7 @@
 
     var title = document.createElement('div');
     title.className = 'order-title line-primary';
-    title.textContent = payload.title || '';
+    fillRhythmicText(title, payload.title || '');
     row.appendChild(title);
 
     if (payload.presenter) {

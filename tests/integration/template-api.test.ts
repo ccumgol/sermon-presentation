@@ -53,9 +53,9 @@ describe('GET /api/templates', () => {
     expect(body.data!.slice(0, BUILTIN_TEMPLATES.length).every((t) => t.isBuiltin)).toBe(true);
   });
 
-  it('프리셋 8종이 모두 있다', async () => {
+  it('프리셋 9종이 모두 있다', async () => {
     const { body } = await get<Template[]>('/api/templates');
-    expect(body.data!.filter((t) => t.isBuiltin)).toHaveLength(8);
+    expect(body.data!.filter((t) => t.isBuiltin)).toHaveLength(9);
   });
 });
 

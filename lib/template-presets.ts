@@ -14,6 +14,16 @@ import type { Anchor, Template, TemplateKind, TextStyle } from '../shared/types.
 
 const FONT_KO = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
 const FONT_EN = '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif';
+
+/**
+ * 한국어 **명조(바탕)** 계열 — 순서 표시처럼 굵고 큰 제목에 쓴다.
+ *
+ * 앞쪽은 굵은 바탕(설치돼 있으면), 그다음 맥·윈도우 기본 명조, 마지막에 총칭.
+ * 총칭(serif)만 남기면 한글을 못 덮는 폰트로 대체돼 자간이 들쭉날쭉해진다
+ * (헬라어에서 겪은 문제와 같은 원리 — PLAN 3.4 참고).
+ */
+const FONT_KO_SERIF =
+  '"BareunBatangOTFPro", "NanumMyeongjoExtraBold", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif';
 /**
  * 다음절 그리스어(Ἐ ῇ ἦ — U+1F00 대역)는 총칭 `serif` 로 두면 글자마다 대체가
  * 일어나 심하게 벌어진다. 실측: 같은 구절이 `serif` 819.6px vs Times 526.6px.
@@ -276,6 +286,40 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
       },
     },
     behavior: { showVerseNumbers: false, showReference: 'none', showHeadings: false, autoFit: false },
+  }),
+
+  preset({
+    id: -9,
+    name: '순서 표시 — 명조 리듬',
+    kind: 'order',
+    anchor: 'bottom-center',
+    safeArea: { left: 80, right: 80, bottom: 80 },
+    layout: { align: 'left', gap: 8 },
+    text: {
+      // 명조(바탕) 계열. 굵은 바탕이 없는 PC 도 있으므로 체인을 두껍게 두고,
+      // 총칭(serif) 앞에 어느 PC 에나 있는 이름을 둔다 (3.4 폰트 대체 교훈).
+      primary: {
+        fontFamily: FONT_KO_SERIF,
+        fontSize: 120,
+        fontWeight: 700,
+        stroke: { width: 3, color: '#000000' },
+      },
+      secondary: {
+        fontFamily: FONT_KO_SERIF,
+        fontSize: 96,
+        fontWeight: 700,
+        stroke: { width: 3, color: '#000000' },
+      },
+    },
+    behavior: {
+      showVerseNumbers: false,
+      showReference: 'none',
+      showHeadings: false,
+      showCredit: false,
+      autoFit: true,
+      // 글자마다 크기·높이를 달리해 붓글씨 같은 리듬을 준다
+      titleRhythm: 0.18,
+    },
   }),
 
   preset({

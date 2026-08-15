@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_TEMPLATES, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
-import { anchorToAlignment, diffCssVars, overrideVarsFor, templateToCssVars, withAlpha } from '../../lib/template-css.ts';
+import {
+  anchorToAlignment, clampRhythm, diffCssVars, MAX_TITLE_RHYTHM, overrideVarsFor, templateToCssVars, withAlpha,
+} from '../../lib/template-css.ts';
 import type { Anchor, Template } from '../../shared/types.ts';
 
 function base(): Template {
@@ -209,8 +211,8 @@ describe('diffCssVars', () => {
 });
 
 describe('내장 프리셋', () => {
-  it('8종이 있고 id 가 겹치지 않는다', () => {
-    expect(BUILTIN_TEMPLATES).toHaveLength(8);
+  it('9종이 있고 id 가 겹치지 않는다', () => {
+    expect(BUILTIN_TEMPLATES).toHaveLength(9);
     const ids = BUILTIN_TEMPLATES.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -275,5 +277,31 @@ describe('언어별 폰트 체인', () => {
         expect(common.some((f) => chain.includes(f)), `${preset.name}/${lang}: ${chain}`).toBe(true);
       }
     }
+  });
+});
+
+describe('순서 표시 리듬', () => {
+  it('기본은 0 — 켜지 않으면 모든 글자가 같은 크기', () => {
+    expect(templateToCssVars(base())['--title-rhythm']).toBe('0');
+  });
+
+  it('지정한 값을 CSS 변수로 내보낸다 (편집 중에도 미리보기에 반영되도록)', () => {
+    const template: Template = { ...base(), behavior: { ...base().behavior, titleRhythm: 0.18 } };
+    expect(templateToCssVars(template)['--title-rhythm']).toBe('0.18');
+  });
+
+  it('범위를 벗어난 값은 잘라 낸다 — 글자가 화면 밖으로 튀면 안 된다', () => {
+    expect(clampRhythm(5)).toBe(MAX_TITLE_RHYTHM);
+    expect(clampRhythm(-1)).toBe(0);
+    expect(clampRhythm(Number.NaN)).toBe(0);
+    expect(clampRhythm(undefined)).toBe(0);
+  });
+
+  it('명조 프리셋은 리듬이 켜져 있고 한글 명조 체인을 쓴다', () => {
+    const preset = BUILTIN_TEMPLATES.find((t) => t.kind === 'order')!;
+    expect(preset.behavior.titleRhythm).toBeGreaterThan(0);
+    // 총칭 serif 앞에 실제 폰트가 있어야 글자별 대체가 일어나지 않는다 (PLAN 3.4)
+    expect(preset.text.primary.fontFamily).toMatch(/Batang|Myeongjo|Myungjo/);
+    expect(preset.text.primary.fontFamily.endsWith('serif')).toBe(true);
   });
 });

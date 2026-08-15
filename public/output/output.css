@@ -225,6 +225,16 @@ body.blanked .slide {
 }
 
 /*
+ * 리듬 글자 — 크기가 저마다 달라도 **아랫선이 흔들리되 무너지지는 않게** 한다.
+ * inline-block 이라야 transform 이 먹고, baseline 정렬이라야 큰 글자와 작은 글자가
+ * 한 줄로 읽힌다.
+ */
+.rhythm-char {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+/*
  * 담당자 자리는 이름보다 넓게 둔다 — 캡처처럼 이름 왼쪽까지 밑줄이 이어져
  * '적어 넣는 칸'처럼 보이게 하기 위함이다. 이름은 오른쪽에 붙인다.
  */

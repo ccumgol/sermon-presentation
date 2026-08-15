@@ -301,7 +301,7 @@ export interface SongSearchResult {
 // 템플릿 / 스타일
 // ─────────────────────────────────────────────────────────────
 
-export type TemplateKind = 'bible' | 'song' | 'lower_third' | 'blank';
+export type TemplateKind = 'bible' | 'song' | 'lower_third' | 'blank' | 'order';
 
 export type Anchor =
   | 'top-left' | 'top-center' | 'top-right'
@@ -382,6 +382,14 @@ export interface TemplateBehavior {
    * 다시 쪼갤 안전한 방법이 없지만, 짧은 행은 언제든 묶을 수 있다.
    */
   maxCharsPerLine?: number;
+  /**
+   * 순서 표시 제목의 **리듬** — 글자마다 크기와 높이를 달리해 붓글씨처럼 보이게 한다.
+   *
+   * 값은 흔들리는 폭이다. `0` 이면 끄고(모든 글자가 같은 크기), `0.18` 이 기본,
+   * `0.35` 면 꽤 과장된다. 파도 모양의 **정해진 규칙**으로 계산하므로 같은 글자는
+   * 언제나 같은 모양이다 — 무작위로 두면 새로고침할 때마다 화면이 달라진다.
+   */
+  titleRhythm?: number;
   transition: { type: 'none' | 'fade' | 'slide-up'; durationMs: number };
   showVerseNumbers: boolean;
   showReference: 'none' | 'top' | 'bottom' | 'inline';

@@ -368,6 +368,31 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
 
       <div className="card">
         <h2>표시 옵션</h2>
+
+        {/* 순서 표시 제목의 리듬 — 글자마다 크기·높이를 달리해 붓글씨처럼 보이게 한다 */}
+        <div className="field">
+          <label title="순서 표시(대표기도·신앙고백 등) 제목에만 적용됩니다">글자 리듬</label>
+          <input
+            type="range"
+            min={0}
+            max={0.4}
+            step={0.02}
+            value={draft.behavior.titleRhythm ?? 0}
+            onChange={(e) =>
+              patchDraft((c) => ({ ...c, behavior: { ...c.behavior, titleRhythm: Number(e.target.value) } }))
+            }
+          />
+          <span className="muted">
+            {(draft.behavior.titleRhythm ?? 0) === 0
+              ? '끔 (모든 글자 같은 크기)'
+              : `±${Math.round((draft.behavior.titleRhythm ?? 0) * 100)}%`}
+          </span>
+        </div>
+        <p className="hintline muted">
+          어절마다 <b>양끝은 크게, 가운데는 작게</b> 두고 작아진 글자를 조금 내립니다.
+          같은 글자는 언제나 같은 모양이라 예배마다 화면이 달라지지 않습니다.
+        </p>
+
         <div className="row">
           <label className="check">
             <input

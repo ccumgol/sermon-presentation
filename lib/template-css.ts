@@ -140,6 +140,19 @@ function backdropOpacity(background: CanvasBackground): string {
   return 'opacity' in background && typeof background.opacity === 'number' ? String(background.opacity) : '1';
 }
 
+/**
+ * 리듬 폭을 안전한 범위로 자른다.
+ *
+ * 너무 크면 글자가 화면 밖으로 튀고 줄 높이가 들쭉날쭉해져 읽히지 않는다.
+ * 0.4 를 넘길 이유가 없어 경계에서 자른다.
+ */
+export const MAX_TITLE_RHYTHM = 0.4;
+
+export function clampRhythm(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.min(Math.max(value, 0), MAX_TITLE_RHYTHM);
+}
+
 /** 템플릿 전체 → CSS 변수 묶음 */
 export function templateToCssVars(template: Template): CssVars {
   const { justify, align } = anchorToAlignment(template.layout.anchor);
@@ -175,6 +188,10 @@ export function templateToCssVars(template: Template): CssVars {
     ...simpleStyleVars('reference', text.reference),
     ...simpleStyleVars('heading', text.heading),
     ...simpleStyleVars('credit', text.credit),
+
+    // 순서 표시 제목의 리듬 (0 = 끔). CSS 변수로 내보내야 **저장 전 편집 중에도**
+    // 미리보기에 반영된다 — behavior 는 저장해야 출력 페이지로 가기 때문이다.
+    '--title-rhythm': String(clampRhythm(behavior.titleRhythm)),
 
     // 전환
     '--transition-duration': `${behavior.transition.type === 'none' ? 0 : behavior.transition.durationMs}ms`,
