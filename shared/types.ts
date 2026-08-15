@@ -390,6 +390,14 @@ export interface TemplateBehavior {
    * 언제나 같은 모양이다 — 무작위로 두면 새로고침할 때마다 화면이 달라진다.
    */
   titleRhythm?: number;
+  /**
+   * 순서 표시 제목의 **높낮이** 흔들림 — 작아진 글자를 얼마나 내릴지.
+   *
+   * 크기(`titleRhythm`)와 **따로** 둔다. 크기만 흔들고 아랫선은 가지런히 두거나,
+   * 반대로 크기는 그대로 두고 높낮이만 흔드는 배치가 각각 쓸모가 있기 때문이다.
+   * 값은 글자 크기에 대한 비율(em)이고 `0` 이면 아랫선이 가지런해진다.
+   */
+  titleRhythmY?: number;
   transition: { type: 'none' | 'fade' | 'slide-up'; durationMs: number };
   showVerseNumbers: boolean;
   showReference: 'none' | 'top' | 'bottom' | 'inline';

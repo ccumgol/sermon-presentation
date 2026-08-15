@@ -318,8 +318,9 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
       showHeadings: false,
       showCredit: false,
       autoFit: true,
-      // 글자마다 크기·높이를 달리해 붓글씨 같은 리듬을 준다
+      // 글자마다 크기·높이를 달리해 붓글씨 같은 리듬을 준다 (둘은 따로 조절한다)
       titleRhythm: 0.18,
+      titleRhythmY: 0.06,
     },
   }),
 

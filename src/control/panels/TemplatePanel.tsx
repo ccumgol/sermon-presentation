@@ -388,9 +388,29 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
               : `±${Math.round((draft.behavior.titleRhythm ?? 0) * 100)}%`}
           </span>
         </div>
+        <div className="field">
+          <label title="작아진 글자를 얼마나 내릴지 — 0 이면 아랫선이 가지런해집니다">글자 높낮이</label>
+          <input
+            type="range"
+            min={0}
+            max={0.4}
+            step={0.01}
+            value={draft.behavior.titleRhythmY ?? 0}
+            onChange={(e) =>
+              patchDraft((c) => ({ ...c, behavior: { ...c.behavior, titleRhythmY: Number(e.target.value) } }))
+            }
+          />
+          <span className="muted">
+            {(draft.behavior.titleRhythmY ?? 0) === 0
+              ? '끔 (아랫선 가지런히)'
+              : `↓ ${Math.round((draft.behavior.titleRhythmY ?? 0) * 100)}%`}
+          </span>
+        </div>
+
         <p className="hintline muted">
-          어절마다 <b>양끝은 크게, 가운데는 작게</b> 두고 작아진 글자를 조금 내립니다.
-          같은 글자는 언제나 같은 모양이라 예배마다 화면이 달라지지 않습니다.
+          <b>큰 · 작은 · 작은</b> 이 세 글자마다 되풀이되고, 띄어쓰기를 만나면 처음부터 다시
+          시작합니다. 크기와 높낮이는 <b>따로</b> 조절합니다 — 크기만 흔들거나, 크기는 두고
+          높낮이만 흔들 수 있습니다. 같은 글자는 언제나 같은 모양이라 예배마다 화면이 달라지지 않습니다.
         </p>
 
         <div className="row">

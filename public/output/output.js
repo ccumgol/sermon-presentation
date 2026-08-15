@@ -294,10 +294,15 @@
   function fillRhythmicText(node, text) {
     clearChildren(node);
 
-    var amount = parseFloat(
-      getComputedStyle(document.documentElement).getPropertyValue('--title-rhythm'),
-    );
-    if (!(amount > 0)) {
+    var root = getComputedStyle(document.documentElement);
+    var amount = parseFloat(root.getPropertyValue('--title-rhythm'));
+    // 높낮이는 크기와 **따로** 조절한다. 크기만 흔들고 아랫선은 가지런히 두거나,
+    // 크기는 그대로 두고 높낮이만 흔드는 배치가 각각 쓸모가 있다.
+    var amountY = parseFloat(root.getPropertyValue('--title-rhythm-y'));
+    if (!(amount > 0)) amount = 0;
+    if (!(amountY > 0)) amountY = 0;
+
+    if (amount === 0 && amountY === 0) {
       node.textContent = text;
       return;
     }
@@ -324,8 +329,9 @@
         var span = document.createElement('span');
         span.className = 'rhythm-char';
         span.style.fontSize = (1 + amount * wave).toFixed(3) + 'em';
-        // 작아진 글자는 그만큼 내려 아랫선을 흔든다
-        span.style.transform = 'translateY(' + (amount * (1 - wave) * 0.18).toFixed(3) + 'em)';
+        // 파도가 아래로 갈수록 글자를 내린다. (1-wave)/2 는 0~1 이라
+        // 값이 곧 '가장 많이 내려간 글자가 몇 em 내려가는지' 가 된다.
+        span.style.transform = 'translateY(' + (amountY * ((1 - wave) / 2)).toFixed(3) + 'em)';
         span.textContent = chars[i];
         node.appendChild(span);
       }

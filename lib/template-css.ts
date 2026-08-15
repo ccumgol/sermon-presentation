@@ -192,6 +192,7 @@ export function templateToCssVars(template: Template): CssVars {
     // 순서 표시 제목의 리듬 (0 = 끔). CSS 변수로 내보내야 **저장 전 편집 중에도**
     // 미리보기에 반영된다 — behavior 는 저장해야 출력 페이지로 가기 때문이다.
     '--title-rhythm': String(clampRhythm(behavior.titleRhythm)),
+    '--title-rhythm-y': String(clampRhythm(behavior.titleRhythmY)),
 
     // 전환
     '--transition-duration': `${behavior.transition.type === 'none' ? 0 : behavior.transition.durationMs}ms`,

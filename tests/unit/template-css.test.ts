@@ -290,6 +290,21 @@ describe('순서 표시 리듬', () => {
     expect(templateToCssVars(template)['--title-rhythm']).toBe('0.18');
   });
 
+  it('크기와 높낮이를 따로 내보낸다', () => {
+    // 크기만 흔들거나(높낮이 0), 크기는 두고 높낮이만 흔드는 배치가 각각 쓸모가 있다
+    const template: Template = {
+      ...base(),
+      behavior: { ...base().behavior, titleRhythm: 0.2, titleRhythmY: 0.05 },
+    };
+    const vars = templateToCssVars(template);
+    expect(vars['--title-rhythm']).toBe('0.2');
+    expect(vars['--title-rhythm-y']).toBe('0.05');
+  });
+
+  it('높낮이 기본은 0 — 아랫선이 가지런하다', () => {
+    expect(templateToCssVars(base())['--title-rhythm-y']).toBe('0');
+  });
+
   it('범위를 벗어난 값은 잘라 낸다 — 글자가 화면 밖으로 튀면 안 된다', () => {
     expect(clampRhythm(5)).toBe(MAX_TITLE_RHYTHM);
     expect(clampRhythm(-1)).toBe(0);
@@ -300,6 +315,7 @@ describe('순서 표시 리듬', () => {
   it('명조 프리셋은 리듬이 켜져 있고 한글 명조 체인을 쓴다', () => {
     const preset = BUILTIN_TEMPLATES.find((t) => t.kind === 'order')!;
     expect(preset.behavior.titleRhythm).toBeGreaterThan(0);
+    expect(preset.behavior.titleRhythmY).toBeGreaterThan(0);
     // 총칭 serif 앞에 실제 폰트가 있어야 글자별 대체가 일어나지 않는다 (PLAN 3.4)
     expect(preset.text.primary.fontFamily).toMatch(/Batang|Myeongjo|Myungjo/);
     expect(preset.text.primary.fontFamily.endsWith('serif')).toBe(true);
