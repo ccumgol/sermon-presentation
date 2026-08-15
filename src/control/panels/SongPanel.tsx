@@ -5,6 +5,7 @@ import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
+import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
 import { SongbookManager } from './SongbookManager.tsx';
 
@@ -271,7 +272,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter') return;
+            // 한글 조합 확정용 Enter 를 걸러낸다 — 안 그러면 한 번 눌러도
+            // 두 번 처리돼 엉뚱한 곡이 송출될 수 있다 (ime.ts 참고)
+            if (e.key !== 'Enter' || isComposing(e)) return;
             e.preventDefault();
             // 첫 결과를 곧바로 송출한다. 목록이 눈앞에 있으니 예측 가능하다.
             const first = result?.hits[0];

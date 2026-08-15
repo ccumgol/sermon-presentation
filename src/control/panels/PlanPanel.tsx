@@ -25,6 +25,7 @@ import {
   type SlidePayload, type Template,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
+import { isComposing } from '../ime.ts';
 import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
 import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
@@ -949,6 +950,7 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 value={nameBar.value}
                 onChange={(e) => setNameBar({ ...nameBar, value: e.target.value })}
                 onKeyDown={(e) => {
+                  if (isComposing(e)) return; // 한글 조합 확정용 Enter 는 넘긴다
                   if (e.key === 'Enter') { e.preventDefault(); void commitNameBar(); }
                   if (e.key === 'Escape') { e.preventDefault(); setNameBar(null); }
                 }}
@@ -1036,6 +1038,22 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                             {running ? '■' : '▶'}
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex - 1)); }}
+                          disabled={row.itemIndex === 0}
+                          title="위로"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex + 1)); }}
+                          disabled={row.itemIndex === items.length - 1}
+                          title="아래로"
+                        >
+                          ↓
+                        </button>
                         <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(removeItem(items, item.id)); }} title="삭제">✕</button>
                       </span>
                     </div>
@@ -1146,7 +1164,7 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                   value={addInput}
                   onChange={(e) => setAddInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key !== 'Enter') return;
+                    if (e.key !== 'Enter' || isComposing(e)) return;
                     // Enter = 항목 추가(성경·찬양과 같은 동작). 줄바꿈은 Shift+Enter.
                     //
                     // 이전에는 ⌘Enter 만 추가라서, 광고를 입력하고 Enter 를 눌러도
@@ -1165,7 +1183,8 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                   value={addInput}
                   onChange={(e) => setAddInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key !== 'Enter') return;
+                    // 한글은 마지막 글자가 조합 중이라 Enter 가 두 번 처리된다 (ime.ts 참고)
+                    if (e.key !== 'Enter' || isComposing(e)) return;
                     e.preventDefault();
                     addFromInput();
                   }}

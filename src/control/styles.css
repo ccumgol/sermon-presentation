@@ -1356,7 +1356,9 @@ button.link-inline {
 
 .cue-row:hover .actions,
 .cue-row.current .actions,
-.cue-divider:hover .actions { opacity: 1; }
+.cue-divider:hover .actions,
+/* 커서가 놓인 구분도 버튼을 보여 준다 — 키보드로 옮길 때 어디를 누를지 보여야 한다 */
+.cue-divider.current .actions { opacity: 1; }
 
 .cue-row .actions button,
 .cue-divider .actions button {
