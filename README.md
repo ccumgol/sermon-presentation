@@ -10,6 +10,12 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 전체 설계는 [PLAN.md](PLAN.md), 원본 데이터의 알려진 문제는
 [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md)를 참고하세요.
 
+저장소: https://github.com/ccumgol/sermon-presentation
+
+**데이터는 저장소에 들어 있지 않습니다.** 성경·찬양 DB(`data/`)는 원본에서 다시
+빌드하고, 곡집 자료는 각자의 폴더에서 가져옵니다. 직접 손본 가사는 `data/songs.sqlite`
+안에만 있으므로 따로 백업해 두세요 (`data/backups/`).
+
 ---
 
 ## 요구 사항
@@ -465,6 +471,8 @@ npm run lyrics:realign -- --apply
 
 자동 정렬은 **제안**입니다. **검토** 탭에서 곡마다 승인해야 확정됩니다.
 승인한 곡은 `lines_source = manual` 이 되어 **이후 어떤 자동 작업도 건드리지 않습니다.**
+찬양 탭의 곡 목록에도 초록색 **승인** 표가 붙어, 내 작업이 남아 있는지 눈으로 확인할
+수 있습니다. 재정렬·후렴 병합 스크립트는 이 곡들을 건너뜁니다.
 
 | 키 | 동작 |
 |----|------|
