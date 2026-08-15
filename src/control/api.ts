@@ -21,6 +21,14 @@ export interface ServerInfo {
   connections: { control: number; output: number };
 }
 
+/** `data/backgrounds/` 안의 배경 파일 하나 */
+export interface BackgroundFile {
+  name: string;
+  kind: 'image' | 'video';
+  bytes: number;
+  url: string;
+}
+
 export interface PassageResponse {
   parse: ParseResult;
   passage: Passage | null;
@@ -161,6 +169,10 @@ export const api = {
     send<{ songs: number; templates: number; plans: number; settings: number; fonts: number; skipped: string[] }>(
       'POST', '/api/backup/import', { bundle, mode },
     ),
+
+  backgrounds: () => get<{ files: BackgroundFile[]; maxUploadBytes: number }>('/api/backgrounds'),
+  uploadBackground: (name: string, base64: string) =>
+    send<{ file: BackgroundFile | null }>('POST', '/api/backgrounds', { name, base64 }),
 
   templates: () => get<Template[]>('/api/templates'),
   currentTemplate: () => get<Template>('/api/template/current'),

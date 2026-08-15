@@ -324,10 +324,26 @@ export interface TextStyle {
   wordBreak: 'normal' | 'keep-all';
 }
 
+/**
+ * 캔버스 배경.
+ *
+ * `image`·`video` 는 카메라 영상이 없을 때 쓴다 — 그림이나 반복 동영상을 깔고
+ * 그 위에 자막을 얹는다. `src` 는 **파일 이름만** 담는다(`data/backgrounds/` 안).
+ * 경로를 담으면 상위 폴더를 가리킬 수 있어 서버가 거부한다.
+ *
+ * 배경 파일은 데이터 이전(백업)에 담기지 않는다 — 동영상이 수백 MB 라
+ * 이전 파일을 못 쓸 만큼 키운다(2026-08-15 사용자 결정). 이름만 남으므로
+ * 다른 PC 에서는 파일을 따로 옮겨야 한다.
+ */
 export type CanvasBackground =
   | { mode: 'transparent' }
   | { mode: 'color'; color: string; opacity: number }
-  | { mode: 'chroma'; color: string };
+  | { mode: 'chroma'; color: string }
+  | { mode: 'image'; src: string; fit?: BackgroundFit; opacity?: number }
+  | { mode: 'video'; src: string; fit?: BackgroundFit; opacity?: number };
+
+/** 화면을 채울지(잘림), 다 보이게 넣을지(여백) */
+export type BackgroundFit = 'cover' | 'contain';
 
 export interface TemplateCanvas {
   width: number;

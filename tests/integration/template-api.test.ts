@@ -147,6 +147,26 @@ describe('사용자 템플릿', () => {
     expect(updated.canvas.background).toEqual({ mode: 'chroma', color: '#1eff00' });
   });
 
+  it('그림·동영상 배경을 저장하고 다시 읽는다', async () => {
+    const created = (await send<Template>('POST', `/api/templates/${DEFAULT_TEMPLATE_ID}/duplicate`, {})).body.data!;
+    createdIds.push(created.id);
+
+    const updated = (
+      await send<Template>('PUT', `/api/templates/${created.id}`, {
+        canvas: { background: { mode: 'video', src: 'loop.mp4', fit: 'contain', opacity: 0.8 } },
+      })
+    ).body.data!;
+    expect(updated.canvas.background).toEqual({ mode: 'video', src: 'loop.mp4', fit: 'contain', opacity: 0.8 });
+
+    // 다시 읽어도 그대로여야 한다 — 배경은 예배 직전에 다시 고를 여유가 없다
+    const reread = (await get<Template>(`/api/templates/${created.id}`)).body.data!;
+    expect(reread.canvas.background).toEqual(updated.canvas.background);
+
+    // 다른 필드를 고쳐도 배경이 지워지지 않는다 (편집 UI 는 바뀐 필드만 보낸다)
+    const renamed = (await send<Template>('PUT', `/api/templates/${created.id}`, { name: '배경 유지' })).body.data!;
+    expect(renamed.canvas.background).toEqual(updated.canvas.background);
+  });
+
   it('삭제된다', async () => {
     const created = (await send<Template>('POST', `/api/templates/${DEFAULT_TEMPLATE_ID}/duplicate`, {})).body.data!;
     expect((await send('DELETE', `/api/templates/${created.id}`)).status).toBe(200);

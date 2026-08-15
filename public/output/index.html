@@ -15,6 +15,13 @@
     <!-- 미리보기 전용 체커보드. ?preview=1 일 때만 보인다. 송출에는 절대 나오지 않는다. -->
     <div id="preview-bg" aria-hidden="true"></div>
 
+    <!--
+      배경 그림·동영상 레이어 (카메라 영상이 없을 때).
+      템플릿이 지정할 때만 내용이 생기고, 없으면 비어 있어 투명 송출 그대로다.
+      체커보드보다 뒤에 두면 미리보기에서 배경이 가려지므로 순서를 바꾸지 말 것.
+    -->
+    <div id="backdrop" class="backdrop" aria-hidden="true"></div>
+
     <main id="stage" class="stage">
       <div id="slide" class="slide" data-empty="true">
         <div id="heading" class="heading" hidden></div>

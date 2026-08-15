@@ -4,6 +4,7 @@ import { templateToCssVars } from '../../../lib/template-css.ts';
 import type { CanvasBackground, ClientMsg, Template, TextStyle } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { AnchorGrid } from '../components/AnchorGrid.tsx';
+import { BackgroundPicker } from '../components/BackgroundPicker.tsx';
 import { ColorField, NumberField, TextStyleFields } from '../components/StyleFields.tsx';
 
 interface Props {
@@ -300,18 +301,25 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
             value={background.mode}
             onChange={(e) => {
               const mode = e.target.value as CanvasBackground['mode'];
+              // 모드를 바꿔도 고른 파일은 기억해 둔다 — 그림↔동영상을 오갈 때
+              // 매번 다시 고르게 하면 확인 작업이 느려진다
+              const keptSrc = background.mode === 'image' || background.mode === 'video' ? background.src : '';
               const next: CanvasBackground =
                 mode === 'transparent'
                   ? { mode: 'transparent' }
                   : mode === 'chroma'
                     ? { mode: 'chroma', color: '#1eff00' }
-                    : { mode: 'color', color: '#000000', opacity: 0.5 };
+                    : mode === 'image' || mode === 'video'
+                      ? { mode, src: keptSrc, fit: 'cover', opacity: 1 }
+                      : { mode: 'color', color: '#000000', opacity: 0.5 };
               patchDraft((c) => ({ ...c, canvas: { ...c.canvas, background: next } }));
             }}
           >
             <option value="transparent">투명 (권장)</option>
             <option value="color">단색·반투명 띠</option>
             <option value="chroma">크로마키 단색</option>
+            <option value="image">그림</option>
+            <option value="video">반복 동영상</option>
           </select>
         </div>
 
@@ -321,7 +329,7 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           </p>
         )}
 
-        {background.mode !== 'transparent' && (
+        {(background.mode === 'color' || background.mode === 'chroma') && (
           <>
             <ColorField
               label="배경 색"
@@ -339,6 +347,13 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
               </p>
             )}
           </>
+        )}
+
+        {(background.mode === 'image' || background.mode === 'video') && (
+          <BackgroundPicker
+            background={background}
+            onChange={(next) => patchDraft((c) => ({ ...c, canvas: { ...c.canvas, background: next } }))}
+          />
         )}
       </div>
 

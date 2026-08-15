@@ -49,6 +49,11 @@ export const paths = {
   fontsDir: path.join(DATA_DIR, 'fonts'),
   backupsDir: path.join(DATA_DIR, 'backups'),
   /**
+   * 배경 그림·동영상. 사용자가 파일을 직접 넣어도 되고 앱에서 올려도 된다.
+   * 서버는 이 폴더 밖의 파일은 배경으로 내주지 않는다.
+   */
+  backgroundsDir: path.join(DATA_DIR, 'backgrounds'),
+  /**
    * 빌드 리포트는 자기가 만든 DB 와 같은 위치에 둔다.
    * APP_ROOT 아래에 두었을 때, SERMON_DATA_DIR 을 바꿔 실행한 시험 빌드의 리포트가
    * 실제 리포트 폴더에 섞여 "어느 파일로 빌드했는지"를 잘못 알려주는 일이 있었다.
@@ -61,7 +66,7 @@ export const paths = {
 
 /** 쓰기 대상 디렉터리를 필요 시 생성한다. 원본 DB 폴더는 건드리지 않는다. */
 export function ensureDataDirs(): void {
-  for (const dir of [paths.dataDir, paths.fontsDir, paths.backupsDir, paths.reportsDir]) {
+  for (const dir of [paths.dataDir, paths.fontsDir, paths.backupsDir, paths.reportsDir, paths.backgroundsDir]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 }

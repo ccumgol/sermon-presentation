@@ -86,6 +86,48 @@ describe('templateToCssVars', () => {
     expect(templateToCssVars(template)['--canvas-bg']).toBe('#1eff00');
   });
 
+  it('그림·동영상 배경은 페이지 배경을 투명으로 둔다 (#backdrop 요소가 그린다)', () => {
+    // 파일이 없거나 못 읽어도 투명 송출이 그대로 유지돼야 한다 —
+    // 페이지 배경에 색을 깔면 배경 실패가 곧 '검은 화면'이 된다.
+    for (const background of [
+      { mode: 'image' as const, src: 'sunrise.jpg', fit: 'cover' as const, opacity: 1 },
+      { mode: 'video' as const, src: 'loop.mp4' },
+    ]) {
+      const template: Template = { ...base(), canvas: { ...base().canvas, background } };
+      expect(templateToCssVars(template)['--canvas-bg']).toBe('transparent');
+    }
+  });
+
+  it('배경 파일은 backdrop 키로, 맞춤·불투명도는 CSS 변수로 나간다', () => {
+    const template: Template = {
+      ...base(),
+      canvas: {
+        ...base().canvas,
+        background: { mode: 'video', src: 'loop.mp4', fit: 'contain', opacity: 0.6 },
+      },
+    };
+    const vars = templateToCssVars(template);
+    // 편집 중 style:set 만으로도 미리보기에 반영되려면 이 키가 함께 나가야 한다
+    expect(vars['backdrop']).toBe('{"mode":"video","src":"loop.mp4"}');
+    expect(vars['--backdrop-fit']).toBe('contain');
+    expect(vars['--backdrop-opacity']).toBe('0.6');
+  });
+
+  it('배경이 파일이 아니면 backdrop 은 빈 문자열 (요소를 지운다)', () => {
+    const vars = templateToCssVars(base());
+    expect(vars['backdrop']).toBe('');
+    expect(vars['--backdrop-fit']).toBe('cover');
+    expect(vars['--backdrop-opacity']).toBe('1');
+  });
+
+  it('파일 이름이 비면 배경을 켜지 않는다', () => {
+    const template: Template = {
+      ...base(),
+      canvas: { ...base().canvas, background: { mode: 'image', src: '' } },
+    };
+    expect(templateToCssVars(template)['backdrop']).toBe('');
+  });
+
   it('외곽선·그림자가 없으면 none', () => {
     const template: Template = {
       ...base(),

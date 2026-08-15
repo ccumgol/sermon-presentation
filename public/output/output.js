@@ -22,6 +22,7 @@
 
   var el = {
     body: document.body,
+    backdrop: document.getElementById('backdrop'),
     stage: document.getElementById('stage'),
     slide: document.getElementById('slide'),
     blocks: document.getElementById('blocks'),
@@ -87,8 +88,29 @@
         applyAnchor(patch[key]);
         return;
       }
+      // 배경 그림·동영상은 요소를 만들어야 해서 CSS 변수로 표현할 수 없다.
+      // 편집 중 style:set 으로도 오므로 여기서 함께 처리한다(저장 전 즉시 반영).
+      if (key === 'backdrop') {
+        applyBackdropFromString(patch[key]);
+        return;
+      }
       root.style.setProperty(key, String(patch[key]));
     });
+  }
+
+  /** '{"mode":"image","src":"a.jpg"}' 또는 빈 문자열 */
+  function applyBackdropFromString(value) {
+    if (!value) {
+      applyBackdrop(null);
+      return;
+    }
+    try {
+      applyBackdrop(JSON.parse(value));
+    } catch (err) {
+      // 값이 깨져도 화면은 그대로 둔다
+      diag.errors++;
+      renderDebug();
+    }
   }
 
   /**
@@ -121,6 +143,57 @@
   function clearChildren(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
   }
+
+  // ── 배경 그림·동영상 ─────────────────────────────────────────
+  //
+  // 카메라 영상이 없을 때 자막 뒤에 깐다. 지금 무엇이 깔려 있는지 기억해 두고
+  // **같으면 다시 만들지 않는다** — 템플릿 메시지가 올 때마다 새로 만들면
+  // 반복 동영상이 매번 처음으로 되감겨 화면이 튄다.
+  var backdropKey = '';
+
+  function applyBackdrop(background) {
+    var mode = background && background.mode;
+    var src = background && background.src;
+    var key = mode === 'image' || mode === 'video' ? mode + ':' + src : '';
+
+    // 같은 파일이면 아무것도 하지 않는다 — 맞춤·불투명도는 CSS 변수
+    // (--backdrop-fit / --backdrop-opacity)로 따로 오므로 다시 만들 필요가 없다.
+    if (key === backdropKey) return;
+    backdropKey = key;
+    clearChildren(el.backdrop);
+    if (!key || !src) return;
+
+    var node;
+    if (mode === 'video') {
+      node = document.createElement('video');
+      node.muted = true; // 자동 재생은 음소거일 때만 허용된다
+      node.loop = true;
+      node.autoplay = true;
+      node.playsInline = true;
+    } else {
+      node = document.createElement('img');
+    }
+
+    // 파일이 없거나 코덱을 못 읽어도 **화면을 비우지 않는다** — 배경만 빠진다.
+    // 대신 컨트롤 패널이 알 수 있게 오류로 올린다.
+    node.addEventListener('error', function () {
+      clearChildren(el.backdrop);
+      backdropKey = '';
+      diag.errors++;
+      pendingErrors.push({ message: '배경 파일을 불러오지 못했습니다: ' + src, url: location.href });
+      renderDebug();
+    });
+
+    node.src = '/backgrounds/' + encodeURIComponent(src);
+    el.backdrop.appendChild(node);
+
+    if (mode === 'video' && typeof node.play === 'function') {
+      // 자동 재생이 막히면 조용히 넘어간다 — 배경 때문에 송출이 멈추면 안 된다
+      var started = node.play();
+      if (started && typeof started.catch === 'function') started.catch(function () {});
+    }
+  }
+
 
   /** 성경 본문 블록 렌더 */
   function renderBible(payload) {
@@ -538,6 +611,7 @@
   function applyTemplate(next) {
     if (!next) return;
     template = next;
+    applyBackdrop(next.canvas && next.canvas.background);
     if (lastSlide) render(lastSlide);
     else lastFit = applyAutoFit();
     renderDebug();

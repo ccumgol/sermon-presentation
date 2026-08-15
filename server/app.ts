@@ -20,6 +20,7 @@ import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
 import { ensureDataDirs, paths } from './paths.ts';
 import { registerBibleRoutes } from './routes/bible.ts';
+import { registerBackgroundRoutes } from './routes/backgrounds.ts';
 import { registerBackupRoutes } from './routes/backup.ts';
 import { registerPlanRoutes } from './routes/plans.ts';
 import { registerSongbookRoutes } from './routes/songbooks.ts';
@@ -112,6 +113,24 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
     },
   });
 
+  /**
+   * 배경 그림·동영상. `data/` 안이라 public 밖에 있으므로 따로 붙인다.
+   * 이 폴더만 열어 주고, 파일 이름 검증은 배경 라우트가 맡는다.
+   *
+   * decorateReply: false — sendFile 데코레이터는 위에서 이미 붙였다(두 번 붙이면 기동 실패).
+   */
+  await app.register(fastifyStatic, {
+    root: paths.backgroundsDir,
+    prefix: '/backgrounds/',
+    decorateReply: false,
+    index: false,
+    // 배경은 자주 바뀌지 않지만, 같은 이름으로 덮어썼을 때 옛 파일이 남으면
+    // '바꿨는데 그대로'가 되므로 재검증하게 둔다
+    setHeaders(res) {
+      res.header('Cache-Control', 'no-cache, must-revalidate');
+    },
+  });
+
   const controlPanelBuilt = existsSync(path.join(paths.publicDir, 'app', 'index.html'));
 
   /**
@@ -157,6 +176,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   await registerSongbookRoutes(app);
   await registerPlanRoutes(app);
   await registerBackupRoutes(app);
+  await registerBackgroundRoutes(app);
 
   await registerTemplateRoutes(app, {
     onTemplateChanged: (template) => options.onTemplateChanged?.(template),

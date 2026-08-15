@@ -55,6 +55,12 @@ function backgroundValue(background: CanvasBackground): string {
       // opacity 를 별도 변수로 두지 않고 색에 합쳐 넣는다 — 배경만 반투명하게 하려면
       // rgba 로 직접 지정하는 것이 텍스트 opacity 와 섞이지 않아 안전하다.
       return background.opacity >= 1 ? background.color : withAlpha(background.color, background.opacity);
+    case 'image':
+    case 'video':
+      // 그림·동영상은 CSS 배경이 아니라 출력 페이지의 #backdrop 요소가 그린다
+      // (동영상은 CSS 로 재생할 수 없고, 맞춤·불투명도를 따로 다뤄야 한다).
+      // 페이지 배경 자체는 투명이라 파일이 없으면 그대로 투명 송출이 된다.
+      return 'transparent';
     default:
       return 'transparent';
   }
@@ -110,6 +116,30 @@ function simpleStyleVars(prefix: string, style: TextStyle): CssVars {
   };
 }
 
+/**
+ * 그림·동영상 배경을 출력 페이지에 넘기는 값.
+ *
+ * CSS 변수가 아니라 **요소를 만들어야** 하는 유일한 항목이라(동영상은 CSS 로 재생할 수
+ * 없다) 문자열 하나로 실어 보낸다. 출력 페이지가 `backdrop` 키를 알아보고 해석한다
+ * (`anchor` 키와 같은 방식). 이렇게 해 두면 편집 중 `style:set` 만으로도
+ * **저장 전에 미리보기에 즉시 반영**된다 — 이 프로젝트의 편집 원칙이다.
+ *
+ * 키 순서를 고정해야 diffCssVars 가 "안 바뀌었다"를 제대로 판단한다.
+ */
+export function backdropValue(background: CanvasBackground): string {
+  if (background.mode !== 'image' && background.mode !== 'video') return '';
+  if (!background.src) return '';
+  return JSON.stringify({ mode: background.mode, src: background.src });
+}
+
+function backdropFit(background: CanvasBackground): string {
+  return 'fit' in background && background.fit === 'contain' ? 'contain' : 'cover';
+}
+
+function backdropOpacity(background: CanvasBackground): string {
+  return 'opacity' in background && typeof background.opacity === 'number' ? String(background.opacity) : '1';
+}
+
 /** 템플릿 전체 → CSS 변수 묶음 */
 export function templateToCssVars(template: Template): CssVars {
   const { justify, align } = anchorToAlignment(template.layout.anchor);
@@ -118,6 +148,10 @@ export function templateToCssVars(template: Template): CssVars {
   return {
     // 캔버스
     '--canvas-bg': backgroundValue(canvas.background),
+    // 배경 그림·동영상 (CSS 변수가 아닌 특수 키 — 출력 페이지가 해석한다)
+    backdrop: backdropValue(canvas.background),
+    '--backdrop-fit': backdropFit(canvas.background),
+    '--backdrop-opacity': backdropOpacity(canvas.background),
     '--safe-top': px(canvas.safeArea.top),
     '--safe-right': px(canvas.safeArea.right),
     '--safe-bottom': px(canvas.safeArea.bottom),
