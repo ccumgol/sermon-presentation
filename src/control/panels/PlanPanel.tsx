@@ -156,6 +156,8 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
   const listRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  /** 종류 버튼을 눌러 입력창이 교체된 뒤에 포커스를 줘야 하는지 */
+  const wantFocus = useRef(false);
   const measurer = useMeasure();
 
   const current = items[cursor];
@@ -525,6 +527,30 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     if (addKind === 'song' && songHits[0]) addSong(songHits[0].id, songHits[0].title);
   }
 
+  /**
+   * 추가 바의 종류를 고른다.
+   *
+   * 종류를 바꾸면 입력창 요소 자체가 바뀐다(한 줄 input ↔ 여러 줄 textarea).
+   * 클릭 즉시 focus() 를 부르면 **교체되기 전의 옛 요소**를 잡아, 그 요소가
+   * 사라지면서 포커스가 body 로 떨어진다. 그러면 이어서 친 글자가 입력창이 아니라
+   * 전역 단축키로 들어가 커서가 움직이거나 Enter 로 송출이 나갈 수 있다.
+   * 그래서 다시 그린 뒤(아래 effect)에 잡는다.
+   */
+  function pickKind(kind: AddKind): void {
+    if (kind === addKind) {
+      addRef.current?.focus(); // 요소가 그대로면 지금 잡아도 된다
+      return;
+    }
+    wantFocus.current = true;
+    setAddKind(kind);
+  }
+
+  useEffect(() => {
+    if (!wantFocus.current) return;
+    wantFocus.current = false;
+    addRef.current?.focus();
+  }, [addKind]);
+
   /** 광고·인용구·순서 표시는 저장 구조가 같고 variant 만 다르다 */
   function addText(content: string, kind: 'notice' | 'quote' | 'order'): void {
     if (content.trim().length === 0) return;
@@ -753,7 +779,9 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
               {saved.map((p) => (
                 <span key={p.id} className="saved-row">
                   <button type="button" onClick={() => openPlan(p)}>
-                    {p.serviceDate ? `${p.serviceDate} · ` : ''}{p.name}
+                    {/* 이름에 이미 날짜가 들어 있으면 앞에 또 붙이지 않는다 */}
+                    {p.serviceDate && !p.name.includes(p.serviceDate) ? `${p.serviceDate} · ` : ''}
+                    {p.name}
                   </button>
                   <button type="button" className="del" onClick={() => void removeSaved(p)} title="삭제">✕</button>
                 </span>
@@ -831,7 +859,7 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                     key={option.kind}
                     type="button"
                     className={`kind${addKind === option.kind ? ' active' : ''}`}
-                    onClick={() => { setAddKind(option.kind); addRef.current?.focus(); }}
+                    onClick={() => pickKind(option.kind)}
                     title={option.label}
                   >
                     {option.icon}
