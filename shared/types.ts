@@ -444,6 +444,13 @@ export type CueItem =
        *   첫 줄이 순서 이름, 다음 줄부터가 부가 설명(설교자 이름 등)이다.
        */
       variant?: 'notice' | 'quote' | 'order';
+      /**
+       * 순서 표시의 배치 (variant 가 'order' 일 때만 쓴다).
+       *
+       * - `split`(기본) 왼쪽 순서 이름 · 오른쪽 담당자 + 밑줄
+       * - `stack`        줄을 그대로 쌓아 올린다 (템플릿 정렬을 따름)
+       */
+      layout?: 'split' | 'stack';
       templateId?: number;
       note?: string;
     }
@@ -514,6 +521,13 @@ export type SlidePayload =
       credit?: string;
     }
   | { kind: 'text'; lines: string[] }
+  /**
+   * 순서 표시 — **왼쪽에 순서 이름, 오른쪽에 담당자**를 한 줄로 놓고 담당자 아래에 밑줄.
+   *
+   * `text` 로 두지 않는 이유는 두 값의 **자리가 다르기 때문**이다. 줄 배열로는
+   * "이건 왼쪽, 저건 오른쪽"을 표현할 수 없어 출력 페이지가 알 방법이 없다.
+   */
+  | { kind: 'order'; title: string; presenter?: string }
   | { kind: 'blank' };
 
 export interface LiveState {

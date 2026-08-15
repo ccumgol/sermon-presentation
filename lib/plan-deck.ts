@@ -102,6 +102,25 @@ export async function buildPlanDeck(
 }
 
 /**
+ * 순서 표시 내용을 '순서 이름'과 '담당자'로 나눈다.
+ *
+ * 첫 줄이 순서 이름, **나머지 줄을 합친 것**이 담당자다. 담당자를 여러 줄로 적는
+ * 경우(직분과 이름을 나눠 쓰는 등)를 한 줄로 합쳐야 오른쪽 자리에 들어간다.
+ * 빈 줄은 버린다 — 마지막에 Enter 를 한 번 더 쳐서 생긴 빈 담당자가 밑줄만
+ * 덩그러니 남기는 것을 막는다.
+ */
+export function splitOrderText(content: string): { title: string; presenter?: string } {
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const [title = '', ...rest] = lines;
+  const presenter = rest.join(' ');
+  return presenter.length > 0 ? { title, presenter } : { title };
+}
+
+/**
  * 구분 하나가 거느리는 항목들 — 그 구분 **다음**부터 **다음 구분 전**까지.
  *
  * 예배 전 안내(자동 진행)가 이 범위를 덱으로 만든다. 구분을 경계로 삼으면

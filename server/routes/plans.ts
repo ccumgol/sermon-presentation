@@ -116,12 +116,16 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         // 아는 값만 통과시킨다 — 모르는 값은 기본(광고)으로 떨어뜨린다.
         const variant =
           text.variant === 'quote' || text.variant === 'order' ? text.variant : undefined;
+        // 배치는 순서 표시에만 뜻이 있다. 기본(split)은 저장하지 않는다 —
+        // 저장된 순서표에 기본값이 박혀 있으면 나중에 기본을 바꿀 수 없다.
+        const layout = variant === 'order' && text.layout === 'stack' ? 'stack' : undefined;
 
         items.push({
           id,
           type: 'text',
           content: text.content,
           ...(variant ? { variant } : {}),
+          ...(layout ? { layout } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });

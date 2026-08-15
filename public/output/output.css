@@ -202,6 +202,40 @@ body.blanked .slide {
   min-width: 0;
 }
 
+/*
+ * 순서 표시 — 왼쪽 순서 이름, 오른쪽 담당자(밑줄).
+ *
+ * 템플릿의 블록 폭(--block-width)이 'auto' 여도 좌우로 벌어져야 하므로,
+ * 이 줄만 **안전 영역 전체 폭**을 쓴다. 블록 폭을 따르면 글자 길이만큼만
+ * 넓어져 두 값이 딱 붙어 버린다.
+ */
+.order-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--block-gap);
+  width: calc(100vw - var(--safe-left) - var(--safe-right));
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.order-title {
+  text-align: left;
+  min-width: 0;
+}
+
+/*
+ * 담당자 자리는 이름보다 넓게 둔다 — 캡처처럼 이름 왼쪽까지 밑줄이 이어져
+ * '적어 넣는 칸'처럼 보이게 하기 위함이다. 이름은 오른쪽에 붙인다.
+ */
+.order-presenter {
+  flex: 0 0 auto;
+  min-width: var(--order-line-width, 38%);
+  text-align: right;
+  border-bottom: var(--order-line-thickness, 4px) solid currentColor;
+  padding-bottom: var(--order-line-gap, 8px);
+}
+
 /* ── 역할별 텍스트 ── */
 
 .block {

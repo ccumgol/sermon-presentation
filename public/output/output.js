@@ -278,6 +278,36 @@
     setOptional(el.credit, null);
   }
 
+  /**
+   * 순서 표시 — 왼쪽 순서 이름, 오른쪽 담당자(밑줄).
+   *
+   * 담당자가 없으면 오른쪽 칸을 아예 만들지 않는다. 빈 밑줄만 떠 있으면
+   * 이름을 못 넣은 것처럼 보인다.
+   */
+  function renderOrder(payload) {
+    clearChildren(el.blocks);
+
+    var row = document.createElement('div');
+    row.className = 'order-row';
+
+    var title = document.createElement('div');
+    title.className = 'order-title line-primary';
+    title.textContent = payload.title || '';
+    row.appendChild(title);
+
+    if (payload.presenter) {
+      var presenter = document.createElement('div');
+      presenter.className = 'order-presenter line-secondary';
+      presenter.textContent = payload.presenter;
+      row.appendChild(presenter);
+    }
+
+    el.blocks.appendChild(row);
+    setOptional(el.heading, null);
+    setOptional(el.reference, null);
+    setOptional(el.credit, null);
+  }
+
   function setOptional(node, value) {
     if (value) {
       node.textContent = value;
@@ -288,7 +318,7 @@
     }
   }
 
-  var RENDERERS = { bible: renderBible, song: renderSong, text: renderText };
+  var RENDERERS = { bible: renderBible, song: renderSong, text: renderText, order: renderOrder };
 
   /**
    * 슬라이드를 그린다. 렌더 중 예외가 나면 이전 화면을 그대로 둔다.

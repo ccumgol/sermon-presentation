@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildPlanDeck, describeItem, itemsInGroup, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
+import { buildPlanDeck, describeItem, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
 import type { CueItem, SlidePayload } from '../../shared/types.ts';
 
 function bible(id: string, ref: string): CueItem {
@@ -220,5 +220,27 @@ describe('itemsInGroup — 예배 전 안내 구간', () => {
     const items = [divider('예배 전'), text('가')];
     expect(itemsInGroup(items, 'nope')).toEqual([]);
     expect(itemsInGroup(items, 't-가')).toEqual([]);
+  });
+});
+
+describe('splitOrderText — 순서 이름과 담당자', () => {
+  it('첫 줄이 순서 이름, 다음 줄이 담당자', () => {
+    expect(splitOrderText('대표기도\n박기현 목사')).toEqual({ title: '대표기도', presenter: '박기현 목사' });
+  });
+
+  it('담당자가 여러 줄이면 한 줄로 합친다 (오른쪽 한 칸에 들어가야 한다)', () => {
+    expect(splitOrderText('설교 제목\n박기현\n목사')).toEqual({ title: '설교 제목', presenter: '박기현 목사' });
+  });
+
+  it('한 줄뿐이면 담당자가 없다 — 빈 밑줄만 남기지 않는다', () => {
+    expect(splitOrderText('주기도문')).toEqual({ title: '주기도문' });
+  });
+
+  it('끝에 빈 줄이 있어도 담당자가 생기지 않는다', () => {
+    expect(splitOrderText('축도\n\n  \n')).toEqual({ title: '축도' });
+  });
+
+  it('앞뒤 공백을 떼어 낸다', () => {
+    expect(splitOrderText('  봉헌  \n   김집사  ')).toEqual({ title: '봉헌', presenter: '김집사' });
   });
 });

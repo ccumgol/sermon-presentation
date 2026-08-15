@@ -446,6 +446,26 @@ describe('구분·인용구 항목 저장', () => {
     expect(items[1]!.content).toBe('설교 제목\n박기현 목사');
   });
 
+  it('순서 표시 배치는 stack 만 저장하고 기본(split)은 남기지 않는다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '배치 테스트',
+      items: [
+        { type: 'text', content: '대표기도\n박기현 목사', variant: 'order' },
+        { type: 'text', content: '주기도문', variant: 'order', layout: 'stack' },
+        { type: 'text', content: '축도', variant: 'order', layout: '<script>' },
+        // 배치는 순서 표시에만 뜻이 있다 — 광고에 붙여도 버린다
+        { type: 'text', content: '광고', layout: 'stack' },
+      ],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const items = created.body.data!.plan.items as Array<{ layout?: string }>;
+    expect(items[0]!.layout).toBeUndefined();
+    expect(items[1]!.layout).toBe('stack');
+    expect(items[2]!.layout).toBeUndefined();
+    expect(items[3]!.layout).toBeUndefined();
+  });
+
   it('알 수 없는 variant 는 광고로 떨어뜨린다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: 'variant 방어',

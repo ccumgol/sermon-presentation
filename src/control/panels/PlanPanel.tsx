@@ -14,7 +14,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { buildPlanDeck, describeItem, itemsInGroup, moveItem, newItemId, removeItem } from '../../../lib/plan-deck.ts';
+import {
+  buildPlanDeck, describeItem, itemsInGroup, moveItem, newItemId, removeItem, splitOrderText,
+} from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
@@ -324,6 +326,10 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
       }
 
       if (item.type === 'text') {
+        // 순서 표시는 기본이 좌우 나누기 — 왼쪽 순서 이름, 오른쪽 담당자
+        if (item.variant === 'order' && item.layout !== 'stack') {
+          return { slides: [{ kind: 'order', ...splitOrderText(item.content) }], labels: ['순서 표시'] };
+        }
         const lines = item.content.split(/\r?\n/).filter((line) => line.trim().length > 0);
         return { slides: [{ kind: 'text', lines }], labels: [textVariantLabel(item.variant)] };
       }
@@ -1165,7 +1171,14 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                                   {block.verses.map((verse) => verse.text).join(' ')}
                                 </span>
                               ))
-                            : <span className="line muted">(공백)</span>}
+                            : slide.kind === 'order'
+                              ? (
+                                  <span className="line">
+                                    {slide.title}
+                                    {slide.presenter ? ` — ${slide.presenter}` : ''}
+                                  </span>
+                                )
+                              : <span className="line muted">(공백)</span>}
                     </span>
                   </button>
                 ))}
@@ -1206,16 +1219,42 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 </div>
               )}
 
+              {current.type === 'text' && current.variant === 'order' && (
+                <div className="row detail-controls">
+                  <label>배치</label>
+                  <select
+                    value={current.layout ?? 'split'}
+                    onChange={(e) =>
+                      patchItems(
+                        items.map((i) =>
+                          i.id === current.id
+                            ? { ...i, layout: e.target.value === 'stack' ? 'stack' : undefined }
+                            : i,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="split">좌우 (순서 이름 · 담당자 + 밑줄)</option>
+                    <option value="stack">쌓기 (줄을 그대로)</option>
+                  </select>
+                </div>
+              )}
+
               {current.type === 'text' && (
-                <textarea
-                  className="detail-text"
-                  rows={4}
-                  value={current.content}
-                  onChange={(e) =>
-                    patchItems(items.map((i) => (i.id === current.id ? { ...i, content: e.target.value } : i)))
-                  }
-                  spellCheck={false}
-                />
+                <>
+                  {current.variant === 'order' && (
+                    <p className="hintline muted">첫 줄 = 순서 이름, 다음 줄 = 담당자</p>
+                  )}
+                  <textarea
+                    className="detail-text"
+                    rows={4}
+                    value={current.content}
+                    onChange={(e) =>
+                      patchItems(items.map((i) => (i.id === current.id ? { ...i, content: e.target.value } : i)))
+                    }
+                    spellCheck={false}
+                  />
+                </>
               )}
             </>
           )}
