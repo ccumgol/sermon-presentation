@@ -7,7 +7,15 @@
 
 import type { FastifyInstance } from 'fastify';
 
-import type { ApiResponse, CueItem, PlanKind, ServicePlan } from '../../shared/types.ts';
+import {
+  AUTO_HOLD_MS_DEFAULT,
+  AUTO_HOLD_MS_MAX,
+  AUTO_HOLD_MS_MIN,
+  type ApiResponse,
+  type CueItem,
+  type PlanKind,
+  type ServicePlan,
+} from '../../shared/types.ts';
 import * as store from '../db/plans.ts';
 
 function ok<T>(data: T): ApiResponse<T> {
@@ -16,6 +24,21 @@ function ok<T>(data: T): ApiResponse<T> {
 
 function fail(error: string): ApiResponse<null> {
   return { success: false, data: null, error };
+}
+
+/**
+ * 예배 전 안내 자동 진행 설정을 검증한다.
+ *
+ * 간격을 범위 밖으로 저장할 수 있으면 0초(무한 반복으로 화면이 깜빡임)나
+ * 몇 시간짜리가 들어간다. 예배 화면이 걸린 문제라 경계에서 잘라 둔다.
+ */
+function readAuto(raw: unknown): { holdMs: number; loop: boolean } | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const value = raw as { holdMs?: unknown; loop?: unknown };
+  const holdMs = typeof value.holdMs === 'number' && Number.isFinite(value.holdMs)
+    ? Math.min(Math.max(Math.round(value.holdMs), AUTO_HOLD_MS_MIN), AUTO_HOLD_MS_MAX)
+    : AUTO_HOLD_MS_DEFAULT;
+  return { holdMs, loop: value.loop !== false };
 }
 
 /**
@@ -116,7 +139,8 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           rejected.push(`${index + 1}번째 항목: 구분 이름이 없습니다`);
           continue;
         }
-        items.push({ id, type: 'divider', label });
+        const auto = readAuto(divider.auto);
+        items.push({ id, type: 'divider', label, ...(auto ? { auto } : {}) });
         break;
       }
 

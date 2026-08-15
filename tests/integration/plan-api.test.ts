@@ -409,6 +409,28 @@ describe('구분·인용구 항목 저장', () => {
     expect(updated.body.data!.plan.items).toHaveLength(2);
   });
 
+  it('예배 전 안내 자동 진행 설정을 저장하고 범위를 지킨다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '자동 진행',
+      items: [
+        { type: 'divider', label: '예배 전', auto: { holdMs: 8000, loop: true } },
+        { type: 'divider', label: '너무 짧음', auto: { holdMs: 0, loop: false } },
+        { type: 'divider', label: '너무 김', auto: { holdMs: 99_999_999 } },
+        { type: 'divider', label: '값이 이상함', auto: { holdMs: 'abc' } },
+        { type: 'divider', label: '자동 아님' },
+      ],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const items = created.body.data!.plan.items as Array<{ auto?: { holdMs: number; loop: boolean } }>;
+    expect(items[0]!.auto).toEqual({ holdMs: 8000, loop: true });
+    // 0초면 화면이 깜빡이고, 몇 시간이면 멈춘 것처럼 보인다 — 경계에서 자른다
+    expect(items[1]!.auto).toEqual({ holdMs: 1000, loop: false });
+    expect(items[2]!.auto!.holdMs).toBe(600000);
+    expect(items[3]!.auto!.holdMs).toBe(8000); // 기본값으로 떨어진다
+    expect(items[4]!.auto).toBeUndefined();
+  });
+
   it('순서 표시(order)를 저장한다 — 둘째 줄(설교자)까지 보존', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: '순서 표시 테스트',

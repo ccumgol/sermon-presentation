@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildPlanDeck, describeItem, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
+import { buildPlanDeck, describeItem, itemsInGroup, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
 import type { CueItem, SlidePayload } from '../../shared/types.ts';
 
 function bible(id: string, ref: string): CueItem {
@@ -194,5 +194,31 @@ describe('구분(divider) 처리', () => {
 
   it('describeItem 은 구분 이름을 그대로 준다', () => {
     expect(describeItem(divider('말씀'))).toBe('말씀');
+  });
+});
+
+describe('itemsInGroup — 예배 전 안내 구간', () => {
+  const divider = (label: string): CueItem => ({ id: `d-${label}`, type: 'divider', label });
+  const text = (content: string): CueItem => ({ id: `t-${content}`, type: 'text', content });
+
+  it('구분 다음부터 다음 구분 전까지만 준다', () => {
+    const items = [divider('예배 전'), text('가'), text('나'), divider('예배 부름'), text('다')];
+    expect(itemsInGroup(items, 'd-예배 전').map((i) => i.id)).toEqual(['t-가', 't-나']);
+  });
+
+  it('마지막 구분이면 끝까지 준다', () => {
+    const items = [divider('예배 전'), text('가'), divider('광고'), text('나'), text('다')];
+    expect(itemsInGroup(items, 'd-광고').map((i) => i.id)).toEqual(['t-나', 't-다']);
+  });
+
+  it('아래에 항목이 없으면 빈 배열 — 시작할 수 없다는 뜻', () => {
+    const items = [divider('예배 전'), divider('예배 부름'), text('가')];
+    expect(itemsInGroup(items, 'd-예배 전')).toEqual([]);
+  });
+
+  it('없는 id 나 구분이 아닌 id 는 빈 배열', () => {
+    const items = [divider('예배 전'), text('가')];
+    expect(itemsInGroup(items, 'nope')).toEqual([]);
+    expect(itemsInGroup(items, 't-가')).toEqual([]);
   });
 });

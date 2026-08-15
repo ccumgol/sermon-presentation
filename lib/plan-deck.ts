@@ -101,6 +101,24 @@ export async function buildPlanDeck(
   };
 }
 
+/**
+ * 구분 하나가 거느리는 항목들 — 그 구분 **다음**부터 **다음 구분 전**까지.
+ *
+ * 예배 전 안내(자동 진행)가 이 범위를 덱으로 만든다. 구분을 경계로 삼으면
+ * 순서표에 이미 보이는 구조를 그대로 쓰므로, 사용자가 따로 범위를 지정할 필요가 없다.
+ */
+export function itemsInGroup(items: readonly CueItem[], dividerId: string): CueItem[] {
+  const start = items.findIndex((item) => item.id === dividerId);
+  if (start < 0 || items[start]?.type !== 'divider') return [];
+
+  const group: CueItem[] = [];
+  for (const item of items.slice(start + 1)) {
+    if (item.type === 'divider') break;
+    group.push(item);
+  }
+  return group;
+}
+
 /** 항목 배열에서 한 항목을 옮긴다 (불변 — 새 배열을 만든다) */
 export function moveItem(items: readonly CueItem[], from: number, to: number): CueItem[] {
   if (from === to || from < 0 || from >= items.length) return [...items];

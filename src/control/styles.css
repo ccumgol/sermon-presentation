@@ -1358,6 +1358,22 @@ button.link-inline {
 
 .cue-row .actions .go { color: var(--live, #ef4444); }
 
+/*
+ * 예배 전 안내가 자동으로 돌고 있음을 알리는 띠.
+ *
+ * 지금 화면이 저절로 넘어가고 있다는 사실을 모르면 예배 중 사고가 난다.
+ * 배너 중에서 가장 눈에 띄게 두고 정지 버튼을 항상 곁에 둔다.
+ */
+.banner.auto-bar {
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* 자동 진행 중인 구분 */
+.cue-divider.auto .label { color: var(--warn); }
+.cue-divider .auto-tag { margin-left: 4px; opacity: 0.8; }
+
 /* 저장된 순서 목록 — '순서 불러오기' 를 눌렀을 때만 펼쳐진다 */
 .plan-saved {
   flex: 0 0 auto;

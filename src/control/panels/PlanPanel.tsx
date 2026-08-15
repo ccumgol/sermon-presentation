@@ -14,10 +14,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { buildPlanDeck, describeItem, moveItem, newItemId, removeItem } from '../../../lib/plan-deck.ts';
+import { buildPlanDeck, describeItem, itemsInGroup, moveItem, newItemId, removeItem } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
-import type {
-  ClientMsg, CueItem, Deck, PlanKind, ServicePlan, SlidePayload, Template,
+import {
+  AUTO_HOLD_MS_DEFAULT,
+  type ClientMsg, type CueItem, type Deck, type PlanKind, type ServicePlan,
+  type SlidePayload, type Template,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { useMeasure } from '../hooks/useMeasure.ts';
@@ -138,6 +140,14 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
   /** 인용구를 띄우기 직전 화면 — '직전으로' 가 여기로 되돌린다 */
   const [before, setBefore] = useState<{ slide: SlidePayload; label: string } | null>(null);
+
+  /**
+   * 예배 전 안내 자동 진행 — 지금 돌고 있는 구분.
+   *
+   * 예배가 시작되면 반드시 멈춰야 하므로, 다른 항목을 송출하거나 순서표를 올리면
+   * 곧바로 끈다. 돌고 있다는 것이 화면에 크게 보여야 한다.
+   */
+  const [auto, setAuto] = useState<{ dividerId: string; holdMs: number; loop: boolean } | null>(null);
 
   /**
    * 단독으로 송출한 항목 — 빨간 점을 켜기 위해 기억한다.
@@ -371,6 +381,8 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
   const sendItem = useCallback(
     async (item: CueItem, slideIndex = 0) => {
       if (!connected || item.type === 'divider') return;
+      // 사람이 무언가를 송출하면 예배가 시작된 것이다 — 자동 진행을 끈다
+      setAuto(null);
 
       // 인용구를 띄우기 전 화면을 기억한다
       if (item.type === 'text' && item.variant === 'quote' && liveSlide) {
@@ -420,12 +432,79 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     setLiveItemId(null);
   }, [before, connected, send]);
 
+  /**
+   * 예배 전 안내를 시작한다 — 이 구분이 거느린 항목만 덱으로 올리고 자동으로 넘긴다.
+   *
+   * 전체 순서표를 올리지 않는 이유는, 예배 전 안내가 **예배 순서의 일부가 아니라
+   * 그 앞의 시간**이기 때문이다. 예배를 시작할 때는 '예배용으로 올리기' 를 새로 누른다.
+   */
+  async function startAuto(divider: Extract<CueItem, { type: 'divider' }>): Promise<void> {
+    const group = itemsInGroup(items, divider.id);
+    if (group.length === 0) {
+      setError(`'${divider.label}' 아래에 항목이 없습니다`);
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await buildPlanDeck(divider.label, group, resolveItem);
+      if (result.deck.slides.length === 0) {
+        setError('올릴 수 있는 항목이 없습니다');
+        return;
+      }
+      if (result.failed.length > 0) {
+        setNotice(
+          `${result.failed.length}개 항목을 건너뛰었습니다: ` +
+            result.failed.map((f) => `${describeItem(f.item)} (${f.error})`).join(', '),
+        );
+      }
+      send({ t: 'deck:load', payload: result.deck });
+      setLiveItemId(null);
+      setAuto({
+        dividerId: divider.id,
+        holdMs: divider.auto?.holdMs ?? AUTO_HOLD_MS_DEFAULT,
+        loop: divider.auto?.loop !== false,
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '시작하지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 자동 진행 타이머.
+   *
+   * 슬라이드가 바뀔 때마다 **다음 한 번**만 예약한다. 반복 타이머를 쓰면
+   * 사람이 중간에 손으로 넘겼을 때 남은 시간이 어긋나 두 장이 연달아 넘어간다.
+   */
+  useEffect(() => {
+    if (!auto || !connected) return;
+    const total = deck?.slides.length ?? 0;
+    if (total === 0) return;
+
+    const timer = setTimeout(() => {
+      if (currentIndex >= total - 1) {
+        // 예배 **전** 안내라 처음으로 돌아간다 (예배 중 덱은 순환하지 않는다)
+        if (auto.loop) send({ t: 'goto', index: 0 });
+        else setAuto(null);
+      } else {
+        send({ t: 'next' });
+      }
+    }, auto.holdMs);
+
+    return () => clearTimeout(timer);
+  }, [auto, connected, currentIndex, deck?.slides.length, send]);
+
   /** 순서표 전체를 하나의 덱으로 올린다 (순서대로 진행할 때) */
   async function loadForService(): Promise<void> {
     if (!plan || items.length === 0) return;
     setBusy(true);
     setError(null);
     setNotice(null);
+    // 예배가 시작된다 — 자동 진행을 끈다
+    setAuto(null);
 
     try {
       const result = await buildPlanDeck(plan.name, items, resolveItem);
@@ -657,6 +736,17 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
         </div>
       )}
 
+      {auto && (
+        <div className="banner auto-bar">
+          <button type="button" className="close" onClick={() => setAuto(null)}>■ 정지</button>
+          ⏱ <b>예배 전 안내 자동 진행 중</b> —{' '}
+          {items.find((i) => i.id === auto.dividerId)?.type === 'divider'
+            ? describeItem(items.find((i) => i.id === auto.dividerId)!)
+            : ''}{' '}
+          · {Math.round(auto.holdMs / 1000)}초마다 {auto.loop ? '· 끝나면 처음으로' : '· 끝나면 정지'}
+        </div>
+      )}
+
       <div className="plan-split">
         {/* ── 좌: 순서 목록 ── */}
         <div
@@ -804,15 +894,34 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
               {items.map((item, index) => {
                 if (item.type === 'divider') {
+                  const running = auto?.dividerId === item.id;
                   return (
                     <div
                       key={item.id}
-                      className={`cue-divider${index === cursor ? ' current' : ''}`}
+                      className={`cue-divider${index === cursor ? ' current' : ''}${running ? ' auto' : ''}`}
                       onClick={() => setCursor(index)}
                     >
-                      <span className="label">{item.label}</span>
+                      <span className="label">
+                        {item.label}
+                        {item.auto && <span className="auto-tag" title="예배 전 안내 — 자동으로 넘어갑니다">⏱</span>}
+                      </span>
                       <span className="actions">
-                        <button type="button" onClick={() => patchItems(removeItem(items, item.id))} title="삭제">✕</button>
+                        {item.auto && (
+                          <button
+                            type="button"
+                            className="go"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (running) setAuto(null);
+                              else void startAuto(item);
+                            }}
+                            disabled={!connected || busy}
+                            title={running ? '자동 진행 정지' : '예배 전 안내 시작 (자동 진행)'}
+                          >
+                            {running ? '■' : '▶'}
+                          </button>
+                        )}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(removeItem(items, item.id)); }} title="삭제">✕</button>
                       </span>
                     </div>
                   );
@@ -941,7 +1050,78 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
           {!current && <p className="hintline muted">왼쪽에서 항목을 고르세요.</p>}
 
           {current && current.type === 'divider' && (
-            <p className="hintline muted">구분선입니다 — 화면에 나가지 않습니다.</p>
+            <>
+              <p className="hintline muted">구분선입니다 — 화면에 나가지 않습니다.</p>
+
+              <div className="row detail-controls">
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(current.auto)}
+                    onChange={(e) =>
+                      patchItems(
+                        items.map((i) =>
+                          i.id === current.id
+                            ? e.target.checked
+                              ? { ...i, auto: { holdMs: AUTO_HOLD_MS_DEFAULT, loop: true } }
+                              : { ...i, auto: undefined }
+                            : i,
+                        ),
+                      )
+                    }
+                  />
+                  예배 전 안내 (자동으로 넘김)
+                </label>
+              </div>
+
+              {current.auto && (
+                <>
+                  <div className="row detail-controls">
+                    <label>한 장에 머무는 시간</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={600}
+                      step={1}
+                      value={Math.round((current.auto.holdMs ?? AUTO_HOLD_MS_DEFAULT) / 1000)}
+                      onChange={(e) => {
+                        const seconds = Math.min(Math.max(Number(e.target.value) || 1, 1), 600);
+                        patchItems(
+                          items.map((i) =>
+                            i.id === current.id && i.type === 'divider' && i.auto
+                              ? { ...i, auto: { ...i.auto, holdMs: seconds * 1000 } }
+                              : i,
+                          ),
+                        );
+                      }}
+                      style={{ width: 72 }}
+                    />
+                    <span className="muted">초</span>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={current.auto.loop !== false}
+                        onChange={(e) =>
+                          patchItems(
+                            items.map((i) =>
+                              i.id === current.id && i.type === 'divider' && i.auto
+                                ? { ...i, auto: { ...i.auto, loop: e.target.checked } }
+                                : i,
+                            ),
+                          )
+                        }
+                      />
+                      마지막에서 처음으로
+                    </label>
+                  </div>
+
+                  <p className="hintline muted">
+                    이 구분 아래 항목 {itemsInGroup(items, current.id).length}개를 자동으로 넘깁니다.
+                    목록에서 <b>▶</b> 로 시작하고, 다른 항목을 송출하거나 순서표를 올리면 멈춥니다.
+                  </p>
+                </>
+              )}
+            </>
           )}
 
           {current && current.type !== 'divider' && (

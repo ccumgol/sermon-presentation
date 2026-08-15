@@ -454,7 +454,24 @@ export type CueItem =
    * **슬라이드를 만들지 않는다.** 덱에 들어가지 않으므로 항목 경계(groups)의
    * 인덱스에도 영향을 주지 않아야 한다 (lib/plan-deck.ts 참고).
    */
-  | { id: string; type: 'divider'; label: string };
+  | {
+      id: string;
+      type: 'divider';
+      label: string;
+      /**
+       * **예배 전 안내** — 이 구분부터 다음 구분 전까지를 자동으로 넘긴다.
+       *
+       * 예배가 시작되면 자동이 돌면 안 되므로, 사람이 다른 것을 송출하거나
+       * 정지를 누르면 곧바로 멈춘다. 켜져 있다고 저절로 시작되지도 않는다 —
+       * 구분 행의 ▶ 를 눌러야 시작한다.
+       */
+      auto?: { holdMs: number; loop: boolean };
+    };
+
+/** 예배 전 안내 자동 진행 기본값 (2026-08-15 사용자 결정) */
+export const AUTO_HOLD_MS_DEFAULT = 8000;
+export const AUTO_HOLD_MS_MIN = 1000;
+export const AUTO_HOLD_MS_MAX = 600000;
 
 /**
  * 순서표의 성격.
