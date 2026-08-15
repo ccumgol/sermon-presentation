@@ -23,7 +23,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export function App(): React.JSX.Element {
-  const { status, state, deck, template, connections, outputErrors, dismissErrors, send } = useLiveState();
+  const {
+    status, state, deck, template, connections,
+    outputErrors, dismissErrors, staleOutput, dismissStale, send,
+  } = useLiveState();
 
   // 기본 탭은 예배 순서. 성경·찬양은 한 종류를 깊게 다룰 때 쓰고,
   // 예배 진행은 찬양·성경·광고가 섞여 순서대로 흐른다.
@@ -191,6 +194,22 @@ export function App(): React.JSX.Element {
               서버와 연결이 끊겼습니다. 자동으로 재연결을 시도하는 동안 조작 버튼이 잠깁니다.
               <br />
               <small>송출 화면은 마지막 내용을 그대로 유지합니다.</small>
+            </div>
+          )}
+
+          {staleOutput && (
+            <div className="banner warn">
+              <button type="button" className="close" onClick={dismissStale}>
+                닫기
+              </button>
+              <b>OBS 브라우저 소스를 새로고침하세요.</b> 연결된 출력 화면
+              {staleOutput !== 'main' ? ` (${staleOutput})` : ''}이 앱보다 옛 판입니다.
+              <br />
+              <small>
+                브라우저 소스 더블클릭 → <b>현재 페이지 새로고침</b>. 서버를 재시작해도 OBS 안의
+                페이지는 다시 읽히지 않아, 새로 만든 항목이 <b>화면에 나오지 않습니다</b>
+                (화면은 비우지 않고 이전 내용을 유지합니다).
+              </small>
             </div>
           )}
 

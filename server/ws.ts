@@ -16,6 +16,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { templateToCssVars } from '../lib/template-css.ts';
 import type { ClientMsg, ClientRole, Deck, LiveState, ServerMsg, Template } from '../shared/types.ts';
 import { getTemplateOrDefault } from './db/templates.ts';
+import { isOutputStale, outputBuildMs } from './output-build.ts';
 import * as state from './state.ts';
 
 interface Client {
@@ -107,6 +108,13 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         log.info(`WS 연결: ${client.role}${client.role === 'output' ? ` (layer=${client.layer})` : ''}`);
         // 역할이 정해진 뒤에 알려야 집계가 맞는다
         broadcastCounts();
+
+        // 옛 판이 붙어 있으면 컨트롤 패널에 알린다.
+        // 미리보기 iframe 은 컨트롤 패널과 함께 새로 뜨므로 대상이 아니다.
+        if (client.role === 'output' && client.layer !== 'preview' && isOutputStale(msg.loadedAt, outputBuildMs())) {
+          log.warn(`출력 페이지가 옛 판입니다 (layer=${client.layer}) — OBS 브라우저 소스를 새로고침하세요`);
+          broadcast({ t: 'output:stale', payload: { layer: client.layer ?? 'main' } }, ['control']);
+        }
         break;
 
       case 'show':

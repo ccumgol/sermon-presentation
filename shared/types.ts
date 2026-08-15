@@ -580,12 +580,21 @@ export type ServerMsg =
   | { t: 'style:patch'; payload: Record<string, string> }
   /** 출력 페이지에서 올라온 오류를 컨트롤 패널에 알린다 */
   | { t: 'output:error'; payload: { message: string; url: string } }
+  /**
+   * 접속한 출력 페이지가 **옛 판**이라 새로고침이 필요하다는 알림.
+   * 새 슬라이드 종류를 못 그려 '아무 일도 안 일어나는' 상태를 미리 잡아 준다.
+   */
+  | { t: 'output:stale'; payload: { layer: string } }
   | { t: 'error'; message: string };
 
 export type ClientRole = 'control' | 'output';
 
 export type ClientMsg =
-  | { t: 'hello'; role: ClientRole; layer?: string }
+  /**
+   * `loadedAt` 은 출력 페이지가 **자기가 로드된 시각**(Date.now())을 알리는 값이다.
+   * 서버가 출력 파일 수정 시각과 비교해 '옛 판이니 새로고침하라'를 컨트롤 패널에 띄운다.
+   */
+  | { t: 'hello'; role: ClientRole; layer?: string; loadedAt?: number }
   | { t: 'show'; payload: SlidePayload }
   /** 슬라이드 묶음을 올린다 (본문 조회 결과) */
   | { t: 'deck:load'; payload: Deck }

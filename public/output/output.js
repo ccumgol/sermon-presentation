@@ -10,6 +10,9 @@
 (function () {
   'use strict';
 
+  /** 이 페이지가 로드된 시각 — 옛 판인지 서버가 판정하는 데 쓴다 */
+  var LOADED_AT = Date.now();
+
   var params = new URLSearchParams(location.search);
   var opts = {
     layer: params.get('layer') || 'main',
@@ -559,7 +562,10 @@
       diag.ws = 'open';
       reconnectDelay = RECONNECT_MIN;
       renderDebug();
-      sendMsg({ t: 'hello', role: 'output', layer: opts.layer });
+      // 이 페이지가 로드된 시각을 함께 보낸다. 서버가 출력 파일 수정 시각과 비교해
+      // '옛 판이니 OBS 소스를 새로고침하라'를 컨트롤 패널에 띄운다.
+      // 서버를 재시작해도 이 페이지는 다시 읽히지 않으므로 스스로는 알 수 없다.
+      sendMsg({ t: 'hello', role: 'output', layer: opts.layer, loadedAt: LOADED_AT });
     };
 
     socket.onmessage = function (event) {

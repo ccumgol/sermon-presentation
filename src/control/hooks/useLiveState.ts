@@ -37,6 +37,12 @@ export interface LiveConnection {
   connections: Connections;
   outputErrors: OutputError[];
   dismissErrors: () => void;
+  /**
+   * 접속한 출력 페이지가 옛 판이라는 알림 (OBS 소스 새로고침 필요).
+   * 서버가 출력 파일 수정 시각과 페이지 로드 시각을 비교해 보내 준다.
+   */
+  staleOutput: string | null;
+  dismissStale: () => void;
   send: (msg: ClientMsg) => boolean;
 }
 
@@ -50,6 +56,7 @@ export function useLiveState(): LiveConnection {
   const [state, setState] = useState<LiveState | null>(null);
   const [deck, setDeck] = useState<Deck | null>(null);
   const [outputErrors, setOutputErrors] = useState<OutputError[]>([]);
+  const [staleOutput, setStaleOutput] = useState<string | null>(null);
   const [connections, setConnections] = useState<Connections>({ control: 0, output: 0 });
   const [template, setTemplate] = useState<Template | null>(null);
 
@@ -102,6 +109,8 @@ export function useLiveState(): LiveConnection {
             ...prev.slice(-4),
             { message: msg.payload.message, url: msg.payload.url, at: Date.now() },
           ]);
+        } else if (msg.t === 'output:stale') {
+          setStaleOutput(msg.payload.layer);
         }
       };
 
@@ -148,6 +157,10 @@ export function useLiveState(): LiveConnection {
   }, []);
 
   const dismissErrors = useCallback(() => setOutputErrors([]), []);
+  const dismissStale = useCallback(() => setStaleOutput(null), []);
 
-  return { status, state, deck, template, connections, outputErrors, dismissErrors, send };
+  return {
+    status, state, deck, template, connections,
+    outputErrors, dismissErrors, staleOutput, dismissStale, send,
+  };
 }
