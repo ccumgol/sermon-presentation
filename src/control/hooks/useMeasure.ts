@@ -9,7 +9,7 @@
  * scrollHeight 가 의미를 잃는다.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SlidePayload, Template } from '../../../shared/types.ts';
 
@@ -96,5 +96,7 @@ export function useMeasure(): Measurer {
     [],
   );
 
-  return { ready, measure };
+  // 매 렌더마다 새 객체를 주면 이걸 의존성으로 쓰는 effect 가 끝없이 다시 돈다.
+  // 예배 순서 탭에서 미리보기 요청이 시작되자마자 취소돼 우측이 비어 있었다.
+  return useMemo(() => ({ ready, measure }), [ready, measure]);
 }

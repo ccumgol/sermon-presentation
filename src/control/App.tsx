@@ -81,6 +81,12 @@ export function App(): React.JSX.Element {
     function onKeyDown(event: KeyboardEvent): void {
       if (isTypingTarget(event.target)) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // 패널이 이미 처리한 키는 건드리지 않는다.
+      //
+      // 예배 순서 탭에서 슬라이드 영역에 포커스가 있으면 ←→ 로 **미리보기 커서**만
+      // 움직여야 하는데, 이 검사가 없으면 실제 송출 화면까지 함께 넘어간다.
+      // 패널 리스너가 먼저 등록되므로(React 는 자식 effect 를 먼저 실행) 여기서 알 수 있다.
+      if (event.defaultPrevented) return;
 
       switch (event.key) {
         case 'ArrowRight':

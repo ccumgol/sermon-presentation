@@ -1203,3 +1203,251 @@ button.link-inline {
   font-weight: 500;
   vertical-align: 1px;
 }
+
+/* ── 예배 순서 ───────────────────────────────────────────────
+   가장 많이 쓰는 화면. 성경·찬양 탭의 큰 카드와 달리 **조밀한 목록**이다 —
+   10항목이 한 화면에 들어와야 진행이 보인다. */
+
+.plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+
+.main:has(.plan-panel) {
+  overflow: hidden;
+}
+
+.plan-split {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.15fr);
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.plan-list,
+.plan-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px;
+  /* 포커스 표시를 위한 자리 — 항상 같은 두께라 눌러도 레이아웃이 안 흔들린다 */
+  border: 1px solid transparent;
+}
+
+/* 지금 키보드가 움직이는 영역 */
+.plan-list.focused,
+.plan-detail.focused {
+  border-color: var(--accent, #4a9eff);
+}
+
+.plan-head {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.plan-head .grow { flex: 1; }
+
+.cue-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  margin: 4px 0;
+}
+
+/* 그룹 머리글 — 항목보다 낮고 조용하게 */
+.cue-divider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 3px;
+  margin-top: 6px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.cue-divider .label {
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.6;
+}
+
+.cue-divider.current .label { opacity: 1; color: var(--accent, #4a9eff); }
+
+/* 항목 한 줄 — 28px 안팎 */
+.cue-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cue-row:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* 선택(커서) — 보고 있을 뿐, 화면에는 안 나간다 */
+.cue-row.current {
+  border-color: var(--accent, #4a9eff);
+  background: rgba(74, 158, 255, 0.1);
+}
+
+/* 송출 중 — 실제로 나가고 있다 */
+.cue-row.live { background: rgba(239, 68, 68, 0.12); }
+
+.cue-row .live-dot {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.cue-row.live .live-dot {
+  background: var(--live, #ef4444);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.cue-row .icon { flex: 0 0 1.2rem; font-size: 0.9rem; }
+
+.cue-row .body {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cue-row .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cue-row .meta { font-size: 0.72rem; opacity: 0.55; white-space: nowrap; }
+
+.cue-row .actions,
+.cue-divider .actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.cue-row:hover .actions,
+.cue-row.current .actions,
+.cue-divider:hover .actions { opacity: 1; }
+
+.cue-row .actions button,
+.cue-divider .actions button {
+  min-height: 22px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+}
+
+.cue-row .actions .go { color: var(--live, #ef4444); }
+
+/* 추가 바 — 타입을 고르면 입력창의 동작이 바뀐다 */
+.add-bar {
+  flex: 0 0 auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.add-bar .kind-row { display: flex; gap: 4px; margin-bottom: 6px; }
+
+.add-bar .kind {
+  min-width: 34px;
+  min-height: 28px;
+  padding: 0;
+  font-size: 0.95rem;
+}
+
+.add-bar .kind.active {
+  border-color: var(--accent, #4a9eff);
+  background: rgba(74, 158, 255, 0.15);
+}
+
+.add-bar input,
+.add-bar textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+/* 선택한 항목의 슬라이드 */
+.plan-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.live-tag {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--live, #ef4444);
+  font-size: 0.7rem;
+}
+
+.cue-slides {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cue-slide {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--panel-2);
+  text-align: left;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cue-slide:hover { border-color: var(--line); }
+.cue-slide.current { border-color: var(--accent, #4a9eff); background: rgba(74, 158, 255, 0.1); }
+
+.cue-slide .num {
+  flex: 0 0 3.2rem;
+  font-size: 0.72rem;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.cue-slide .text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cue-slide .line {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-controls { margin-top: 8px; align-items: center; gap: 8px; }
+.detail-controls label { font-size: 0.8rem; opacity: 0.7; }
+.detail-text { width: 100%; margin-top: 8px; resize: vertical; }
+
+.plan-keys { flex: 0 0 auto; margin: 0; text-align: center; opacity: 0.5; }
+
+@media (max-width: 900px) {
+  .plan-split { grid-template-columns: 1fr; }
+  .main:has(.plan-panel) { overflow-y: auto; }
+  .plan-panel { height: auto; }
+  .cue-list { max-height: 40vh; }
+}
