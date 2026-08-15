@@ -291,8 +291,11 @@
    * 걸음(0.9)을 유리수로 딱 떨어지지 않게 둬서 2~5글자에서 기계적인 반복이
    * 보이지 않게 했다. 작아진 글자는 그만큼 아래로 내려 아랫선을 흔든다.
    */
-  function fillRhythmicText(node, text) {
+  function fillRhythmicText(node, text, charStyles) {
     clearChildren(node);
+    var manual = charStyles || [];
+    // 공백을 뺀 글자 순서 = 슬라이더 한 줄. lib/order-rhythm.ts 의 adjustableChars 와 같아야 한다.
+    var manualIndex = 0;
 
     var root = getComputedStyle(document.documentElement);
     var amount = parseFloat(root.getPropertyValue('--title-rhythm'));
@@ -302,7 +305,11 @@
     if (!(amount > 0)) amount = 0;
     if (!(amountY > 0)) amountY = 0;
 
-    if (amount === 0 && amountY === 0) {
+    // 자동 리듬이 꺼져 있고 사람이 만진 글자도 없으면 쪼갤 이유가 없다
+    var hasManual = manual.some(function (style) {
+      return style && (typeof style.size === 'number' || typeof style.dy === 'number');
+    });
+    if (amount === 0 && amountY === 0 && !hasManual) {
       node.textContent = text;
       return;
     }
@@ -326,12 +333,18 @@
          * 4자에서 '큰·작은·작은·큰' 이 되어 신앙고백 캡처와도 맞는다.
          */
         var wave = Math.cos((i * 2 * Math.PI) / 3);
-        var span = document.createElement('span');
-        span.className = 'rhythm-char';
-        span.style.fontSize = (1 + amount * wave).toFixed(3) + 'em';
+        // 사람이 슬라이더로 만진 글자는 그 값이 이긴다. 만지지 않은 글자만 자동 리듬.
+        var style = manual[manualIndex] || {};
+        manualIndex += 1;
+        var size = typeof style.size === 'number' ? style.size : 1 + amount * wave;
         // 파도가 아래로 갈수록 글자를 내린다. (1-wave)/2 는 0~1 이라
         // 값이 곧 '가장 많이 내려간 글자가 몇 em 내려가는지' 가 된다.
-        span.style.transform = 'translateY(' + (amountY * ((1 - wave) / 2)).toFixed(3) + 'em)';
+        var dy = typeof style.dy === 'number' ? style.dy : amountY * ((1 - wave) / 2);
+
+        var span = document.createElement('span');
+        span.className = 'rhythm-char';
+        span.style.fontSize = size.toFixed(3) + 'em';
+        span.style.transform = 'translateY(' + dy.toFixed(3) + 'em)';
         span.textContent = chars[i];
         node.appendChild(span);
       }
@@ -352,7 +365,7 @@
 
     var title = document.createElement('div');
     title.className = 'order-title line-primary';
-    fillRhythmicText(title, payload.title || '');
+    fillRhythmicText(title, payload.title || '', payload.charStyles);
     row.appendChild(title);
 
     if (payload.presenter) {

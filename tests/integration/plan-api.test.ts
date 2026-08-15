@@ -466,6 +466,26 @@ describe('구분·인용구 항목 저장', () => {
     expect(items[3]!.layout).toBeUndefined();
   });
 
+  it('글자별 조정을 저장하고 범위를 지킨다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '글자 조정',
+      items: [
+        { type: 'text', content: '폐회송', variant: 'order',
+          charStyles: [{ size: 1.4 }, { size: 99, dy: -9 }, {}] },
+        // 순서 표시가 아니면 뜻이 없으므로 버린다
+        { type: 'text', content: '광고', charStyles: [{ size: 1.4 }] },
+      ],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const items = created.body.data!.plan.items as Array<{ charStyles?: Array<{ size?: number; dy?: number }> }>;
+    expect(items[0]!.charStyles![0]!.size).toBe(1.4);
+    expect(items[0]!.charStyles![1]!.size).toBe(2.5); // 상한
+    expect(items[0]!.charStyles![1]!.dy).toBe(-0.6); // 하한
+    expect(items[0]!.charStyles![2]).toEqual({}); // 만지지 않은 글자는 빈 채로
+    expect(items[1]!.charStyles).toBeUndefined();
+  });
+
   it('알 수 없는 variant 는 광고로 떨어뜨린다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: 'variant 방어',

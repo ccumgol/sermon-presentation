@@ -467,6 +467,11 @@ export type CueItem =
        * - `stack`        줄을 그대로 쌓아 올린다 (템플릿 정렬을 따름)
        */
       layout?: 'split' | 'stack';
+      /**
+       * 순서 이름의 **글자별 수동 조정** (variant 가 'order' 일 때만).
+       * 슬라이더로 만진 글자만 값이 차고, 나머지는 자동 리듬을 따른다.
+       */
+      charStyles?: OrderCharStyle[];
       templateId?: number;
       note?: string;
     }
@@ -521,6 +526,20 @@ export interface ServicePlan {
 // 송출 상태 (Live State)
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * 순서 표시 제목의 **글자 하나**에 대한 수동 조정.
+ *
+ * 값이 없으면 그 글자는 자동 리듬을 따른다. 사람이 슬라이더로 만진 글자만 채워진다.
+ * 색인은 제목에서 **공백을 뺀** 글자 순서다 — '예배 부름' 을 '예배부름' 으로 고쳐도
+ * 조정이 그대로 따라간다.
+ */
+export interface OrderCharStyle {
+  /** 크기 배수 (1 = 기준) */
+  size?: number;
+  /** 내림 폭(em). 양수면 아래로 */
+  dy?: number;
+}
+
 export type SlidePayload =
   | {
       kind: 'bible';
@@ -543,7 +562,7 @@ export type SlidePayload =
    * `text` 로 두지 않는 이유는 두 값의 **자리가 다르기 때문**이다. 줄 배열로는
    * "이건 왼쪽, 저건 오른쪽"을 표현할 수 없어 출력 페이지가 알 방법이 없다.
    */
-  | { kind: 'order'; title: string; presenter?: string }
+  | { kind: 'order'; title: string; presenter?: string; charStyles?: OrderCharStyle[] }
   | { kind: 'blank' };
 
 export interface LiveState {

@@ -25,6 +25,7 @@ import {
   type SlidePayload, type Template,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
+import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
 
 interface Props {
@@ -361,7 +362,16 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
       if (item.type === 'text') {
         // 순서 표시는 기본이 좌우 나누기 — 왼쪽 순서 이름, 오른쪽 담당자
         if (item.variant === 'order' && item.layout !== 'stack') {
-          return { slides: [{ kind: 'order', ...splitOrderText(item.content) }], labels: ['순서 표시'] };
+          return {
+            slides: [
+              {
+                kind: 'order',
+                ...splitOrderText(item.content),
+                ...(item.charStyles ? { charStyles: item.charStyles } : {}),
+              },
+            ],
+            labels: ['순서 표시'],
+          };
         }
         const lines = item.content.split(/\r?\n/).filter((line) => line.trim().length > 0);
         return { slides: [{ kind: 'text', lines }], labels: [textVariantLabel(item.variant)] };
@@ -808,6 +818,13 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
     const start = deck.groups[groupIndex]?.startIndex;
     return start === undefined ? -1 : currentIndex - start;
   })();
+
+  /** 이 항목이 실제로 쓸 템플릿 — 지정이 없으면 지금 송출 중인 것 */
+  function itemTemplateFor(item: CueItem): Template | null {
+    const id = 'templateId' in item ? item.templateId : undefined;
+    if (typeof id === 'number') return styleTemplates.find((t) => t.id === id) ?? template;
+    return template;
+  }
 
   const kindHint = ADD_KINDS.find((option) => option.kind === addKind)?.hint ?? '';
   // 순서 표시도 여러 줄이다 — '설교 제목' 아래 줄에 설교자를 넣는다
@@ -1320,6 +1337,27 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 <option value="stack">쌓기 (줄을 그대로)</option>
               </select>
             </div>
+          )}
+
+          {current.type === 'text' && current.variant === 'order' && current.layout !== 'stack' && (
+            <OrderCharTuner
+              title={splitOrderText(current.content).title}
+              charStyles={current.charStyles}
+              // 슬라이더의 출발점은 **이 항목이 쓸 템플릿**의 자동 리듬이다.
+              // 송출 중인 템플릿을 기준으로 삼으면, 아직 올리지 않은 항목에서
+              // 눈금과 실제 화면이 어긋난다.
+              rhythm={itemTemplateFor(current)?.behavior.titleRhythm ?? 0}
+              rhythmY={itemTemplateFor(current)?.behavior.titleRhythmY ?? 0}
+              onChange={(charStyles) => {
+                const next = items.map((i) => (i.id === current.id ? { ...i, charStyles } : i));
+                patchItems(next);
+                // 이 항목을 **단독으로 송출 중**이면 바로 다시 보내 눈으로 보며 맞출 수 있게 한다.
+                // 순서표 전체가 올라가 있을 때는 건드리지 않는다 — 예배 중에 덱이
+                // 통째로 바뀌면 진행 위치를 잃는다. 그때는 다시 올려야 반영된다.
+                const updated = next.find((i) => i.id === current.id);
+                if (updated && liveItemId === current.id) void sendItem(updated);
+              }}
+            />
           )}
 
           {current.type === 'text' && (

@@ -7,6 +7,8 @@
 
 import type { FastifyInstance } from 'fastify';
 
+import { normalizeCharStyles } from '../../lib/order-rhythm.ts';
+
 import {
   AUTO_HOLD_MS_DEFAULT,
   AUTO_HOLD_MS_MAX,
@@ -119,6 +121,8 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         // 배치는 순서 표시에만 뜻이 있다. 기본(split)은 저장하지 않는다 —
         // 저장된 순서표에 기본값이 박혀 있으면 나중에 기본을 바꿀 수 없다.
         const layout = variant === 'order' && text.layout === 'stack' ? 'stack' : undefined;
+        // 글자별 수동 조정도 순서 표시에만 뜻이 있다
+        const charStyles = variant === 'order' ? normalizeCharStyles(fields.charStyles) : undefined;
 
         items.push({
           id,
@@ -126,6 +130,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           content: text.content,
           ...(variant ? { variant } : {}),
           ...(layout ? { layout } : {}),
+          ...(charStyles ? { charStyles } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
