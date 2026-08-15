@@ -21,9 +21,19 @@ describe('AUTO_PATTERN — 사용자가 정한 네 글자 표', () => {
     expect([0, 1, 2, 3].map((i) => autoDy(i, 1))).toEqual([0, -0.19, 0.1, -0.05]);
   });
 
-  it('다섯째 글자부터 처음으로 돌아가 되풀이된다', () => {
-    expect(autoScale(4, 1)).toBe(autoScale(0, 1));
-    expect(autoDy(5, 1)).toBe(autoDy(1, 1));
+  it('표는 네 글자까지 — 다섯째 글자부터는 흔들지 않는다', () => {
+    // 다섯 글자 이상('찬양과경배' 같은 XX와XX 꼴)은 이름마다 어울리는 모양이 달라
+    // 자동으로 정하면 어색해진다. 글자별 조정으로 직접 맞춘다.
+    for (const i of [4, 5, 6, 10]) {
+      expect(autoScale(i, 1)).toBe(1);
+      expect(autoDy(i, 1)).toBe(0);
+    }
+  });
+
+  it("두 글자·세 글자는 네 글자의 앞부분을 그대로 따른다", () => {
+    // '축도'(2자) '축복송'(3자) 은 '예배부름'(4자) 의 앞 두세 글자와 같아야 한다
+    expect([0, 1].map((i) => autoScale(i, 1))).toEqual([1, 0.96]);
+    expect([0, 1, 2].map((i) => autoDy(i, 1))).toEqual([0, -0.19, 0.1]);
   });
 
   it('2자 어절에서도 크기가 달라진다', () => {

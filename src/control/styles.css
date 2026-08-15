@@ -1466,6 +1466,11 @@ button.link-inline {
   font-size: 1rem;
   opacity: 0.6;
 }
+/* 자동 표 밖(다섯째 글자부터) — 손대지 않으면 기본 크기 그대로다 */
+.char-row.plain .ch {
+  border-bottom: 1px dashed var(--muted);
+}
+
 .char-row.manual .ch {
   opacity: 1;
   color: var(--accent, #4a9eff);

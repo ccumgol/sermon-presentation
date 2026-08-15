@@ -9,7 +9,7 @@
  */
 
 import {
-  adjustableChars, autoDy, autoScale,
+  adjustableChars, autoDy, autoScale, AUTO_PATTERN,
   CHAR_DY_MAX, CHAR_DY_MIN, CHAR_SIZE_MAX, CHAR_SIZE_MIN,
 } from '../../../lib/order-rhythm.ts';
 import type { OrderCharStyle } from '../../../shared/types.ts';
@@ -62,7 +62,11 @@ export function OrderCharTuner({ title, charStyles, rhythm, rhythmY, onChange }:
     <div className="char-tuner">
       <div className="row">
         <label>글자 조정</label>
-        <span className="muted">만진 글자만 자동 리듬을 벗어납니다</span>
+        <span className="muted">
+          {chars.length > AUTO_PATTERN.length
+            ? `자동은 앞 ${AUTO_PATTERN.length}글자까지 — 나머지는 직접 맞추세요`
+            : '만진 글자만 자동 리듬을 벗어납니다'}
+        </span>
         <button type="button" onClick={() => onChange(undefined)} disabled={!touched}>
           전부 자동으로
         </button>
@@ -73,10 +77,12 @@ export function OrderCharTuner({ title, charStyles, rhythm, rhythmY, onChange }:
         const size = styles[index]?.size ?? autoScale(inWord, rhythm);
         const dy = styles[index]?.dy ?? autoDy(inWord, rhythmY);
         const manual = styles[index]?.size !== undefined || styles[index]?.dy !== undefined;
+        // 표는 네 글자까지다. 그 뒤 글자는 자동이 손대지 않으므로 눈에 띄게 둔다.
+        const beyondTable = inWord >= AUTO_PATTERN.length;
 
         return (
-          <div className={`char-row${manual ? ' manual' : ''}`} key={`${ch}-${index}`}>
-            <span className="ch" title={manual ? '직접 조정함' : '자동'}>{ch}</span>
+          <div className={`char-row${manual ? ' manual' : ''}${beyondTable && !manual ? ' plain' : ''}`} key={`${ch}-${index}`}>
+            <span className="ch" title={manual ? '직접 조정함' : beyondTable ? '자동 없음 — 직접 조정하세요' : '자동'}>{ch}</span>
 
             <span className="knob">
               <span className="tag">크기</span>

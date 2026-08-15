@@ -336,7 +336,8 @@
       var chars = Array.from(words[w]);
 
       for (var i = 0; i < chars.length; i++) {
-        var pattern = AUTO_PATTERN[i % AUTO_PATTERN.length];
+        // 표는 네 글자까지만. 그 뒤는 흔들지 않고 글자별 조정에 맡긴다
+        var pattern = AUTO_PATTERN[i] || { size: 1, dy: 0 };
         // 사람이 슬라이더로 만진 글자는 그 값이 이긴다. 만지지 않은 글자만 자동 리듬.
         var style = manual[manualIndex] || {};
         manualIndex += 1;

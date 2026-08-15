@@ -1,7 +1,8 @@
 /**
  * 순서 표시 제목의 글자별 크기·높낮이 계산.
  *
- * **자동 리듬**(세 글자 주기)이 기본이고, 사람이 슬라이더로 만진 글자는 그 값이 이긴다.
+ * **자동 리듬**(네 글자 표)이 기본이고, 사람이 슬라이더로 만진 글자는 그 값이 이긴다.
+ * 표를 넘어가는 다섯째 글자부터는 흔들지 않는다 — 직접 조정하는 자리다.
  *
  * ⚠️ 출력 페이지(`public/output/output.js`)에 **같은 계산이 한 벌 더 있다.**
  * 출력 페이지는 의존성 0 원칙 때문에 이 모듈을 가져다 쓸 수 없다(번들러가 없다).
@@ -16,7 +17,9 @@ import type { OrderCharStyle } from '../shared/types.ts';
  *
  * 계산식(파도)이 아니라 표인 이유는, 사용자가 실제 예배 화면을 보고 고른 값이기
  * 때문이다. 식으로 근사하면 그 값이 그대로 나오지 않는다.
- * 어절이 네 글자를 넘으면 **처음으로 돌아가 되풀이**한다.
+ *
+ * 실제로 쓰는 순서 이름이 이 표에 맞춰져 있다 —
+ * '예배부름'(4자)이 기준이고, '축도'(2자)·'축복송'(3자)은 앞 두세 글자를 그대로 따른다.
  *
  * `dy` 는 음수가 위, 양수가 아래다(컨트롤 패널의 ↑↓ 표시와 같다).
  */
@@ -27,8 +30,19 @@ export const AUTO_PATTERN: ReadonlyArray<{ size: number; dy: number }> = [
   { size: 0.9, dy: -0.05 },
 ];
 
+/** 표 밖(다섯째 글자부터) — 흔들지 않는다 */
+const NEUTRAL = { size: 1, dy: 0 } as const;
+
+/**
+ * 표는 **네 글자까지만** 적용한다.
+ *
+ * 다섯 글자 이상('찬양과경배' 처럼 `XX와XX` 꼴)은 어떻게 흔드는 것이 좋은지가
+ * 이름마다 달라, 자동으로 정하면 오히려 어색해진다. 그래서 남는 글자는 기본
+ * 크기로 두고 **글자별 조정으로 직접 맞추게** 한다(2026-08-15 사용자 결정).
+ * 되풀이하면 여섯째 글자부터 의도치 않게 다시 흔들린다.
+ */
 function patternAt(indexInWord: number): { size: number; dy: number } {
-  return AUTO_PATTERN[((indexInWord % AUTO_PATTERN.length) + AUTO_PATTERN.length) % AUTO_PATTERN.length]!;
+  return AUTO_PATTERN[indexInWord] ?? NEUTRAL;
 }
 
 /**
