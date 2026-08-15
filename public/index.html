@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sermon Presentation</title>
+    <style>
+      /* 방송실은 대개 어둡다 — 다크 UI 를 기본으로 (계획서 §6.1) */
+      :root {
+        color-scheme: dark;
+        --bg: #14161a;
+        --panel: #1d2026;
+        --line: #2c3038;
+        --fg: #e8eaee;
+        --muted: #9aa2ae;
+        --accent: #5aa9ff;
+        --ok: #4ade80;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 48px 24px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 16px/1.6 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif;
+      }
+      main { max-width: 760px; margin: 0 auto; }
+      h1 { font-size: 24px; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 32px; font-size: 14px; }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+      .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
+      .url-row { display: flex; gap: 8px; align-items: center; }
+      code {
+        flex: 1;
+        background: #0f1115;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font: 13px/1.4 ui-monospace, monospace;
+        color: var(--accent);
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      button {
+        background: var(--accent);
+        color: #08121e;
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:active { transform: translateY(1px); }
+      ol { margin: 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+      ol li { margin-bottom: 6px; }
+      ol strong { color: var(--fg); }
+      .links { display: flex; gap: 12px; flex-wrap: wrap; }
+      .links a {
+        color: var(--fg);
+        text-decoration: none;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 14px;
+      }
+      .links a:hover { border-color: var(--accent); color: var(--accent); }
+      .phase { color: var(--muted); font-size: 13px; }
+      .badge { color: var(--ok); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sermon Presentation</h1>
+      <p class="sub">OBS 브라우저 소스 송출 서버 <span class="badge" id="status">● 확인 중…</span></p>
+
+      <div class="card">
+        <h2>OBS 브라우저 소스 URL</h2>
+        <div class="url-row">
+          <code id="output-url">—</code>
+          <button id="copy">복사</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>OBS 설정</h2>
+        <ol>
+          <li>소스 추가 → <strong>브라우저</strong></li>
+          <li>URL 에 위 주소를 붙여넣기</li>
+          <li>폭 <strong>1920</strong> / 높이 <strong>1080</strong></li>
+          <li>사용자 지정 CSS 칸은 <strong>비우기</strong> (기본값 삭제)</li>
+          <li>“표시되지 않을 때 소스 종료” <strong>해제</strong></li>
+          <li>“장면이 활성화될 때 브라우저 새로고침” <strong>해제</strong></li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <h2>확인용 링크</h2>
+        <div class="links">
+          <a href="/output/?layer=main&amp;demo=1&amp;preview=1" target="_blank">데모 + 미리보기 배경</a>
+          <a href="/output/?layer=main&amp;demo=1" target="_blank">데모 (투명 배경)</a>
+          <a href="/output/?layer=main&amp;debug=1" target="_blank">빈 화면 + 진단 배지</a>
+        </div>
+      </div>
+
+      <p class="phase">
+        컨트롤 패널은 Phase 2 에서 이 자리에 들어갑니다.
+        지금은 Phase 0(기반) · Phase 1(성경 DB) 단계입니다.
+      </p>
+    </main>
+
+    <script>
+      const outputUrlEl = document.getElementById('output-url');
+      const statusEl = document.getElementById('status');
+
+      fetch('/api/info')
+        .then((r) => r.json())
+        .then((res) => {
+          outputUrlEl.textContent = res.data.outputUrl;
+          statusEl.textContent = `● 실행 중 (포트 ${res.data.port})`;
+        })
+        .catch(() => {
+          statusEl.textContent = '● 서버 응답 없음';
+          statusEl.style.color = '#f87171';
+        });
+
+      document.getElementById('copy').addEventListener('click', async () => {
+        const btn = document.getElementById('copy');
+        try {
+          await navigator.clipboard.writeText(outputUrlEl.textContent);
+          btn.textContent = '복사됨';
+        } catch {
+          btn.textContent = '복사 실패';
+        }
+        setTimeout(() => (btn.textContent = '복사'), 1500);
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+out/
+
+# 생성물 및 사용자 데이터 — 원본 DB에서 다시 빌드할 수 있으므로 커밋하지 않음
+# 빌드/검증 리포트는 data/reports/ 에 생성된다
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+.DS_Store
+*.log
+.env
+.env.local
+
+# Vite 빌드 산출물 (컨트롤 패널)
+public/app/
+
+# 테스트용 임시 데이터
+.test-data/
+
+# Claude Code 개인 설정 (launch.json 은 프로젝트 공용이라 커밋한다)
+.claude/settings.local.json

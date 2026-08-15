@@ -1,0 +1,281 @@
+/*
+ * 출력 페이지 스타일.
+ *
+ * 모든 시각 속성은 CSS Custom Property 로만 지정한다. 템플릿이 바뀌면
+ * JS 가 style.setProperty() 로 변수만 갱신하므로 DOM 재구성이 없다
+ * → 예배 중 폰트 크기를 조절해도 화면이 깜빡이지 않는다 (계획서 §5.2).
+ */
+
+:root {
+  /* ── 캔버스 ── */
+  --canvas-bg: transparent;
+  --safe-top: 0px;
+  --safe-right: 0px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
+
+  /* ── 레이아웃 ── */
+  --justify: center; /* anchor 의 가로 성분 */
+  --align: end; /* anchor 의 세로 성분 */
+  --offset-x: 0px;
+  --offset-y: 0px;
+  --block-width: auto;
+  --block-max-height: none;
+  --text-align: center;
+  --flow-direction: column; /* 다역본/다언어 배치 방향 */
+  --block-gap: 24px;
+  --fit-scale: 1; /* autoFit 축소 배율 */
+
+  /* ── 주 역본 / 주 언어 ── */
+  --primary-font: system-ui, sans-serif;
+  --primary-size: 64px;
+  --primary-weight: 700;
+  --primary-line-height: 1.4;
+  --primary-spacing: 0px;
+  --primary-color: #ffffff;
+  --primary-opacity: 1;
+  --primary-style: normal;
+  --primary-transform: none;
+  --primary-word-break: keep-all;
+  --primary-stroke: none;
+  --primary-shadow: none;
+  --primary-box-bg: transparent;
+  --primary-box-pad-x: 0px;
+  --primary-box-pad-y: 0px;
+  --primary-box-radius: 0px;
+
+  /* ── 보조 역본 / 보조 언어 ── */
+  --secondary-font: system-ui, sans-serif;
+  --secondary-size: 44px;
+  --secondary-weight: 400;
+  --secondary-line-height: 1.4;
+  --secondary-spacing: 0px;
+  --secondary-color: #ffe9a8;
+  --secondary-opacity: 1;
+  --secondary-style: normal;
+  --secondary-transform: none;
+  --secondary-word-break: normal;
+  --secondary-stroke: none;
+  --secondary-shadow: none;
+  --secondary-box-bg: transparent;
+  --secondary-box-pad-x: 0px;
+  --secondary-box-pad-y: 0px;
+  --secondary-box-radius: 0px;
+
+  /* ── 절 번호 ── */
+  --versenum-font: system-ui, sans-serif;
+  --versenum-size: 32px;
+  --versenum-weight: 700;
+  --versenum-color: #ffd24a;
+  --versenum-opacity: 1;
+
+  /* ── 참조 표기 ── */
+  --reference-font: system-ui, sans-serif;
+  --reference-size: 36px;
+  --reference-weight: 500;
+  --reference-color: #ffffff;
+  --reference-opacity: 0.85;
+  --reference-stroke: none;
+  --reference-shadow: none;
+
+  /* ── 소제목 ── */
+  --heading-font: system-ui, sans-serif;
+  --heading-size: 40px;
+  --heading-weight: 600;
+  --heading-color: #cfe8ff;
+  --heading-opacity: 0.9;
+
+  /* ── 저작권 표기 ── */
+  --credit-font: system-ui, sans-serif;
+  --credit-size: 22px;
+  --credit-weight: 400;
+  --credit-color: #ffffff;
+  --credit-opacity: 0.7;
+
+  /* ── 전환 ── */
+  --transition-duration: 0ms;
+}
+
+/*
+ * OBS 브라우저 소스는 페이지 배경이 투명하면 그대로 알파 합성한다.
+ * 크로마키 필터가 필요 없고 안티앨리어싱 경계가 깨끗하다 (계획서 §5.3).
+ */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--canvas-bg);
+  /* OBS 안에서는 커서가 없지만, 브라우저로 열어 확인할 때 방해되지 않게 */
+  cursor: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 미리보기 체커보드 — ?preview=1 에서만 활성 */
+#preview-bg {
+  display: none;
+}
+body.preview #preview-bg {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-color: #4a4a4a;
+  background-image:
+    linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%),
+    linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%);
+  background-size: 64px 64px;
+  background-position: 0 0, 32px 32px;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  justify-items: var(--justify);
+  align-items: var(--align);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  box-sizing: border-box;
+}
+
+/*
+ * .slide 는 **항상 세로**다: 소제목 → 본문 → 참조 → 저작권.
+ * --flow-direction(다역본 좌우 배치)은 .blocks 에만 적용한다.
+ * 이걸 .slide 에 걸면 좌우 분할 템플릿에서 참조 표기가 본문 옆 칸으로
+ * 밀려 세로로 눌린다 (실제로 겪은 문제).
+ */
+.slide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--block-gap);
+  width: var(--block-width);
+  max-width: 100%;
+  max-height: var(--block-max-height);
+  text-align: var(--text-align);
+  transform: translate(var(--offset-x), var(--offset-y)) scale(var(--fit-scale));
+  transform-origin: center;
+  transition: opacity var(--transition-duration) ease;
+  opacity: 1;
+}
+
+/* 블랙(숨김) 상태 — 내용은 DOM 에 그대로 두고 투명도만 0 으로.
+   상태를 잃지 않으므로 복구가 즉시 이뤄진다. */
+body.blanked .slide {
+  opacity: 0;
+}
+
+.slide[data-empty='true'] .blocks:empty {
+  display: none;
+}
+
+.blocks {
+  display: flex;
+  flex-direction: var(--flow-direction);
+  gap: var(--block-gap);
+  min-width: 0;
+}
+
+/* ── 역할별 텍스트 ── */
+
+.block {
+  min-width: 0;
+}
+
+.block[dir='rtl'] {
+  direction: rtl;
+}
+
+.line-primary {
+  font-family: var(--primary-font);
+  font-size: var(--primary-size);
+  font-weight: var(--primary-weight);
+  line-height: var(--primary-line-height);
+  letter-spacing: var(--primary-spacing);
+  color: var(--primary-color);
+  opacity: var(--primary-opacity);
+  font-style: var(--primary-style);
+  text-transform: var(--primary-transform);
+  word-break: var(--primary-word-break);
+  overflow-wrap: break-word;
+  -webkit-text-stroke: var(--primary-stroke);
+  paint-order: stroke fill;
+  text-shadow: var(--primary-shadow);
+  background: var(--primary-box-bg);
+  padding: var(--primary-box-pad-y) var(--primary-box-pad-x);
+  border-radius: var(--primary-box-radius);
+}
+
+.line-secondary {
+  font-family: var(--secondary-font);
+  font-size: var(--secondary-size);
+  font-weight: var(--secondary-weight);
+  line-height: var(--secondary-line-height);
+  letter-spacing: var(--secondary-spacing);
+  color: var(--secondary-color);
+  opacity: var(--secondary-opacity);
+  font-style: var(--secondary-style);
+  text-transform: var(--secondary-transform);
+  word-break: var(--secondary-word-break);
+  overflow-wrap: break-word;
+  -webkit-text-stroke: var(--secondary-stroke);
+  paint-order: stroke fill;
+  text-shadow: var(--secondary-shadow);
+  background: var(--secondary-box-bg);
+  padding: var(--secondary-box-pad-y) var(--secondary-box-pad-x);
+  border-radius: var(--secondary-box-radius);
+}
+
+.verse-num {
+  font-family: var(--versenum-font);
+  font-size: var(--versenum-size);
+  font-weight: var(--versenum-weight);
+  color: var(--versenum-color);
+  opacity: var(--versenum-opacity);
+  vertical-align: super;
+  margin-inline-end: 0.25em;
+}
+
+.reference {
+  font-family: var(--reference-font);
+  font-size: var(--reference-size);
+  font-weight: var(--reference-weight);
+  color: var(--reference-color);
+  opacity: var(--reference-opacity);
+  -webkit-text-stroke: var(--reference-stroke);
+  paint-order: stroke fill;
+  text-shadow: var(--reference-shadow);
+}
+
+.heading {
+  font-family: var(--heading-font);
+  font-size: var(--heading-size);
+  font-weight: var(--heading-weight);
+  color: var(--heading-color);
+  opacity: var(--heading-opacity);
+}
+
+.credit {
+  font-family: var(--credit-font);
+  font-size: var(--credit-size);
+  font-weight: var(--credit-weight);
+  color: var(--credit-color);
+  opacity: var(--credit-opacity);
+}
+
+/* ── 진단 배지 (?debug=1) ── */
+.debug {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 99;
+  font: 12px/1.5 ui-monospace, monospace;
+  color: #0f0;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: pre;
+  pointer-events: none;
+}

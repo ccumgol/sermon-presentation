@@ -1,0 +1,531 @@
+/**
+ * 서버와 클라이언트(컨트롤 패널 / 출력 페이지)가 공유하는 단일 타입 정의.
+ * 이 파일이 유일한 계약이며, 어느 쪽도 자체 타입을 따로 만들지 않는다.
+ */
+
+// ─────────────────────────────────────────────────────────────
+// 성경
+// ─────────────────────────────────────────────────────────────
+
+export type Testament = 'OT' | 'NT';
+
+/** 역본 언어. 자유 문자열이 아니라 알려진 값 + 확장 가능한 형태로 둔다. */
+export type LangCode = string; // 'ko' | 'en' | 'grc' | 'heb' | 'zh' | 'ja' | ...
+
+export interface BookMeta {
+  code: number; // 1..66
+  nameKo: string;
+  abbrKo: string;
+  nameEn: string;
+  abbrEn: string;
+  /** 개신교 표준 장 수 (개역개정 기준). 화면 표기·탐색에 쓴다. */
+  chapters: number;
+  /**
+   * 번들된 역본 중 최대 장 수. 참조 파싱 검증에 쓴다.
+   * 요엘 4장(마소라), 다니엘 14장(공동번역 추가부)처럼 역본마다 장 구분이 다르다.
+   */
+  maxChapters: number;
+  testament: Testament;
+}
+
+export interface Translation {
+  id: string; // 'nkrv', 'niv', 'grk'
+  name: string; // '개역개정'
+  shortName: string; // '개정'
+  lang: LangCode;
+  direction: 'ltr' | 'rtl';
+  /** 이 역본이 담고 있는 성경책 범위. 헬라어=신약만, 히브리어=구약만. */
+  coverage: Testament[];
+  sortOrder: number;
+}
+
+export interface Verse {
+  book: number;
+  chapter: number;
+  verse: number;
+  text: string;
+}
+
+/** 한 역본의 본문 블록. 다역본 표시는 이 블록을 여러 개 나열한다. */
+export interface PassageBlock {
+  translationId: string;
+  translationName: string;
+  lang: LangCode;
+  direction: 'ltr' | 'rtl';
+  verses: Verse[];
+  /** 이 역본에 해당 본문이 없을 때(예: 헬라어로 창세기 조회) */
+  unavailable?: boolean;
+}
+
+export interface Passage {
+  /** 정규화된 참조 문자열 — '요한복음 3:16-17' */
+  reference: string;
+  referenceAbbr: string; // '요 3:16-17'
+  referenceEn: string; // 'John 3:16-17'
+  ranges: VerseRange[];
+  blocks: PassageBlock[];
+  heading?: string;
+}
+
+export interface PassageQuery {
+  ranges: VerseRange[];
+  /** 첫 번째가 주 역본, 나머지가 보조 역본 (표시 순서와 같다) */
+  translationIds: string[];
+  includeHeading?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 검색
+// ─────────────────────────────────────────────────────────────
+
+export interface SearchHit {
+  translationId: string;
+  book: number;
+  chapter: number;
+  verse: number;
+  text: string;
+  /** 사람이 읽는 참조 — '요 3:16' */
+  reference: string;
+}
+
+export interface SearchResult {
+  term: string;
+  /** 실제로 쓴 검색 방식. 한국어는 부분일치, 그 외는 어절 검색 */
+  strategy: 'like' | 'fts';
+  total: number;
+  truncated: boolean;
+  hits: SearchHit[];
+}
+
+// ─────────────────────────────────────────────────────────────
+// 참조 파싱
+// ─────────────────────────────────────────────────────────────
+
+export interface VerseRange {
+  book: number;
+  startChapter: number;
+  /** null = 장 전체 */
+  startVerse: number | null;
+  endChapter: number;
+  /** null = 장 끝까지 */
+  endVerse: number | null;
+}
+
+export interface BookCandidate {
+  code: number;
+  nameKo: string;
+  nameEn: string;
+  /** 어떤 별칭에 걸렸는지 — UI에서 이유를 보여주기 위함 */
+  matched: string;
+}
+
+export type ParseResult =
+  | { ok: true; ranges: VerseRange[]; reference: string; referenceAbbr: string; referenceEn: string }
+  | { ok: false; error: ParseErrorCode; message: string; candidates: BookCandidate[] };
+
+export type ParseErrorCode =
+  | 'EMPTY' // 입력이 비었음
+  | 'BOOK_NOT_FOUND' // 책 이름을 못 찾음
+  | 'BOOK_AMBIGUOUS' // 후보가 여럿
+  | 'CHAPTER_REQUIRED' // 장 번호 필요
+  | 'CHAPTER_OUT_OF_RANGE'
+  | 'VERSE_INVALID'
+  | 'RANGE_REVERSED' // 끝이 시작보다 앞
+  | 'SYNTAX';
+
+// ─────────────────────────────────────────────────────────────
+// 찬양
+// ─────────────────────────────────────────────────────────────
+
+export type SectionKind = 'verse' | 'chorus' | 'prechorus' | 'bridge' | 'tag' | 'ending' | 'intro';
+
+export interface SongLine {
+  lineIndex: number;
+  lang: LangCode;
+  text: string;
+}
+
+export interface SongSection {
+  id: number;
+  kind: SectionKind;
+  label: string; // '1절', '후렴', 'Bridge'
+  position: number;
+  lines: SongLine[];
+}
+
+/**
+ * 곡집(시리즈). 새찬송가·통일찬송가·많은물소리·찬미2000·기타 …
+ *
+ * 시리즈를 컬럼이 아니라 **행**으로 다룬다. 컬럼으로 두면 시리즈가 늘 때마다
+ * 스키마를 고쳐야 하고, 한 곡이 여러 시리즈에 실린 경우를 표현할 수 없다.
+ */
+export interface Songbook {
+  id: string;
+  name: string;
+  /** 바로가기 버튼에 넣을 대표 한 글자 — '새' '통' '물' '기' */
+  shortLabel: string;
+  /** 번호 체계가 있는지. '기타' 곡집은 false 라 번호 없이 넣을 수 있다. */
+  numbered: boolean;
+  sortOrder: number;
+  /** 내장 곡집(찬송가·기타)은 지울 수 없다 */
+  isBuiltin: boolean;
+  /** 1~4 — 바로가기 버튼 위치. 없으면 드롭다운에서만 고른다. */
+  quickSlot?: number;
+  sourceNote?: string;
+  importedAt?: string;
+  songCount: number;
+}
+
+/** 곡이 어느 곡집 몇 번으로 실렸는지 */
+export interface SongEntry {
+  songbookId: string;
+  songbookName: string;
+  songbookShortLabel: string;
+  /** 번호 없는 수록곡('기타' 등)은 undefined */
+  number?: number;
+}
+
+/** 가사가 다른 대응곡 (새찬송가 305장 ↔ 통일찬송가 405장) */
+export interface SongLink {
+  id: number;
+  title: string;
+  entries: SongEntry[];
+}
+
+export interface Song {
+  id: number;
+  title: string;
+  titleAlt?: string;
+  author?: string;
+  composer?: string;
+  copyright?: string;
+  ccliNumber?: string;
+  tags: string[];
+  /** 이 곡이 실제로 보유한 언어 목록 */
+  langs: LangCode[];
+  sections: SongSection[];
+  defaultTemplateId?: number;
+
+  /** 수록 곡집·번호 (여러 곡집에 실릴 수 있다) */
+  entries: SongEntry[];
+  /** 가사가 다른 대응곡 — 판본이 달라 별도 곡이지만 서로 참조한다 */
+  links?: SongLink[];
+  /** '아멘'으로 끝나는 곡 — 별도 절로 만들지 않고 속성으로 둔다 */
+  hasAmen?: boolean;
+  /** 가져오기 재실행 범위를 잡는 데 쓴다 */
+  source?: string;
+  /**
+   * 즐겨찾기 여부.
+   *
+   * 사용 기록(자주 쓴 곡)과 다르다 — 예배마다 반드시 쓰는 송영·봉헌송처럼
+   * 사람이 직접 지정한 곡이라야 목록이 흔들리지 않는다.
+   */
+  isFavorite?: boolean;
+  /** 줄나눔을 사람이 확인한 곡 — 자동 갱신 대상에서 빠진다 */
+  confirmed?: boolean;
+}
+
+export interface SongArrangement {
+  id: number;
+  songId: number;
+  name: string;
+  /** 섹션 id 순서 — 예: 1절, 후렴, 2절, 후렴 */
+  sequence: number[];
+}
+
+export interface SongSearchHit {
+  id: number;
+  title: string;
+  titleAlt?: string;
+  entries: SongEntry[];
+  langs: LangCode[];
+  sectionCount: number;
+  /** 검색어가 걸린 위치 — UI 가 이유를 보여줄 수 있게 */
+  matchedOn: 'number' | 'title' | 'lyrics';
+  /** 가사에 걸린 경우 그 대목 */
+  snippet?: string;
+  /**
+   * 사람이 줄나눔을 확인·수정한 곡인지 (`lines_source` 가 모두 `manual`).
+   *
+   * 목록에 드러내는 이유는 **내 작업이 자동 갱신에 지워지지 않는다는 것을 눈으로
+   * 확인할 수 있어야** 하기 때문이다. 표시가 없으면 승인했는지 알 수 없고,
+   * 알 수 없으면 매번 다시 확인하게 된다.
+   */
+  confirmed?: boolean;
+}
+
+/**
+ * 줄나눔 검토 대기열의 한 항목.
+ *
+ * `confirmed` 는 그 곡의 모든 섹션이 `lines_source = 'manual'` 인지를 뜻한다 —
+ * 즉 사람이 확인해 자동 작업에서 제외된 상태다.
+ */
+export interface ReviewItem {
+  id: number;
+  title: string;
+  /** '새305' 같은 짧은 수록 표기 (번호 없는 곡은 빈 문자열) */
+  reference: string;
+  confirmed: boolean;
+  sectionCount: number;
+  lineCount: number;
+  /**
+   * 초안을 신뢰하기 어려운 곡인지.
+   *
+   * 두 경우다 — **절이 하나뿐**이라 절 간 정렬을 못 해 원본 줄나눔이 그대로
+   * 남은 곡, 또는 **홀수 행**이 남아 2줄씩 표시에서 고아 줄이 생기는 곡.
+   * 이 곡들을 먼저 보면 검토가 효율적이다.
+   */
+  needsAttention: boolean;
+  /** 왜 손봐야 하는지 (없으면 빈 배열) */
+  attentionReasons: string[];
+  useCount: number;
+}
+
+export interface ReviewQueue {
+  total: number;
+  confirmed: number;
+  items: ReviewItem[];
+}
+
+export interface SongSearchResult {
+  /** 통합 검색인지, 특정 곡집 목록인지 */
+  scope: 'all' | 'songbook';
+  songbookId?: string;
+  query: string;
+  total: number;
+  truncated: boolean;
+  hits: SongSearchHit[];
+}
+
+// ─────────────────────────────────────────────────────────────
+// 템플릿 / 스타일
+// ─────────────────────────────────────────────────────────────
+
+export type TemplateKind = 'bible' | 'song' | 'lower_third' | 'blank';
+
+export type Anchor =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'mid-left' | 'center' | 'mid-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
+export interface TextStyle {
+  fontFamily: string;
+  fontSize: number; // px @1080p
+  fontWeight: number; // 100..900
+  lineHeight: number; // 배수
+  letterSpacing: number; // px
+  color: string;
+  opacity: number;
+  stroke: { width: number; color: string } | null;
+  shadow: { x: number; y: number; blur: number; color: string } | null;
+  bgBox: { color: string; paddingX: number; paddingY: number; radius: number } | null;
+  italic: boolean;
+  textTransform: 'none' | 'uppercase';
+  wordBreak: 'normal' | 'keep-all';
+}
+
+export type CanvasBackground =
+  | { mode: 'transparent' }
+  | { mode: 'color'; color: string; opacity: number }
+  | { mode: 'chroma'; color: string };
+
+export interface TemplateCanvas {
+  width: number;
+  height: number;
+  background: CanvasBackground;
+  safeArea: { top: number; right: number; bottom: number; left: number };
+}
+
+export interface TemplateLayout {
+  anchor: Anchor;
+  offsetX: number;
+  offsetY: number;
+  width: number | 'auto';
+  maxHeight: number | 'auto';
+  align: 'left' | 'center' | 'right';
+  verticalAlign: 'top' | 'middle' | 'bottom';
+  /** 다역본/다언어 블록 배치 방향 */
+  direction: 'column' | 'row';
+  gap: number;
+}
+
+export type TextRole = 'primary' | 'secondary' | 'verseNum' | 'reference' | 'heading' | 'credit';
+
+export interface TemplateBehavior {
+  autoFit: boolean;
+  autoFitMinScale: number;
+  maxLinesPerSlide: number | 'auto';
+  /**
+   * 표시 한 행에 담을 최대 글자 수 (기본 24).
+   *
+   * 가사는 **악보의 운율 행 단위로 저장**하고(새256 = 9.9.9.9), 표시할 때 이 폭에
+   * 맞춰 인접 행을 짝으로 묶는다. 하단 두 줄 템플릿은 24자로 4행을 2행으로 묶고,
+   * 전체화면 큰 글씨 템플릿은 값을 낮춰 4행 그대로 쓴다.
+   *
+   * 저장을 세밀하게 두는 이유는 되돌릴 수 없기 때문이다 — 긴 행으로 저장하면
+   * 다시 쪼갤 안전한 방법이 없지만, 짧은 행은 언제든 묶을 수 있다.
+   */
+  maxCharsPerLine?: number;
+  transition: { type: 'none' | 'fade' | 'slide-up'; durationMs: number };
+  showVerseNumbers: boolean;
+  showReference: 'none' | 'top' | 'bottom' | 'inline';
+  referenceFormat: 'full' | 'abbr' | 'en';
+  showHeadings: boolean;
+  showCredit: boolean;
+}
+
+export interface Template {
+  id: number;
+  name: string;
+  kind: TemplateKind;
+  canvas: TemplateCanvas;
+  layout: TemplateLayout;
+  text: Record<TextRole, TextStyle>;
+  overridesByTranslation?: Record<string, Partial<TextStyle>>;
+  overridesByLang?: Record<LangCode, Partial<TextStyle>>;
+  behavior: TemplateBehavior;
+  isBuiltin?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 예배 순서 (큐)
+// ─────────────────────────────────────────────────────────────
+
+/** 예배 순서의 한 항목. id 는 목록 재배치·삭제에 필요한 안정적인 키다. */
+export type CueItem =
+  | {
+      id: string;
+      type: 'bible';
+      ref: string;
+      primary: string;
+      secondary: string[];
+      paging?: string;
+      templateId?: number;
+      note?: string;
+    }
+  | {
+      id: string;
+      type: 'song';
+      songId: number;
+      /** 표시용 — 곡이 삭제돼도 순서표에 무엇이었는지 남는다 */
+      songTitle: string;
+      langs: LangCode[];
+      lines?: string;
+      templateId?: number;
+      note?: string;
+    }
+  | { id: string; type: 'text'; content: string; templateId?: number; note?: string }
+  | { id: string; type: 'blank'; note?: string };
+
+export interface ServicePlan {
+  id: number;
+  name: string;
+  serviceDate?: string; // ISO date
+  items: CueItem[];
+  updatedAt?: string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 송출 상태 (Live State)
+// ─────────────────────────────────────────────────────────────
+
+export type SlidePayload =
+  | {
+      kind: 'bible';
+      reference: string;
+      blocks: PassageBlock[];
+      heading?: string;
+    }
+  | {
+      kind: 'song';
+      title: string;
+      sectionLabel: string;
+      /** 줄 배열. 각 줄은 언어별 텍스트 페어 묶음. */
+      lines: SongLine[][];
+      credit?: string;
+    }
+  | { kind: 'text'; lines: string[] }
+  | { kind: 'blank' };
+
+export interface LiveState {
+  slide: SlidePayload | null;
+  blank: boolean;
+  templateId: number;
+  /** 단조 증가. 출력 페이지는 자기가 아는 값보다 작은 메시지를 버린다. */
+  revision: number;
+  cursor: { planItemIndex: number; slideIndex: number } | null;
+}
+
+/**
+ * 현재 로드된 슬라이드 묶음. **컨트롤 패널에만** 보낸다.
+ * 출력 페이지는 현재 슬라이드 하나만 알면 되므로, 장 전체(150절 이상)를
+ * OBS 브라우저 소스로 매번 보내지 않는다.
+ */
+/**
+ * 덱 안의 항목 경계. 예배 순서를 불러오면 여러 항목이 하나의 평평한 덱으로 합쳐지고,
+ * 이 경계로 PgUp/PgDn 항목 단위 점프를 한다.
+ */
+export interface DeckGroup {
+  label: string;
+  startIndex: number;
+}
+
+export interface Deck {
+  /** 이 묶음의 출처 — '요 3:16-17' 또는 예배 순서 이름 */
+  reference: string;
+  slides: SlidePayload[];
+  /** 슬라이드별 짧은 라벨 ('3:16-17') */
+  labels: string[];
+  index: number;
+  /** 예배 순서로 만든 덱일 때의 항목 경계 */
+  groups?: DeckGroup[];
+}
+
+// ─────────────────────────────────────────────────────────────
+// WebSocket 메시지
+// ─────────────────────────────────────────────────────────────
+
+export type ServerMsg =
+  /** 접속 직후 전체 스냅샷. 새로고침 후 즉시 복구되는 근거. */
+  | { t: 'state'; payload: LiveState }
+  | { t: 'state:patch'; payload: Partial<LiveState>; revision: number }
+  /** 컨트롤 패널 전용 */
+  | { t: 'deck'; payload: Deck | null }
+  /** 접속 수가 바뀔 때 컨트롤 패널에 알린다 (폴링 대신 푸시) */
+  | { t: 'connections'; payload: { control: number; output: number } }
+  | { t: 'template'; payload: Template }
+  | { t: 'style:patch'; payload: Record<string, string> }
+  /** 출력 페이지에서 올라온 오류를 컨트롤 패널에 알린다 */
+  | { t: 'output:error'; payload: { message: string; url: string } }
+  | { t: 'error'; message: string };
+
+export type ClientRole = 'control' | 'output';
+
+export type ClientMsg =
+  | { t: 'hello'; role: ClientRole; layer?: string }
+  | { t: 'show'; payload: SlidePayload }
+  /** 슬라이드 묶음을 올린다 (본문 조회 결과) */
+  | { t: 'deck:load'; payload: Deck }
+  | { t: 'next' }
+  | { t: 'prev' }
+  | { t: 'goto'; index: number }
+  /** 예배 순서 항목 단위 이동 (PgDn/PgUp) */
+  | { t: 'group:next' }
+  | { t: 'group:prev' }
+  | { t: 'blank'; on: boolean }
+  | { t: 'restore' }
+  | { t: 'clear' }
+  | { t: 'template:set'; id: number }
+  | { t: 'style:set'; patch: Record<string, unknown> }
+  | { t: 'measure:report'; payload: { overflow: boolean; height: number; revision: number } }
+  | { t: 'client:error'; payload: { message: string; stack?: string; url: string } };
+
+// ─────────────────────────────────────────────────────────────
+// API 공통 응답 형식 (~/.claude/rules/common/patterns.md)
+// ─────────────────────────────────────────────────────────────
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T | null;
+  error: string | null;
+}

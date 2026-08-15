@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sermon Output</title>
+    <!--
+      OBS 브라우저 소스가 로드하는 페이지.
+      의존성 0 (프레임워크·CDN·외부 폰트 없음) — OBS 내장 브라우저(CEF)에서
+      초기화 실패 지점을 없애기 위한 의도적 제약이다. 이 원칙을 깨지 말 것.
+    -->
+    <link rel="stylesheet" href="./output.css" />
+  </head>
+  <body>
+    <!-- 미리보기 전용 체커보드. ?preview=1 일 때만 보인다. 송출에는 절대 나오지 않는다. -->
+    <div id="preview-bg" aria-hidden="true"></div>
+
+    <main id="stage" class="stage">
+      <div id="slide" class="slide" data-empty="true">
+        <div id="heading" class="heading" hidden></div>
+        <div id="blocks" class="blocks"></div>
+        <div id="reference" class="reference" hidden></div>
+        <div id="credit" class="credit" hidden></div>
+      </div>
+    </main>
+
+    <!-- 진단용 배지. ?debug=1 일 때만 보인다. -->
+    <div id="debug" class="debug" hidden></div>
+
+    <script src="./output.js"></script>
+  </body>
+</html>

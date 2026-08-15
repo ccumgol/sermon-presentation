@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sermon-presentation",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 7777,
+      "autoPort": true
+    }
+  ]
+}

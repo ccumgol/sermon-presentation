@@ -1,0 +1,281 @@
+/**
+ * 찬양 REST 라우트.
+ *
+ * 성경과 마찬가지로 응답에 **슬라이드 묶음까지** 담아, 컨트롤 패널이
+ * 한 번의 요청으로 송출 준비를 마치게 한다.
+ */
+
+import type { FastifyInstance } from 'fastify';
+
+import { parseLyrics } from '../../lib/lyrics-parser.ts';
+import {
+  availableLangs,
+  buildSongDeck,
+  DEFAULT_MAX_CHARS_PER_LINE,
+  type LinesPerSlide,
+} from '../../lib/song-slides.ts';
+import type { ApiResponse, Deck, LangCode, Song } from '../../shared/types.ts';
+import * as store from '../db/songs.ts';
+
+function ok<T>(data: T): ApiResponse<T> {
+  return { success: true, data, error: null };
+}
+
+function fail(error: string): ApiResponse<null> {
+  return { success: false, data: null, error };
+}
+
+const LINES_OPTIONS = new Set(['1', '2', '4', 'section']);
+
+/**
+ * 덱 이름 — 번호가 있는 첫 수록 곡집을 앞에 붙인다.
+ * '새찬송가 305장 나 같은 죄인 살리신' 처럼 오퍼레이터가 무엇을 올렸는지 바로 보이게.
+ */
+function deckReference(song: Song): string {
+  const numbered = song.entries.find((entry) => entry.number !== undefined);
+  return numbered ? `${numbered.songbookShortLabel} ${numbered.number}장 ${song.title}` : song.title;
+}
+
+function parseLines(raw: unknown): LinesPerSlide {
+  if (raw === 'section') return 'section';
+  const n = Number(raw);
+  return n === 1 || n === 2 || n === 4 ? (n as LinesPerSlide) : 2;
+}
+
+/**
+ * 표시 행 폭. 범위를 벗어난 값은 기본값으로 되돌린다.
+ *
+ * 하한 8자는 한 어절도 못 담는 폭을 막고, 상한 60자는 한 절이 통째로 한 행이
+ * 되는 것을 막는다 — 둘 다 화면에서 읽을 수 없는 결과가 된다.
+ */
+function parseMaxChars(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 8 || n > 60) return DEFAULT_MAX_CHARS_PER_LINE;
+  return Math.round(n);
+}
+
+function parseLangs(raw: unknown, fallback: LangCode[]): LangCode[] {
+  if (typeof raw !== 'string' || raw.trim().length === 0) return fallback;
+  const langs = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  // 최대 2개까지만 — 3개 이상은 화면에서 읽을 수 없다
+  return langs.slice(0, 2);
+}
+
+export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
+  app.get('/api/songs/count', async () => ok({ total: store.countSongs() }));
+
+  /** 최근 송출한 곡 — 검색 없이 바로 꺼내는 경로 */
+  app.get<{ Querystring: { limit?: string } }>('/api/songs/recent', async (request) => {
+    const limit = Number(request.query.limit);
+    return ok(store.listRecent(Number.isInteger(limit) && limit > 0 ? Math.min(limit, 40) : 12));
+  });
+
+  /** 자주 송출한 곡 */
+  app.get<{ Querystring: { limit?: string } }>('/api/songs/frequent', async (request) => {
+    const limit = Number(request.query.limit);
+    return ok(store.listFrequent(Number.isInteger(limit) && limit > 0 ? Math.min(limit, 40) : 12));
+  });
+
+  /** 즐겨찾기 — 예배마다 쓰는 곡을 검색 없이 바로 꺼낸다 */
+  app.get<{ Querystring: { limit?: string } }>('/api/songs/favorites', async (request) => {
+    const limit = Number(request.query.limit);
+    return ok(store.listFavorites(Number.isInteger(limit) && limit > 0 ? Math.min(limit, 20) : 5));
+  });
+
+  /** 즐겨찾기에 넣거나 뺀다 */
+  app.post<{ Params: { id: string }; Body: { value?: boolean } }>(
+    '/api/songs/:id/favorite',
+    async (request, reply) => {
+      const next = store.toggleFavorite(Number(request.params.id), request.body?.value);
+      if (next === null) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+      return ok({ id: Number(request.params.id), favorite: next });
+    },
+  );
+
+  /** 가사가 비었거나 한 줄인 곡 — 가져오기 누락을 예배 전에 발견하기 위한 점검 */
+  app.get<{ Querystring: { book?: string } }>('/api/songs/incomplete', async (request) =>
+    ok(store.listIncomplete(request.query.book)),
+  );
+
+  app.get<{ Querystring: { q?: string; limit?: string; book?: string } }>('/api/songs', async (request) => {
+    const query = (request.query.q ?? '').trim();
+    const limitRaw = Number(request.query.limit);
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 200) : undefined;
+
+    // 곡집을 고르면 그 곡집으로 범위를 좁힌다. 검색어가 없으면 목록을 돌려준다.
+    return ok(
+      store.searchSongs(query, {
+        ...(request.query.book ? { songbookId: request.query.book } : {}),
+        ...(limit ? { limit } : {}),
+      }),
+    );
+  });
+
+  app.get<{ Params: { id: string } }>('/api/songs/:id', async (request, reply) => {
+    const song = store.getSong(Number(request.params.id));
+    if (!song) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+    return ok({ song, availableLangs: availableLangs(song) });
+  });
+
+  /**
+   * 줄나눔 검토 대기열.
+   *
+   * 자동 정렬은 제안이므로 사람이 한 번 훑어야 한다. 확인한 곡은 이후 자동
+   * 작업에서 제외되므로, 여기서 승인한 것은 영구히 보존된다.
+   */
+  app.get<{
+    Querystring: { sort?: string; pending?: string; book?: string; limit?: string; offset?: string };
+  }>('/api/songs/review', async (request) => {
+    const sort = ['number', 'usage', 'attention'].includes(request.query.sort ?? '')
+      ? (request.query.sort as 'number' | 'usage' | 'attention')
+      : 'number';
+
+    return ok(
+      store.reviewQueue({
+        sort,
+        pendingOnly: request.query.pending === 'true',
+        ...(request.query.book ? { songbookId: request.query.book } : {}),
+        limit: Math.min(200, Math.max(1, Number(request.query.limit) || 50)),
+        offset: Math.max(0, Number(request.query.offset) || 0),
+      }),
+    );
+  });
+
+  /** 줄나눔을 확인 완료로 표시 */
+  app.post<{ Params: { id: string } }>('/api/songs/:id/confirm', async (request, reply) => {
+    const songId = Number(request.params.id);
+    if (!store.getSong(songId)) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+    if (!store.confirmLines(songId)) return reply.code(400).send(fail('확인할 섹션이 없습니다'));
+    return ok({ id: songId, confirmed: true });
+  });
+
+  /** 확인 표시 되돌리기 */
+  app.delete<{ Params: { id: string } }>('/api/songs/:id/confirm', async (request, reply) => {
+    const songId = Number(request.params.id);
+    if (!store.getSong(songId)) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+    store.unconfirmLines(songId);
+    return ok({ id: songId, confirmed: false });
+  });
+
+  /** 송출용 슬라이드 묶음 */
+  app.get<{
+    Params: { id: string };
+    Querystring: {
+      langs?: string;
+      lines?: string;
+      section?: string;
+      credit?: string;
+      /** 표시 한 행의 최대 글자 수 — 템플릿의 값을 그대로 넘긴다 */
+      maxChars?: string;
+    };
+  }>('/api/songs/:id/deck', async (request, reply) => {
+    const song = store.getSong(Number(request.params.id));
+    if (!song) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+
+    const langs = parseLangs(request.query.langs, availableLangs(song).slice(0, 1));
+    const linesPerSlide = parseLines(request.query.lines);
+    const includeCredit = request.query.credit !== 'false';
+    const maxCharsPerLine = parseMaxChars(request.query.maxChars);
+
+    // 특정 섹션만 요청한 경우
+    const sectionId = request.query.section ? Number(request.query.section) : null;
+    const sequence =
+      sectionId !== null && song.sections.some((s) => s.id === sectionId) ? [sectionId] : undefined;
+
+    const { slides, labels } = buildSongDeck(song, {
+      langs,
+      linesPerSlide,
+      includeCredit,
+      maxCharsPerLine,
+      ...(sequence ? { sequence } : {}),
+    });
+
+    const deck: Deck = {
+      reference: deckReference(song),
+      slides,
+      labels,
+      index: 0,
+    };
+
+    // 덱을 만들어 준 시점을 '사용'으로 본다 — 최근 목록의 근거가 된다
+    if (slides.length > 0) store.markUsed(song.id);
+
+    // 요청한 언어 중 이 곡에 없는 것을 조용히 넘기지 않고 알린다
+    const missingLangs = langs.filter((lang) => !song.langs.includes(lang));
+
+    return ok({ deck, langs, availableLangs: availableLangs(song), missingLangs });
+  });
+
+  /**
+   * 가사 텍스트를 붙여넣어 구조를 미리 본다 (저장하지 않음).
+   * `|` 페어링이 의도대로 잡혔는지 편집 UI 가 보여주기 위한 용도.
+   */
+  app.post<{ Body: { text?: string; primaryLang?: string; secondaryLang?: string } }>(
+    '/api/songs/parse-lyrics',
+    async (request, reply) => {
+      const text = request.body?.text;
+      if (typeof text !== 'string') return reply.code(400).send(fail('text 가 필요합니다'));
+
+      return ok(
+        parseLyrics(text, {
+          primaryLang: request.body?.primaryLang ?? 'ko',
+          secondaryLang: request.body?.secondaryLang ?? 'en',
+        }),
+      );
+    },
+  );
+
+  /** 가사 구조를 통째로 교체한다 (부분 수정보다 페어링이 안전하다) */
+  app.put<{ Params: { id: string }; Body: { text?: string; primaryLang?: string; secondaryLang?: string } }>(
+    '/api/songs/:id/lyrics',
+    async (request, reply) => {
+      const id = Number(request.params.id);
+      if (!store.getSong(id)) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+
+      const text = request.body?.text;
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        return reply.code(400).send(fail('가사 텍스트가 필요합니다'));
+      }
+
+      const sections = parseLyrics(text, {
+        primaryLang: request.body?.primaryLang ?? 'ko',
+        secondaryLang: request.body?.secondaryLang ?? 'en',
+      });
+      if (sections.length === 0) return reply.code(400).send(fail('해석할 수 있는 가사가 없습니다'));
+
+      store.replaceSections(id, sections);
+      const updated = store.getSong(id)!;
+      return ok({ song: updated, availableLangs: availableLangs(updated) });
+    },
+  );
+
+  app.post<{ Body: { title?: string; text?: string; primaryLang?: string; secondaryLang?: string } }>(
+    '/api/songs',
+    async (request, reply) => {
+      const title = request.body?.title;
+      if (typeof title !== 'string' || title.trim().length === 0) {
+        return reply.code(400).send(fail('title 이 필요합니다'));
+      }
+
+      const sections = parseLyrics(request.body?.text ?? '', {
+        primaryLang: request.body?.primaryLang ?? 'ko',
+        secondaryLang: request.body?.secondaryLang ?? 'en',
+      });
+
+      const id = store.createSong({ title: title.trim(), source: 'manual', sections });
+      return ok(store.getSong(id));
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>('/api/songs/:id', async (request, reply) => {
+    const id = Number(request.params.id);
+    if (!store.getSong(id)) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
+    store.deleteSong(id);
+    return ok({ deleted: id });
+  });
+}
+
+export { LINES_OPTIONS };

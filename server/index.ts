@@ -1,0 +1,86 @@
+/**
+ * 실행 진입점. 앱 구성은 server/app.ts 가 담당하고 여기서는 바인딩과 종료만 다룬다.
+ *
+ * 실행: npm start (컨트롤 패널을 빌드한 뒤 기동) / npm run serve (빌드 없이)
+ */
+
+import { buildApp, lanHosts } from './app.ts';
+import { DEFAULT_PORT, HOST, PORT_SCAN_RANGE } from './config.ts';
+import { closeAppDb } from './db/app.ts';
+import { closeBibleDb } from './db/bible.ts';
+import { paths } from './paths.ts';
+import { createWsHub, type WsHub } from './ws.ts';
+
+let actualPort = DEFAULT_PORT;
+let hub: WsHub | null = null;
+
+const { app, bibleReady, stateRestored } = await buildApp({
+  logger: {
+    level: process.env.LOG_LEVEL ?? 'info',
+    transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } },
+  },
+  getPort: () => actualPort,
+  getConnections: () => hub?.counts() ?? { control: 0, output: 0 },
+  // REST 로 템플릿을 고치면 송출 화면에 즉시 반영된다
+  onTemplateChanged: (template) => hub?.pushTemplate(template),
+});
+
+if (stateRestored.corrupt) {
+  app.log.warn('저장된 송출 상태를 읽을 수 없어 초기 상태로 시작합니다');
+} else if (stateRestored.restored) {
+  app.log.info('이전 송출 상태를 복구했습니다');
+}
+
+/**
+ * 포트를 순차 탐색해 바인딩한다.
+ * 다른 PC 에서 7777 이 이미 쓰이고 있어도 앱이 죽지 않아야 한다 (계획서 D1 제약 2).
+ */
+async function listenWithFallback(): Promise<number> {
+  let lastError: unknown;
+  for (let port = DEFAULT_PORT; port < DEFAULT_PORT + PORT_SCAN_RANGE; port++) {
+    try {
+      await app.listen({ port, host: HOST });
+      return port;
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== 'EADDRINUSE') throw err;
+      lastError = err;
+      app.log.warn(`포트 ${port} 사용 중 — 다음 포트를 시도합니다`);
+    }
+  }
+  throw lastError ?? new Error('사용 가능한 포트를 찾지 못했습니다');
+}
+
+actualPort = await listenWithFallback();
+
+// WebSocket 허브는 HTTP 서버가 뜬 뒤에 붙인다
+hub = createWsHub(app.server, {
+  info: (msg) => app.log.info(msg),
+  warn: (msg) => app.log.warn(msg),
+});
+
+app.log.info(`컨트롤 패널      : http://localhost:${actualPort}/`);
+app.log.info(`OBS 브라우저 소스: http://localhost:${actualPort}/output/?layer=main`);
+for (const host of lanHosts()) {
+  app.log.info(`태블릿 접속      : http://${host}:${actualPort}/`);
+}
+if (!bibleReady) {
+  app.log.warn(
+    `성경 DB 가 없어 조회 기능이 비활성입니다 (${paths.bibleDb}) — 'npm run bible:build' 실행 후 재시작하세요`,
+  );
+}
+
+let shuttingDown = false;
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    app.log.info('종료합니다');
+    hub?.close();
+    void app.close().then(() => {
+      closeBibleDb();
+      closeAppDb();
+      process.exit(0);
+    });
+  });
+}

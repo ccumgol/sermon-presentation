@@ -1,0 +1,250 @@
+/**
+ * 찬양 섹션 → 슬라이드.
+ *
+ * 2언어 표시의 핵심은 `lineIndex` 페어링이다. 같은 lineIndex 를 가진 줄들이
+ * 한 묶음이 되어 화면에서 위아래(또는 좌우)로 짝지어 나온다.
+ * 통짜 텍스트로 저장했다면 이 대응을 만들 방법이 없다 (계획서 §3.2).
+ */
+
+import type { LangCode, SlidePayload, Song, SongLine, SongSection } from '../shared/types.ts';
+
+/** 한 화면에 담을 줄 수 */
+export type LinesPerSlide = 1 | 2 | 4 | 'section';
+
+export interface SongSlideOptions {
+  /** 표시할 언어 — 순서가 표시 순서다. 첫 번째가 주 언어. */
+  langs: LangCode[];
+  linesPerSlide?: LinesPerSlide;
+  /** 저작권 표기를 붙일지 */
+  includeCredit?: boolean;
+  /** 표시 한 행의 최대 글자 수 — 이 폭에 맞춰 운율 행을 짝으로 묶는다 */
+  maxCharsPerLine?: number;
+}
+
+/** 템플릿이 지정하지 않았을 때의 표시 행 폭 */
+export const DEFAULT_MAX_CHARS_PER_LINE = 24;
+
+/**
+ * 섹션의 줄을 lineIndex 별 묶음으로 만든다.
+ *
+ * 선택한 언어 중 그 줄에 없는 언어는 조용히 빠진다 — 한국어만 있는 찬송가에
+ * 영어를 함께 켜도 빈 자리가 생기지 않는다.
+ */
+export function pairLines(section: SongSection, langs: readonly LangCode[]): SongLine[][] {
+  const maxIndex = section.lines.reduce((max, line) => Math.max(max, line.lineIndex), -1);
+  const groups: SongLine[][] = [];
+
+  for (let index = 0; index <= maxIndex; index++) {
+    const atIndex = section.lines.filter((line) => line.lineIndex === index);
+    // 요청한 언어 순서대로 담는다 (표시 순서 = 요청 순서)
+    const group = langs.flatMap((lang) => atIndex.filter((line) => line.lang === lang));
+    if (group.length > 0) groups.push(group);
+  }
+
+  return groups;
+}
+
+/** 한 묶음에서 가장 긴 언어의 글자 수 (공백 제외) */
+function groupWidth(group: readonly SongLine[]): number {
+  return group.reduce((max, line) => Math.max(max, line.text.replace(/\s/g, '').length), 0);
+}
+
+/** 인접한 두 묶음을 합친다 — 언어별로 이어 붙여 줄 짝을 유지한다 */
+function mergePair(first: readonly SongLine[], second: readonly SongLine[]): SongLine[] {
+  const langs = [...new Set([...first, ...second].map((line) => line.lang))];
+
+  return langs.map((lang) => {
+    const texts = [first, second]
+      .map((group) => group.find((line) => line.lang === lang)?.text)
+      .filter((text): text is string => text !== undefined);
+    return { lineIndex: first[0]!.lineIndex, lang, text: texts.join(' ') };
+  });
+}
+
+/**
+ * 저장된 운율 행을 표시 폭에 맞춰 묶는다.
+ *
+ * 가사는 악보의 운율 행 단위로 저장한다 (새256 = 9.9.9.9). 화면 구성에 따라
+ * 필요한 행 길이가 다르므로, 표시할 때 인접 행을 **짝으로** 묶어 폭을 맞춘다.
+ *
+ *   9.9.9.9  --24자-->  19.19   (하단 두 줄 템플릿)
+ *   9.9.9.9  --12자-->  9.9.9.9 (전체화면 큰 글씨)
+ *
+ * **반드시 짝으로 묶는다.** 3개를 2+1 로 묶으면 행 길이가 들쭉날쭉해지고 홀수
+ * 행이 되어 2줄씩 표시에서 마지막 한 줄이 혼자 남는다. 그래서 절반으로 나누어
+ * 떨어질 때만, 그리고 결과가 짝수(또는 1행)일 때만 묶는다.
+ *
+ * 모든 짝이 폭 안에 들어와야 묶는다 — 일부만 묶으면 운율이 깨진다.
+ */
+export function fitLinesToWidth(groups: readonly SongLine[][], maxChars: number): SongLine[][] {
+  let current = [...groups];
+
+  while (current.length >= 2 && current.length % 2 === 0) {
+    const halved = current.length / 2;
+    // 결과가 홀수면 2줄씩 표시에서 고아 줄이 생긴다 (1행은 예외 — 나눌 것이 없다)
+    if (halved !== 1 && halved % 2 !== 0) break;
+
+    const merged: SongLine[][] = [];
+    for (let index = 0; index < current.length; index += 2) {
+      merged.push(mergePair(current[index]!, current[index + 1]!));
+    }
+    if (merged.some((group) => groupWidth(group) > maxChars)) break;
+
+    current = merged;
+  }
+
+  return current;
+}
+
+/** items 를 pages 장에 균등하게 나눈다 (앞장이 한 줄 더 많다) */
+function distribute<T>(items: T[], pages: number): T[][] {
+  const base = Math.floor(items.length / pages);
+  const extra = items.length % pages;
+
+  const out: T[][] = [];
+  let cursor = 0;
+  for (let page = 0; page < pages; page++) {
+    const size = base + (page < extra ? 1 : 0);
+    out.push(items.slice(cursor, cursor + size));
+    cursor += size;
+  }
+  return out;
+}
+
+/**
+ * 줄을 화면 단위로 나눈다 — **고아 줄을 만들지 않는다.**
+ *
+ * 앞에서부터 기계적으로 잘라 담으면 3줄짜리 절이 '2줄 + 1줄'이 되어 마지막
+ * 한 줄이 혼자 다음 화면으로 넘어간다. 찬송가 섹션의 30%(1,484/4,877)가
+ * 홀수 줄이라 2줄씩 설정에서 실제로 자주 일어난다. 가사는 구가 이어지는데
+ * 화면이 끊기면 회중이 따라 부르지 못한다.
+ *
+ * 그래서 두 가지를 한다:
+ *  1. 필요한 장수를 먼저 정하고 **균등 분배** (6줄·4줄씩 → 4+2 가 아니라 3+3)
+ *  2. 그래도 마지막 장이 한 줄뿐이면 장수를 하나 줄인다
+ *     (한 장에 `size + 1` 줄까지만 허용 — 넘치면 출력 페이지가 배율로 줄인다)
+ */
+function chunk<T>(items: T[], size: number): T[][] {
+  if (!Number.isFinite(size) || size <= 0) return items.length > 0 ? [items] : [];
+  if (items.length === 0) return [];
+
+  const pages = Math.ceil(items.length / size);
+  const even = distribute(items, pages);
+
+  // 마지막 장이 한 줄뿐이면 한 장 줄여 붙인다.
+  // '1줄씩'은 모든 화면이 한 줄인 것이 의도이므로 고아로 보지 않는다.
+  if (size > 1 && pages > 1 && even[even.length - 1]!.length === 1) {
+    const merged = distribute(items, pages - 1);
+    if (merged[0]!.length <= size + 1) return merged;
+  }
+
+  return even;
+}
+
+/**
+ * 저작권·출처 표기.
+ *
+ * 수록 곡집이 여러 개면 첫 번째(정렬 순서상 가장 앞선 곡집)만 쓴다 —
+ * 화면 아래 한 줄에 여러 곡집 번호를 늘어놓으면 읽히지 않는다.
+ * '기타'처럼 번호가 없는 곡집은 표기에서 뺀다.
+ */
+function creditOf(song: Song): string | undefined {
+  const parts: string[] = [];
+
+  const numbered = song.entries.find((entry) => entry.number !== undefined);
+  if (numbered) parts.push(`${numbered.songbookName} ${numbered.number}장`);
+
+  if (song.copyright) parts.push(song.copyright);
+  if (song.ccliNumber) parts.push(`CCLI ${song.ccliNumber}`);
+  return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+/** 섹션 하나를 슬라이드 배열로 */
+export function buildSectionSlides(
+  song: Song,
+  section: SongSection,
+  options: SongSlideOptions,
+): SlidePayload[] {
+  const paired = pairLines(section, options.langs);
+  if (paired.length === 0) return [];
+
+  // 저장된 운율 행을 표시 폭에 맞춰 묶는다 (9.9.9.9 → 19.19)
+  const groups = fitLinesToWidth(paired, options.maxCharsPerLine ?? DEFAULT_MAX_CHARS_PER_LINE);
+
+  const perSlide = options.linesPerSlide ?? 2;
+  const pages = perSlide === 'section' ? [groups] : chunk(groups, perSlide);
+  const credit = options.includeCredit ? creditOf(song) : undefined;
+
+  return pages.map((lines) => ({
+    kind: 'song',
+    title: song.title,
+    sectionLabel: section.label,
+    lines,
+    ...(credit ? { credit } : {}),
+  }));
+}
+
+/**
+ * 곡 전체(또는 지정한 섹션 순서)를 슬라이드로.
+ *
+ * `sequence` 로 진행 순서를 줄 수 있다 — 1절, 후렴, 2절, 후렴 처럼
+ * 같은 섹션이 여러 번 나오는 것이 찬양의 기본 형태다.
+ */
+export function buildSongSlides(
+  song: Song,
+  options: SongSlideOptions & { sequence?: number[] },
+): SlidePayload[] {
+  const order = options.sequence
+    ? options.sequence.flatMap((id) => {
+        const section = song.sections.find((s) => s.id === id);
+        return section ? [section] : [];
+      })
+    : [...song.sections].sort((a, b) => a.position - b.position);
+
+  return order.flatMap((section) => buildSectionSlides(song, section, options));
+}
+
+/** 슬라이드 라벨 — 컨트롤 패널 목록용 */
+export function describeSongSlide(slide: SlidePayload, indexInSection: number, totalInSection: number): string {
+  if (slide.kind !== 'song') return '';
+  return totalInSection > 1 ? `${slide.sectionLabel} ${indexInSection + 1}/${totalInSection}` : slide.sectionLabel;
+}
+
+/**
+ * 곡 전체 슬라이드에 라벨을 붙인다.
+ * 섹션 안에서 몇 번째인지 표시해야 오퍼레이터가 위치를 알 수 있다.
+ */
+export function buildSongDeck(
+  song: Song,
+  options: SongSlideOptions & { sequence?: number[] },
+): { slides: SlidePayload[]; labels: string[] } {
+  const order = options.sequence
+    ? options.sequence.flatMap((id) => {
+        const section = song.sections.find((s) => s.id === id);
+        return section ? [section] : [];
+      })
+    : [...song.sections].sort((a, b) => a.position - b.position);
+
+  const slides: SlidePayload[] = [];
+  const labels: string[] = [];
+
+  for (const section of order) {
+    const sectionSlides = buildSectionSlides(song, section, options);
+    for (const [index, slide] of sectionSlides.entries()) {
+      slides.push(slide);
+      labels.push(describeSongSlide(slide, index, sectionSlides.length));
+    }
+  }
+
+  return { slides, labels };
+}
+
+/** 곡이 실제로 가진 언어 목록에서 표시 가능한 조합을 추린다 */
+export function availableLangs(song: Song): LangCode[] {
+  const order = ['ko', 'en', 'zh', 'ja'];
+  return [...song.langs].sort((a, b) => {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+}
