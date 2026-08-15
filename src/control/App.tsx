@@ -12,7 +12,8 @@ import { SongPanel } from './panels/SongPanel.tsx';
 import { TemplatePanel } from './panels/TemplatePanel.tsx';
 import { SettingsPanel } from './panels/SettingsPanel.tsx';
 
-type Tab = 'bible' | 'song' | 'plan' | 'review' | 'template' | 'settings';
+/** 탭 순서 = 화면에 나오는 순서. 예배 순서가 첫 번째다 — 실제로 가장 많이 쓴다. */
+type Tab = 'plan' | 'bible' | 'song' | 'review' | 'template' | 'settings';
 
 /** 입력 중에는 단축키가 동작하지 않아야 한다 */
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -24,7 +25,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function App(): React.JSX.Element {
   const { status, state, deck, template, connections, outputErrors, dismissErrors, send } = useLiveState();
 
-  const [tab, setTab] = useState<Tab>('bible');
+  // 기본 탭은 예배 순서. 성경·찬양은 한 종류를 깊게 다룰 때 쓰고,
+  // 예배 진행은 찬양·성경·광고가 섞여 순서대로 흐른다.
+  const [tab, setTab] = useState<Tab>('plan');
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [translations, setTranslations] = useState<Translation[]>([]);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -123,14 +126,14 @@ export function App(): React.JSX.Element {
     <div className="app">
       <header className="topbar">
         <nav className="tabs">
+          <button type="button" className={`tab${tab === 'plan' ? ' active' : ''}`} onClick={() => setTab('plan')}>
+            예배 순서
+          </button>
           <button type="button" className={`tab${tab === 'bible' ? ' active' : ''}`} onClick={() => setTab('bible')}>
             성경
           </button>
           <button type="button" className={`tab${tab === 'song' ? ' active' : ''}`} onClick={() => setTab('song')}>
             찬양
-          </button>
-          <button type="button" className={`tab${tab === 'plan' ? ' active' : ''}`} onClick={() => setTab('plan')}>
-            예배 순서
           </button>
           <button
             type="button"
