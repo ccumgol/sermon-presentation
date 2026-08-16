@@ -598,6 +598,12 @@ export type SlidePayload =
       kind: 'song';
       title: string;
       sectionLabel: string;
+      /**
+       * 이 슬라이드가 그 절의 **첫 장**인지. 절 번호를 여기서만 띄운다 —
+       * 이어지는 장에도 붙으면 절이 바뀐 것처럼 읽힌다.
+       * 출력 페이지는 슬라이드 하나만 받으므로 앞뒤를 비교할 수 없어 여기에 담는다.
+       */
+      sectionStart?: boolean;
       /** 줄 배열. 각 줄은 언어별 텍스트 페어 묶음. */
       lines: SongLine[][];
       credit?: string;

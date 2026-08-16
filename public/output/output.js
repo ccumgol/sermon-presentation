@@ -243,11 +243,26 @@
     else el.slide.appendChild(el.reference);
   }
 
+  /**
+   * 섹션 라벨에서 절 번호 접두사를 만든다 — '1절' → '1. '
+   *
+   * ⚠️ lib/song-slides.ts 의 verseNumberPrefix 와 **같은 규칙이어야 한다.**
+   * 출력 페이지는 의존성 0 이라 그 모듈을 가져다 쓸 수 없다(ANCHOR_MAP 과 같은 사정).
+   * 번호가 없는 섹션(후렴·브리지)은 붙이지 않는다.
+   */
+  function verseNumberPrefix(sectionLabel) {
+    var matched = /(\d+)/.exec(sectionLabel || '');
+    return matched ? matched[1] + '. ' : '';
+  }
+
   /** 찬양 가사 렌더 — 각 줄은 언어별 페어 묶음 */
   function renderSong(payload) {
     clearChildren(el.blocks);
 
-    payload.lines.forEach(function (pair) {
+    // 절 번호는 **그 절의 첫 장, 첫 줄에만** 붙인다
+    var prefix = payload.sectionStart ? verseNumberPrefix(payload.sectionLabel) : '';
+
+    payload.lines.forEach(function (pair, lineIndex) {
       var lineWrap = document.createElement('div');
       lineWrap.className = 'song-line';
 
@@ -256,7 +271,18 @@
         div.className = i === 0 ? 'line-primary' : 'line-secondary';
         div.setAttribute('data-lang', part.lang);
         applyBlockOverrides(div, i === 0 ? 'primary' : 'secondary', '', part.lang);
-        div.textContent = part.text;
+
+        // 주 언어의 첫 줄에만 번호를 얹는다. 보조 언어(번역)에는 붙이지 않는다 —
+        // 같은 번호가 두 번 보이면 줄이 어긋나 보인다.
+        if (prefix && lineIndex === 0 && i === 0) {
+          var num = document.createElement('span');
+          num.className = 'verse-no';
+          num.textContent = prefix;
+          div.appendChild(num);
+          div.appendChild(document.createTextNode(part.text));
+        } else {
+          div.textContent = part.text;
+        }
         lineWrap.appendChild(div);
       });
 

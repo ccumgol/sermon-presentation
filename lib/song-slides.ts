@@ -175,10 +175,12 @@ export function buildSectionSlides(
   const pages = perSlide === 'section' ? [groups] : chunk(groups, perSlide);
   const credit = options.includeCredit ? creditOf(song) : undefined;
 
-  return pages.map((lines) => ({
+  return pages.map((lines, index) => ({
     kind: 'song',
     title: song.title,
     sectionLabel: section.label,
+    // 절 번호는 첫 장에만 — 출력 페이지는 슬라이드 하나만 받아 앞뒤를 볼 수 없다
+    ...(index === 0 ? { sectionStart: true } : {}),
     lines,
     ...(credit ? { credit } : {}),
   }));

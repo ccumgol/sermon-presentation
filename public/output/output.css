@@ -258,6 +258,15 @@ body.blanked .slide {
   font-size: calc(var(--secondary-size) * var(--presenter-scale, 1));
 }
 
+/*
+ * 찬양 절 번호 — 가사와 같은 크기·색으로 이어 붙인다.
+ * 성경 절 번호(.verse-num)처럼 작게 띄우지 않는 이유는, 찬양에서는 '1. 가사' 가
+ * 한 문장처럼 읽혀야 하기 때문이다.
+ */
+.verse-no {
+  margin-right: 0.15em;
+}
+
 /* ── 역할별 텍스트 ── */
 
 .block {

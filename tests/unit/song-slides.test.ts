@@ -402,3 +402,27 @@ describe('isSectionStart — 절의 첫 장인지', () => {
     expect(isSectionStart({ kind: 'blank' }, undefined)).toBe(false);
   });
 });
+
+describe('sectionStart — 출력 페이지가 절 첫 장을 알 수 있어야 한다', () => {
+  it('섹션의 첫 장에만 표시된다', () => {
+    // 출력 페이지는 슬라이드 하나만 받아 앞뒤를 비교할 수 없다
+    const long = section(1, '1절', [
+      { lineIndex: 0, lang: 'ko', text: '한 줄' },
+      { lineIndex: 1, lang: 'ko', text: '두 줄' },
+      { lineIndex: 2, lang: 'ko', text: '세 줄' },
+      { lineIndex: 3, lang: 'ko', text: '네 줄' },
+    ]);
+    const slides = buildSectionSlides(
+      { id: 1, title: '곡', tags: [], langs: ['ko'], sections: [long], entries: [] },
+      long,
+      // 폭을 좁게 줘 인접 행이 묶이지 않게 한다 (묶이면 한 장으로 끝나 시험이 안 된다)
+      { langs: ['ko'], linesPerSlide: 1, maxCharsPerLine: 4 },
+    );
+
+    expect(slides.length).toBeGreaterThan(1);
+    expect((slides[0] as { sectionStart?: boolean }).sectionStart).toBe(true);
+    for (const slide of slides.slice(1)) {
+      expect((slide as { sectionStart?: boolean }).sectionStart).toBeUndefined();
+    }
+  });
+});
