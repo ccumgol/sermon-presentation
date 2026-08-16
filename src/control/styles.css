@@ -1449,6 +1449,21 @@ button.link-inline {
 .cue-divider.auto .label { color: var(--warn); }
 .cue-divider .auto-tag { margin-left: 4px; opacity: 0.8; }
 
+/*
+ * 역본 고르기 — 주 역본 드롭다운 + 보조 역본 칩.
+ * 칩이 여러 개라 줄바꿈을 허용하되, 좁은 화면에서도 한 덩어리로 보이게 묶는다.
+ */
+.translation-pick .candidates {
+  margin-top: 0;
+  flex: 1 1 auto;
+}
+.translation-pick .candidates button {
+  min-height: 30px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+}
+.translation-pick select { min-height: 34px; padding: 4px 8px; font-size: 0.8rem; }
+
 /* 순서 표시 글자별 조정 — 한 줄이 한 글자 */
 .char-tuner {
   margin: 6px 0 2px;

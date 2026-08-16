@@ -22,7 +22,7 @@ import { paginateByMeasure } from '../../../lib/paginator.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
   type ClientMsg, type CueItem, type Deck, type PlanKind, type ServicePlan,
-  type SlidePayload, type Template,
+  type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { isComposing } from '../ime.ts';
@@ -35,8 +35,14 @@ interface Props {
   currentIndex: number;
   connected: boolean;
   template: Template | null;
+  /** 역본 목록 — 성경 항목의 주·보조 역본을 고르는 데 쓴다 */
+  translations: Translation[];
+  defaultTranslation: string;
   send: (msg: ClientMsg) => boolean;
 }
+
+/** 성경 탭과 같은 한도 — 세 역본을 넘기면 한 화면에 들어가지 않는다 */
+const MAX_SECONDARY = 2;
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
 type AddKind = 'bible' | 'song' | 'order' | 'notice' | 'quote' | 'blank' | 'divider';
@@ -136,7 +142,9 @@ function itemMeta(item: CueItem): string {
   }
 }
 
-export function PlanPanel({ deck, currentIndex, connected, template, send }: Props): React.JSX.Element {
+export function PlanPanel({
+  deck, currentIndex, connected, template, translations, defaultTranslation, send,
+}: Props): React.JSX.Element {
   /** 예배 유형(주일예배·수요예배 …) — 매주 고쳐 쓰는 원본 */
   const [templates, setTemplates] = useState<ServicePlan[]>([]);
   /** 저장해 둔 회차 — 지난주 순서를 다시 열 때 */
@@ -196,6 +204,9 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
   const [addInput, setAddInput] = useState('');
   const [songHits, setSongHits] = useState<Array<{ id: number; title: string; label?: string }>>([]);
   const [parseOk, setParseOk] = useState<{ ok: boolean; text: string } | null>(null);
+  /** 성경 항목을 추가할 때 쓸 역본 — 마지막에 고른 값을 다음 추가에도 이어 쓴다 */
+  const [addPrimary, setAddPrimary] = useState(defaultTranslation);
+  const [addSecondary, setAddSecondary] = useState<string[]>([]);
 
   const listRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
@@ -658,7 +669,14 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
 
     if (addKind === 'bible') {
       if (parseOk && !parseOk.ok) return; // 참조가 틀리면 넣지 않는다
-      insertItem({ id: newItemId(), type: 'bible', ref: text, primary: 'nkrv', secondary: [], paging: 'verse' });
+      insertItem({
+        id: newItemId(),
+        type: 'bible',
+        ref: text,
+        primary: addPrimary,
+        secondary: addSecondary,
+        paging: 'verse',
+      });
       return;
     }
     if (addKind === 'divider') {
@@ -1194,6 +1212,53 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 />
               )}
 
+              {addKind === 'bible' && (
+                <div className="row detail-controls translation-pick">
+                  <label>역본</label>
+                  <select
+                    value={addPrimary}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setAddPrimary(next);
+                      // 주 역본으로 올라온 것은 보조에서 뺀다 — 같은 본문이 두 번 나간다
+                      setAddSecondary((prev) => prev.filter((id) => id !== next));
+                    }}
+                    title="주 역본"
+                  >
+                    {translations.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <span className="candidates">
+                    {translations
+                      .filter((t) => t.id !== addPrimary)
+                      .map((t) => {
+                        const active = addSecondary.includes(t.id);
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            className={active ? 'primary' : undefined}
+                            onClick={() =>
+                              setAddSecondary((prev) =>
+                                prev.includes(t.id)
+                                  ? prev.filter((id) => id !== t.id)
+                                  : prev.length >= MAX_SECONDARY
+                                    ? prev
+                                    : [...prev, t.id],
+                              )
+                            }
+                            disabled={!active && addSecondary.length >= MAX_SECONDARY}
+                            title={`보조 역본 (최대 ${MAX_SECONDARY}개)`}
+                          >
+                            {t.shortName}
+                          </button>
+                        );
+                      })}
+                  </span>
+                </div>
+              )}
+
               {addKind === 'bible' && parseOk && (
                 <p className={`hintline ${parseOk.ok ? 'ok' : 'error'}`}>{parseOk.text}</p>
               )}
@@ -1323,6 +1388,64 @@ export function PlanPanel({ deck, currentIndex, connected, template, send }: Pro
                 <option value="4">4줄씩</option>
                 <option value="section">섹션 전체</option>
               </select>
+            </div>
+          )}
+
+          {current.type === 'bible' && (
+            <div className="row detail-controls translation-pick">
+              <label>역본</label>
+              <select
+                value={current.primary}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  patchItems(
+                    items.map((i) =>
+                      i.id === current.id && i.type === 'bible'
+                        ? { ...i, primary: next, secondary: i.secondary.filter((id) => id !== next) }
+                        : i,
+                    ),
+                  );
+                }}
+                title="주 역본"
+              >
+                {translations.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <span className="candidates">
+                {translations
+                  .filter((t) => t.id !== current.primary)
+                  .map((t) => {
+                    const active = current.secondary.includes(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={active ? 'primary' : undefined}
+                        onClick={() =>
+                          patchItems(
+                            items.map((i) =>
+                              i.id === current.id && i.type === 'bible'
+                                ? {
+                                    ...i,
+                                    secondary: active
+                                      ? i.secondary.filter((id) => id !== t.id)
+                                      : i.secondary.length >= MAX_SECONDARY
+                                        ? i.secondary
+                                        : [...i.secondary, t.id],
+                                  }
+                                : i,
+                            ),
+                          )
+                        }
+                        disabled={!active && current.secondary.length >= MAX_SECONDARY}
+                        title={`보조 역본 (최대 ${MAX_SECONDARY}개)`}
+                      >
+                        {t.shortName}
+                      </button>
+                    );
+                  })}
+              </span>
             </div>
           )}
 

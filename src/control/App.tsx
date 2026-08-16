@@ -255,6 +255,8 @@ export function App(): React.JSX.Element {
               currentIndex={deck?.index ?? 0}
               connected={connected}
               template={template}
+              translations={translations}
+              defaultTranslation={info?.defaultTranslation ?? 'nkrv'}
               send={send}
             />
           )}
