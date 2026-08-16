@@ -12,6 +12,7 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | **탭별 사용법·기능·단축키** — 예배를 진행하는 사람이 보는 문서 |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | **문제 해결** — 증상 → 원인 → 조치 (실제로 겪은 것만) |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 변경 이력 |
+| [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) | **보안 감사** — 확인된 위험과 권고 |
 | [PLAN.md](PLAN.md) | 전체 설계와 판단 근거 |
 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) | 원본 데이터의 알려진 문제 |
 | [docs/collaboration-report.md](docs/collaboration-report.md) | 여러 Agent 협업 규칙·작업 보드 |

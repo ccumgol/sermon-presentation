@@ -197,7 +197,7 @@ lsof -ti:7777 | xargs kill -9    # 내 서버를 띄우기 전에 확인
 | 기술 | Node.js 26(TypeScript 네이티브 실행, 빌드 없음) · Fastify 5 · `node:sqlite` · React 19 + Vite |
 | 기능 완성도 | **실사용 가능**. 성경 12역본, 찬양 1,202곡, 템플릿 9종, 예배 순서(유형·저장·자동 진행·배경), 줄나눔 검토 |
 | 테스트 | **556개 통과** (단위 + 통합, `npx vitest run` 약 3초) |
-| 문서 | README(설치·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제) + **운영 3종**(2026-08-16 사용자 요청으로 신설) — [USER-GUIDE](USER-GUIDE.md)(탭별 사용법) · [TROUBLESHOOTING](TROUBLESHOOTING.md)(증상별 해결) · [CHANGELOG](CHANGELOG.md)(변경 이력). analysis·handover·setup-guide 처럼 **겹치는 문서는 여전히 만들지 않습니다** |
+| 문서 | README(설치·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제) + **운영 3종**(2026-08-16 사용자 요청으로 신설) — [USER-GUIDE](USER-GUIDE.md)(탭별 사용법) · [TROUBLESHOOTING](TROUBLESHOOTING.md)(증상별 해결) · [CHANGELOG](CHANGELOG.md)(변경 이력) · [SECURITY-AUDIT](SECURITY-AUDIT.md)(보안 감사, 2026-08-16). analysis·handover·setup-guide 처럼 **겹치는 문서는 여전히 만들지 않습니다** |
 | 저장소 | `github.com/ccumgol/sermon-presentation` (**PRIVATE**) · `main` 직통 |
 | 실행 환경 | **모든 Agent 가 사용자의 같은 맥·같은 `data/` 를 공유** (0.3 참고) |
 | 배포 | 아직 로컬 실행만. **Phase 6(Electron 패키징) 미착수** — 다른 봉사자 PC 배포용 |
