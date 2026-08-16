@@ -564,3 +564,71 @@ describe('예배 유형 기본값 시딩', () => {
     for (const plan of planStore.listPlans()) planStore.deletePlan(plan.id);
   });
 });
+
+describe('예배 기본 설정', () => {
+  it('템플릿·역본 기본값을 저장하고 다시 읽는다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '기본 설정',
+      defaults: {
+        templates: { bible: -2, song: -4, order: -9, text: -6 },
+        bible: { primary: 'krv', secondary: ['niv', 'kjv'], paging: 'auto' },
+        song: { langs: ['ko', 'en'], lines: '4' },
+      },
+      items: [],
+    });
+    const id = created.body.data!.plan.id;
+    createdPlanIds.push(id);
+
+    expect(created.body.data!.plan.defaults).toEqual({
+      templates: { bible: -2, song: -4, order: -9, text: -6 },
+      bible: { primary: 'krv', secondary: ['niv', 'kjv'], paging: 'auto' },
+      song: { langs: ['ko', 'en'], lines: '4' },
+    });
+
+    const reread = await get<ServicePlan>(`/api/plans/${id}`);
+    expect(reread.body.data!.defaults?.bible?.primary).toBe('krv');
+  });
+
+  it('알 수 없는 값은 버리고 보조 역본은 2개로 자른다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '기본 설정 방어',
+      defaults: {
+        templates: { bible: 'x', song: 1.5, nope: 3 },
+        bible: { primary: 42, secondary: ['niv', 'kjv', 'esv', 7] },
+      },
+      items: [],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const defaults = created.body.data!.plan.defaults!;
+    expect(defaults.templates).toBeUndefined(); // 정수가 아닌 값만 있었다
+    expect(defaults.bible?.primary).toBeUndefined();
+    expect(defaults.bible?.secondary).toEqual(['niv', 'kjv']);
+  });
+
+  it('null 을 보내면 기본 설정을 지운다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '기본 설정 삭제',
+      defaults: { bible: { primary: 'krv' } },
+      items: [],
+    });
+    const id = created.body.data!.plan.id;
+    createdPlanIds.push(id);
+
+    const cleared = await send<PlanResponse>('PUT', `/api/plans/${id}`, { defaults: null });
+    expect(cleared.body.data!.plan.defaults).toBeUndefined();
+  });
+
+  it('복제하면 기본 설정도 따라간다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '복제 기본 설정',
+      defaults: { bible: { primary: 'krv' } },
+      items: [],
+    });
+    createdPlanIds.push(created.body.data!.plan.id);
+
+    const copy = await send<ServicePlan>('POST', `/api/plans/${created.body.data!.plan.id}/duplicate`, {});
+    createdPlanIds.push(copy.body.data!.id);
+    expect(copy.body.data!.defaults?.bible?.primary).toBe('krv');
+  });
+});

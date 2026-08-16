@@ -17,6 +17,7 @@ import {
   AUTO_HOLD_MS_MIN,
   type ApiResponse,
   type CueItem,
+  type PlanDefaults,
   type PlanKind,
   type ServicePlan,
 } from '../../shared/types.ts';
@@ -169,6 +170,51 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
   return { items, rejected };
 }
 
+/**
+ * 순서표의 기본 설정을 검증한다.
+ *
+ * 아는 필드만 통과시킨다. 템플릿 id 는 정수만, 역본은 문자열만, 보조 역본은 두 개까지.
+ * 여기서 걸러야 잘못된 값이 **예배 중 모든 항목에** 퍼진다.
+ */
+function readDefaults(raw: unknown): PlanDefaults | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const value = raw as Record<string, unknown>;
+  const out: PlanDefaults = {};
+
+  const templates = value.templates as Record<string, unknown> | undefined;
+  if (templates && typeof templates === 'object') {
+    const picked: NonNullable<PlanDefaults['templates']> = {};
+    for (const key of ['bible', 'song', 'order', 'text'] as const) {
+      const id = templates[key];
+      if (typeof id === 'number' && Number.isInteger(id)) picked[key] = id;
+    }
+    if (Object.keys(picked).length > 0) out.templates = picked;
+  }
+
+  const bible = value.bible as Record<string, unknown> | undefined;
+  if (bible && typeof bible === 'object') {
+    const picked: NonNullable<PlanDefaults['bible']> = {};
+    if (typeof bible.primary === 'string') picked.primary = bible.primary;
+    if (Array.isArray(bible.secondary)) {
+      picked.secondary = bible.secondary.filter((id): id is string => typeof id === 'string').slice(0, 2);
+    }
+    if (typeof bible.paging === 'string') picked.paging = bible.paging;
+    if (Object.keys(picked).length > 0) out.bible = picked;
+  }
+
+  const song = value.song as Record<string, unknown> | undefined;
+  if (song && typeof song === 'object') {
+    const picked: NonNullable<PlanDefaults['song']> = {};
+    if (Array.isArray(song.langs)) {
+      picked.langs = song.langs.filter((l): l is string => typeof l === 'string').slice(0, 2);
+    }
+    if (typeof song.lines === 'string') picked.lines = song.lines;
+    if (Object.keys(picked).length > 0) out.song = picked;
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** 알 수 없는 값은 유형이 아니라 저장된 순서로 본다 — 유형이 함부로 늘어나면 안 된다 */
 function readKind(value: unknown): PlanKind | undefined {
   if (value === 'template' || value === 'plan') return value;
@@ -185,7 +231,7 @@ export async function registerPlanRoutes(app: FastifyInstance): Promise<void> {
     return plan ? ok(plan) : reply.code(404).send(fail('예배 순서를 찾을 수 없습니다'));
   });
 
-  app.post<{ Body: { name?: string; serviceDate?: string; items?: unknown; kind?: string } }>(
+  app.post<{ Body: { name?: string; serviceDate?: string; items?: unknown; kind?: string; defaults?: unknown } }>(
     '/api/plans',
     async (request, reply) => {
       const name = request.body?.name;
@@ -200,6 +246,7 @@ export async function registerPlanRoutes(app: FastifyInstance): Promise<void> {
         ...(request.body?.serviceDate ? { serviceDate: request.body.serviceDate } : {}),
         items,
         ...(kind ? { kind } : {}),
+        ...(readDefaults(request.body?.defaults) ? { defaults: readDefaults(request.body?.defaults)! } : {}),
       });
 
       // 버린 항목이 있으면 조용히 넘기지 않고 알린다
@@ -207,7 +254,7 @@ export async function registerPlanRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  app.put<{ Params: { id: string }; Body: { name?: string; serviceDate?: string; items?: unknown } }>(
+  app.put<{ Params: { id: string }; Body: { name?: string; serviceDate?: string; items?: unknown; defaults?: unknown } }>(
     '/api/plans/:id',
     async (request, reply) => {
       const id = Number(request.params.id);
@@ -218,6 +265,11 @@ export async function registerPlanRoutes(app: FastifyInstance): Promise<void> {
         patch.name = request.body.name.trim();
       }
       if (typeof request.body?.serviceDate === 'string') patch.serviceDate = request.body.serviceDate;
+
+      if (request.body?.defaults !== undefined) {
+        // null 을 보내면 기본 설정을 지운다 — '이 예배는 항목이 알아서'로 되돌리는 길
+        patch.defaults = readDefaults(request.body.defaults);
+      }
 
       let rejected: string[] = [];
       if (request.body?.items !== undefined) {

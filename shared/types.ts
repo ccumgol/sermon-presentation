@@ -531,6 +531,32 @@ export const AUTO_HOLD_MS_MAX = 600000;
  */
 export type PlanKind = 'template' | 'plan';
 
+/**
+ * 순서표 하나에 걸리는 **기본 설정**.
+ *
+ * 한 예배 안에서는 성경·찬양의 템플릿과 역본이 대개 그대로 간다. 그런데 항목마다
+ * 다시 고르게 하면 매번 같은 클릭을 반복하게 되고, 하나 빠뜨리면 그 항목만
+ * 다른 모양으로 나간다. 그래서 **여기서 한 번 정하고 항목은 예외만** 지정한다.
+ *
+ * - `templates` 는 **송출할 때 기준**이 된다. 항목에 templateId 가 없으면 이 값을 쓴다.
+ *   나중에 기본을 바꾸면 따로 지정하지 않은 항목이 모두 따라온다.
+ * - 나머지(역본·화면 넘김·언어)는 **항목을 새로 넣을 때 채워 넣는다.**
+ *   이미 만든 항목의 본문 설정까지 나중에 바뀌면 놀랍기 때문이다.
+ */
+export interface PlanDefaults {
+  /** 항목 종류별 기본 템플릿 id */
+  templates?: {
+    bible?: number;
+    song?: number;
+    /** 순서 표시 */
+    order?: number;
+    /** 광고·인용구 */
+    text?: number;
+  };
+  bible?: { primary?: string; secondary?: string[]; paging?: string };
+  song?: { langs?: LangCode[]; lines?: string };
+}
+
 export interface ServicePlan {
   id: number;
   name: string;
@@ -539,6 +565,8 @@ export interface ServicePlan {
   updatedAt?: string;
   /** 없으면 'plan' 으로 본다 — 유형 개념 도입 전 순서표의 하위 호환 */
   kind?: PlanKind;
+  /** 이 예배에서 기본으로 쓸 템플릿·역본 (항목이 따로 지정하면 그쪽이 이긴다) */
+  defaults?: PlanDefaults;
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1511,6 +1511,17 @@ button.link-inline {
   font-variant-numeric: tabular-nums;
 }
 
+/* 예배 기본 설정 — '기본 설정' 을 눌렀을 때만 펼쳐진다 */
+.plan-defaults {
+  flex: 0 0 auto;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.plan-defaults .detail-controls { margin-top: 4px; }
+.plan-defaults select { min-height: 34px; padding: 4px 8px; font-size: 0.8rem; }
+
 /* 저장된 순서 목록 — '순서 불러오기' 를 눌렀을 때만 펼쳐진다 */
 .plan-saved {
   flex: 0 0 auto;

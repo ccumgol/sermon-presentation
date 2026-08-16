@@ -157,7 +157,7 @@ export const api = {
       items,
       ...(kind ? { kind } : {}),
     }),
-  updatePlan: (id: number, patch: { name?: string; items?: unknown[] }) =>
+  updatePlan: (id: number, patch: { name?: string; items?: unknown[]; defaults?: unknown }) =>
     send<{ plan: ServicePlan; rejected?: string[] }>('PUT', `/api/plans/${id}`, patch),
   deletePlan: (id: number) => send<{ deleted: number }>('DELETE', `/api/plans/${id}`),
 

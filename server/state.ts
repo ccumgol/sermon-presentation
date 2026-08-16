@@ -101,10 +101,17 @@ function commit(next: CommitInput): void {
 // 조작
 // ─────────────────────────────────────────────────────────────
 
-/** 단일 슬라이드를 즉시 송출한다. 기존 묶음은 버린다. */
+/**
+ * 단일 슬라이드를 즉시 송출한다. 기존 묶음은 버린다.
+ *
+ * **블랙 상태는 건드리지 않는다.** 블랙은 '지금 화면을 가린다'는 사람의 결정이라,
+ * 그 사이 다음 것을 골라 둬도 화면은 계속 가려져 있어야 한다. 해제는 사람이 한다
+ * (블랙 해제·Esc). 예전에는 여기서 blank 를 꺼 버려 **다른 슬라이드를 누르는 순간
+ * 블랙이 풀렸다** — 2026-08-15 실사용에서 발견.
+ */
 export function show(payload: SlidePayload): void {
   commit({
-    state: { slide: payload, blank: false, cursor: null },
+    state: { slide: payload, cursor: null },
     deck: null,
     lastSlide: payload,
   });
@@ -118,8 +125,8 @@ export function loadDeck(deck: Deck): void {
 
   commit({
     state: {
+      // 블랙은 유지한다 (show 주석 참고)
       slide,
-      blank: false,
       cursor: { planItemIndex: 0, slideIndex: index },
       ...(templateId !== undefined ? { templateId } : {}),
     },
@@ -164,8 +171,8 @@ export function goto(index: number): boolean {
   const templateId = groupTemplateAt(deck, next);
   commit({
     state: {
+      // 블랙은 유지한다 (show 주석 참고)
       slide,
-      blank: false,
       cursor: { planItemIndex: 0, slideIndex: next },
       // 항목에 템플릿이 지정돼 있으면 경계를 넘을 때 함께 바뀐다
       ...(templateId !== undefined ? { templateId } : {}),

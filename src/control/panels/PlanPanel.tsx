@@ -21,7 +21,7 @@ import {
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
-  type ClientMsg, type CueItem, type Deck, type PlanKind, type ServicePlan,
+  type ClientMsg, type CueItem, type Deck, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
@@ -156,6 +156,8 @@ export function PlanPanel({
   /** 이름을 받아야 하는 저장 동작 (유형 만들기 / 순서 저장하기) */
   const [nameBar, setNameBar] = useState<{ kind: PlanKind; value: string } | null>(null);
   const [loadOpen, setLoadOpen] = useState(false);
+  /** 기본 설정 패널을 펼쳤는지 */
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -260,6 +262,9 @@ export function PlanPanel({
     if (dirty && !window.confirm('저장하지 않은 변경이 있습니다. 그래도 여시겠습니까?')) return;
     setPlan(target);
     setItems(target.items);
+    // 추가 바의 역본도 이 예배의 기본값에서 시작한다
+    setAddPrimary(target.defaults?.bible?.primary ?? defaultTranslation);
+    setAddSecondary(target.defaults?.bible?.secondary ?? []);
     setDirty(false);
     setCursor(0);
     setNotice(null);
@@ -273,7 +278,11 @@ export function PlanPanel({
     setBusy(true);
     setError(null);
     try {
-      const result = await api.updatePlan(plan.id, { name: plan.name, items });
+      const result = await api.updatePlan(plan.id, {
+        name: plan.name,
+        items,
+        defaults: plan.defaults ?? null,
+      });
       setPlan(result.plan);
       setItems(result.plan.items);
       setDirty(false);
@@ -311,7 +320,7 @@ export function PlanPanel({
           : items;
 
       const result = nameBarTarget
-        ? await api.updatePlan(nameBarTarget.id, { name, items: payload })
+        ? await api.updatePlan(nameBarTarget.id, { name, items: payload, defaults: plan?.defaults ?? null })
         : (await api.createPlan(name, nameBar.kind === 'plan' ? today() : '', payload, nameBar.kind));
 
       setPlan(result.plan);
@@ -462,11 +471,10 @@ export function PlanPanel({
         setBefore({ slide: liveSlide, label: liveLabel ?? '' });
       }
 
-      // 항목에 지정된 템플릿이 있으면 **슬라이드보다 먼저** 올린다.
+      // 쓸 템플릿을 **슬라이드보다 먼저** 올린다 (항목 지정 → 예배 기본 설정 순).
       // 순서가 반대면 옛 템플릿으로 한 번 그려졌다가 바뀌어 화면이 튄다.
-      if ('templateId' in item && typeof item.templateId === 'number') {
-        send({ t: 'template:set', id: item.templateId });
-      }
+      const useTemplate = templateIdFor(item);
+      if (typeof useTemplate === 'number') send({ t: 'template:set', id: useTemplate });
 
       const groupIndex = items.filter((i) => i.type !== 'divider').findIndex((i) => i.id === item.id);
       const group = deck?.groups?.[groupIndex];
@@ -591,13 +599,24 @@ export function PlanPanel({
         setError('올릴 수 있는 항목이 없습니다');
         return;
       }
+      // 항목이 템플릿을 지정하지 않았으면 예배 기본 설정을 경계에 실어 보낸다.
+      // 이게 없으면 순서표를 올려 진행할 때만 기본 설정이 빠진다.
+      const withDefaults = {
+        ...result.deck,
+        groups: result.deck.groups?.map((group, index) => {
+          if (group.templateId !== undefined) return group;
+          const item = items.filter((i) => i.type !== 'divider')[index];
+          const id = item ? templateIdFor(item) : undefined;
+          return id === undefined ? group : { ...group, templateId: id };
+        }),
+      };
       if (result.failed.length > 0) {
         setNotice(
           `${result.failed.length}개 항목을 건너뛰었습니다: ` +
             result.failed.map((f) => `${describeItem(f.item)} (${f.error})`).join(', '),
         );
       }
-      send({ t: 'deck:load', payload: result.deck });
+      send({ t: 'deck:load', payload: withDefaults });
       setLiveItemId(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '순서표를 올리지 못했습니다');
@@ -675,7 +694,7 @@ export function PlanPanel({
         ref: text,
         primary: addPrimary,
         secondary: addSecondary,
-        paging: 'verse',
+        paging: plan?.defaults?.bible?.paging ?? 'verse',
       });
       return;
     }
@@ -728,7 +747,15 @@ export function PlanPanel({
   }
 
   function addSong(songId: number, songTitle: string): void {
-    insertItem({ id: newItemId(), type: 'song', songId, songTitle, langs: ['ko'], lines: '2' });
+    // 찬양의 언어·줄 수도 예배 기본 설정을 따른다 — 매번 같은 값을 다시 고르지 않게
+    insertItem({
+      id: newItemId(),
+      type: 'song',
+      songId,
+      songTitle,
+      langs: plan?.defaults?.song?.langs ?? ['ko'],
+      lines: plan?.defaults?.song?.lines ?? '2',
+    });
   }
 
   // ── 줄을 눌렀을 때 ──────────────────────────────────────────
@@ -842,11 +869,41 @@ export function PlanPanel({
     return start === undefined ? -1 : currentIndex - start;
   })();
 
-  /** 이 항목이 실제로 쓸 템플릿 — 지정이 없으면 지금 송출 중인 것 */
+  /** 기본 설정에서 이 항목이 어느 칸에 해당하는지 */
+  function defaultsKeyFor(item: CueItem): 'bible' | 'song' | 'order' | 'text' | null {
+    if (item.type === 'bible') return 'bible';
+    if (item.type === 'song') return 'song';
+    if (item.type === 'text') return item.variant === 'order' ? 'order' : 'text';
+    return null;
+  }
+
+  /**
+   * 이 항목이 실제로 쓸 템플릿 id.
+   *
+   * 항목이 지정한 것 → 예배 기본 설정 → (없으면) 지금 템플릿 유지.
+   * 기본 설정을 두는 이유는, 한 예배 안에서 성경·찬양 템플릿이 대개 그대로 가기
+   * 때문이다. 항목마다 고르게 하면 하나 빠뜨렸을 때 그 항목만 다르게 나간다.
+   */
+  function templateIdFor(item: CueItem): number | undefined {
+    const own = 'templateId' in item ? item.templateId : undefined;
+    if (typeof own === 'number') return own;
+    const key = defaultsKeyFor(item);
+    return key ? plan?.defaults?.templates?.[key] : undefined;
+  }
+
+  /** 이 항목이 실제로 쓸 템플릿 — 지정이 없으면 기본 설정, 그것도 없으면 지금 것 */
   function itemTemplateFor(item: CueItem): Template | null {
-    const id = 'templateId' in item ? item.templateId : undefined;
+    const id = templateIdFor(item);
     if (typeof id === 'number') return styleTemplates.find((t) => t.id === id) ?? template;
     return template;
+  }
+
+  /** 기본 설정을 고친다 — 순서표에 저장되므로 dirty 로 표시된다 */
+  function patchDefaults(mutate: (current: PlanDefaults) => PlanDefaults): void {
+    if (!plan) return;
+    const next = mutate(plan.defaults ?? {});
+    setPlan({ ...plan, defaults: next });
+    setDirty(true);
   }
 
   const kindHint = ADD_KINDS.find((option) => option.kind === addKind)?.hint ?? '';
@@ -956,7 +1013,133 @@ export function PlanPanel({
                 >
                   순서 불러오기
                 </button>
+                <button
+                  type="button"
+                  className={defaultsOpen ? 'primary' : undefined}
+                  onClick={() => setDefaultsOpen((prev) => !prev)}
+                  title="이 예배에서 기본으로 쓸 템플릿·역본"
+                >
+                  기본 설정
+                </button>
               </div>
+
+              {defaultsOpen && (
+                <div className="card plan-defaults">
+                  <p className="hintline muted">
+                    이 예배 전체의 기본값입니다. <b>항목에서 따로 지정한 것만</b> 예외가 됩니다.
+                    템플릿은 이미 만든 항목에도 곧바로 적용되고, 역본·언어는 <b>앞으로 넣는</b> 항목에 채워집니다.
+                  </p>
+
+                  {([
+                    ['bible', '성경'],
+                    ['song', '찬양'],
+                    ['order', '순서 표시'],
+                    ['text', '광고·인용구'],
+                  ] as const).map(([key, label]) => (
+                    <div className="row detail-controls" key={key}>
+                      <label>{label} 템플릿</label>
+                      <select
+                        value={plan.defaults?.templates?.[key] ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : Number(e.target.value);
+                          patchDefaults((c) => ({
+                            ...c,
+                            templates: { ...c.templates, [key]: value },
+                          }));
+                        }}
+                      >
+                        <option value="">지정 안 함 (지금 템플릿 유지)</option>
+                        {styleTemplates.map((t) => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+
+                  <div className="row detail-controls translation-pick">
+                    <label>성경 역본</label>
+                    <select
+                      value={plan.defaults?.bible?.primary ?? defaultTranslation}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        patchDefaults((c) => ({
+                          ...c,
+                          bible: {
+                            ...c.bible,
+                            primary: next,
+                            secondary: (c.bible?.secondary ?? []).filter((id) => id !== next),
+                          },
+                        }));
+                        setAddPrimary(next);
+                        setAddSecondary((prev) => prev.filter((id) => id !== next));
+                      }}
+                    >
+                      {translations.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <span className="candidates">
+                      {translations
+                        .filter((t) => t.id !== (plan.defaults?.bible?.primary ?? defaultTranslation))
+                        .map((t) => {
+                          const current2 = plan.defaults?.bible?.secondary ?? [];
+                          const active = current2.includes(t.id);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              className={active ? 'primary' : undefined}
+                              onClick={() => {
+                                const next = active
+                                  ? current2.filter((id) => id !== t.id)
+                                  : current2.length >= MAX_SECONDARY
+                                    ? current2
+                                    : [...current2, t.id];
+                                patchDefaults((c) => ({ ...c, bible: { ...c.bible, secondary: next } }));
+                                setAddSecondary(next);
+                              }}
+                              disabled={!active && (plan.defaults?.bible?.secondary?.length ?? 0) >= MAX_SECONDARY}
+                            >
+                              {t.shortName}
+                            </button>
+                          );
+                        })}
+                    </span>
+                  </div>
+
+                  <div className="row detail-controls">
+                    <label>성경 화면 넘김</label>
+                    <select
+                      value={plan.defaults?.bible?.paging ?? 'verse'}
+                      onChange={(e) =>
+                        patchDefaults((c) => ({ ...c, bible: { ...c.bible, paging: e.target.value } }))
+                      }
+                    >
+                      <option value="verse">1절씩</option>
+                      <option value="auto">자동 (화면에 맞춰)</option>
+                      <option value="pair">2절씩</option>
+                      <option value="all">구간 전체</option>
+                    </select>
+
+                    <label>찬양 화면 넘김</label>
+                    <select
+                      value={plan.defaults?.song?.lines ?? '2'}
+                      onChange={(e) =>
+                        patchDefaults((c) => ({ ...c, song: { ...c.song, lines: e.target.value } }))
+                      }
+                    >
+                      <option value="1">1줄씩</option>
+                      <option value="2">2줄씩</option>
+                      <option value="4">4줄씩</option>
+                      <option value="section">섹션 전체</option>
+                    </select>
+                  </div>
+
+                  <p className="hintline muted">
+                    바꾼 뒤 <b>템플릿 업데이트</b>(유형) 또는 <b>순서 저장하기</b> 를 눌러야 남습니다.
+                  </p>
+                </div>
+              )}
             </>
           )}
 

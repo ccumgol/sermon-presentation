@@ -87,11 +87,14 @@ describe('loadDeck', () => {
     expect(state.getState().slide).toBeNull();
   });
 
-  it('블랙 상태에서 새 묶음을 올리면 블랙이 풀린다', () => {
+  it('블랙 상태에서 새 묶음을 올려도 블랙은 유지된다', () => {
+    // 2026-08-15 동작 변경 — 예전에는 여기서 블랙이 풀렸다.
+    // 실사용에서 '블랙을 켜 뒀는데 다른 슬라이드를 누르니 화면이 나가 버린다'로 드러났다.
+    // 블랙은 사람이 끄기 전까지 유지되는 것이 맞다(블랙 해제·Esc).
     state.show(slide('가'));
     state.setBlank(true);
     state.loadDeck(deck(2));
-    expect(state.getState().blank).toBe(false);
+    expect(state.getState().blank).toBe(true);
   });
 });
 
@@ -173,6 +176,45 @@ describe('blank / restore', () => {
     state.clear();
     expect(state.getDeck()).toBeNull();
     expect(state.getState().slide).toBeNull();
+  });
+});
+
+describe('블랙 유지 (사람이 끌 때까지)', () => {
+  it('블랙 중 다른 슬라이드를 골라도 블랙이 풀리지 않는다', () => {
+    // 블랙은 '지금 화면을 가린다'는 결정이라, 그 사이 다음 것을 준비해도
+    // 화면은 계속 가려져 있어야 한다. 예전에는 여기서 풀려 화면이 나가 버렸다.
+    state.loadDeck(deck(3));
+    state.setBlank(true);
+
+    state.goto(2);
+    expect(state.getState().blank).toBe(true);
+    state.next();
+    expect(state.getState().blank).toBe(true);
+    state.prev();
+    expect(state.getState().blank).toBe(true);
+  });
+
+  it('덱을 새로 올려도 블랙이 유지된다', () => {
+    state.setBlank(true);
+    state.loadDeck(deck(2));
+    expect(state.getState().blank).toBe(true);
+  });
+
+  it('단일 슬라이드를 송출해도 블랙이 유지된다', () => {
+    state.setBlank(true);
+    state.show(slide('한 장'));
+    expect(state.getState().blank).toBe(true);
+  });
+
+  it('사람이 끄면 풀린다 (블랙 해제 · Esc)', () => {
+    state.loadDeck(deck(2));
+    state.setBlank(true);
+    state.setBlank(false);
+    expect(state.getState().blank).toBe(false);
+
+    state.setBlank(true);
+    state.restore();
+    expect(state.getState().blank).toBe(false);
   });
 });
 
