@@ -19,6 +19,7 @@ import {
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
+import { verseNumberPrefix } from '../../../lib/song-slides.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
   type ClientMsg, type CueItem, type Deck, type PlanDefaults, type PlanKind, type ServicePlan,
@@ -104,7 +105,11 @@ function itemIcon(item: CueItem): string {
 function slideSummary(slide: SlidePayload): string {
   switch (slide.kind) {
     case 'song':
-      return slide.lines.map((group) => group.map((line) => line.text).join(' / ')).join(' · ');
+      // 몇 절인지 가사 앞에 붙인다 — 목록에서 가사만 보면 절을 구분할 수 없다
+      return (
+        verseNumberPrefix(slide.sectionLabel) +
+        slide.lines.map((group) => group.map((line) => line.text).join(' / ')).join(' · ')
+      );
     case 'text':
       return slide.lines.join(' · ');
     case 'order':

@@ -6,6 +6,7 @@ import {
   buildSongDeck,
   fitLinesToWidth,
   pairLines,
+  verseNumberPrefix,
 } from '../../lib/song-slides.ts';
 import type { Song, SongLine, SongSection } from '../../shared/types.ts';
 
@@ -353,5 +354,23 @@ describe('fitLinesToWidth — 표시 폭에 맞춰 묶기', () => {
 
   it('한 행이면 그대로', () => {
     expect(fitLinesToWidth([HYMN_256[0]!], 24)).toHaveLength(1);
+  });
+});
+
+describe('verseNumberPrefix — 절 번호 접두사', () => {
+  it("'1절' → '1. '", () => {
+    expect(verseNumberPrefix('1절')).toBe('1. ');
+    expect(verseNumberPrefix('12절')).toBe('12. ');
+  });
+
+  it('번호가 없는 섹션은 붙이지 않는다 (라벨 칸에 이미 보인다)', () => {
+    expect(verseNumberPrefix('후렴')).toBe('');
+    expect(verseNumberPrefix('Bridge')).toBe('');
+    expect(verseNumberPrefix(undefined)).toBe('');
+    expect(verseNumberPrefix('')).toBe('');
+  });
+
+  it('번호가 섞여 있어도 첫 숫자를 쓴다', () => {
+    expect(verseNumberPrefix('3절 2/2')).toBe('3. ');
   });
 });

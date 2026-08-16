@@ -205,6 +205,20 @@ export function buildSongSlides(
 }
 
 /** 슬라이드 라벨 — 컨트롤 패널 목록용 */
+/**
+ * 섹션 라벨에서 **절 번호 접두사**를 만든다 — `'1절'` → `'1. '`.
+ *
+ * 찬송가는 절이 여럿이라, 목록에서 가사만 보면 몇 절인지 바로 안 보인다.
+ * 사용자가 실제로 쓰는 표기가 `'1. 주 믿는 사람 일어나…'` 라 그 형식을 따른다.
+ *
+ * 후렴·브리지처럼 **번호가 없는 섹션은 접두사를 붙이지 않는다** — 목록의 라벨 칸에
+ * 이미 '후렴' 이 보이므로, 없는 번호를 지어내는 것보다 비워 두는 편이 정확하다.
+ */
+export function verseNumberPrefix(sectionLabel: string | undefined): string {
+  const matched = /(\d+)/.exec(sectionLabel ?? '');
+  return matched ? `${matched[1]}. ` : '';
+}
+
 export function describeSongSlide(slide: SlidePayload, indexInSection: number, totalInSection: number): string {
   if (slide.kind !== 'song') return '';
   return totalInSection > 1 ? `${slide.sectionLabel} ${indexInSection + 1}/${totalInSection}` : slide.sectionLabel;
