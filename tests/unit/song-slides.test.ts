@@ -5,10 +5,11 @@ import {
   buildSectionSlides,
   buildSongDeck,
   fitLinesToWidth,
+  isSectionStart,
   pairLines,
   verseNumberPrefix,
 } from '../../lib/song-slides.ts';
-import type { Song, SongLine, SongSection } from '../../shared/types.ts';
+import type { SlidePayload, Song, SongLine, SongSection } from '../../shared/types.ts';
 
 function section(id: number, label: string, lines: SongLine[], kind: SongSection['kind'] = 'verse'): SongSection {
   return { id, kind, label, position: id - 1, lines };
@@ -372,5 +373,32 @@ describe('verseNumberPrefix — 절 번호 접두사', () => {
 
   it('번호가 섞여 있어도 첫 숫자를 쓴다', () => {
     expect(verseNumberPrefix('3절 2/2')).toBe('3. ');
+  });
+});
+
+describe('isSectionStart — 절의 첫 장인지', () => {
+  const songSlide = (sectionLabel: string): SlidePayload => ({
+    kind: 'song', title: '곡', sectionLabel, lines: [],
+  });
+
+  it('앞이 없으면 첫 장', () => {
+    expect(isSectionStart(songSlide('1절'), undefined)).toBe(true);
+  });
+
+  it('앞과 같은 절이면 이어지는 장', () => {
+    expect(isSectionStart(songSlide('1절'), songSlide('1절'))).toBe(false);
+  });
+
+  it('절이 바뀌면 첫 장', () => {
+    expect(isSectionStart(songSlide('2절'), songSlide('1절'))).toBe(true);
+    expect(isSectionStart(songSlide('후렴'), songSlide('1절'))).toBe(true);
+  });
+
+  it('앞이 찬양이 아니면 첫 장 (성경 뒤에 이어지는 경우)', () => {
+    expect(isSectionStart(songSlide('1절'), { kind: 'blank' })).toBe(true);
+  });
+
+  it('찬양 슬라이드가 아니면 거짓', () => {
+    expect(isSectionStart({ kind: 'blank' }, undefined)).toBe(false);
   });
 });

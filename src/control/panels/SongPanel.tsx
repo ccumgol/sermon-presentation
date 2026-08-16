@@ -4,7 +4,7 @@ import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
 } from '../../../shared/types.ts';
-import { verseNumberPrefix } from '../../../lib/song-slides.ts';
+import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import { api, ApiError } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
@@ -522,7 +522,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                           {group.map((line, li) => (
                             <span key={li} className={li === 0 ? undefined : 'secondary'} style={{ display: 'block' }}>
                               {/* 몇 절인지 첫 줄 앞에 붙인다 (후렴처럼 번호가 없으면 붙지 않는다) */}
-                              {gi === 0 && li === 0 ? verseNumberPrefix(slide.sectionLabel) : ''}
+                              {gi === 0 && li === 0 && isSectionStart(slide, deck.slides[index - 1])
+                                ? verseNumberPrefix(slide.sectionLabel)
+                                : ''}
                               {line.text}
                             </span>
                           ))}

@@ -19,7 +19,7 @@ import {
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
-import { verseNumberPrefix } from '../../../lib/song-slides.ts';
+import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
   type ClientMsg, type CueItem, type Deck, type PlanDefaults, type PlanKind, type ServicePlan,
@@ -101,15 +101,18 @@ function itemIcon(item: CueItem): string {
   return ITEM_ICONS[item.type];
 }
 
-/** 슬라이드 줄에 보여 줄 한 줄 요약 — 목록이 조밀해야 진행이 보인다 */
-function slideSummary(slide: SlidePayload): string {
+/**
+ * 슬라이드 줄에 보여 줄 한 줄 요약 — 목록이 조밀해야 진행이 보인다.
+ * `previous` 는 절 번호를 **첫 장에만** 붙이기 위해 앞 슬라이드를 본다.
+ */
+function slideSummary(slide: SlidePayload, previous?: SlidePayload): string {
   switch (slide.kind) {
-    case 'song':
-      // 몇 절인지 가사 앞에 붙인다 — 목록에서 가사만 보면 절을 구분할 수 없다
-      return (
-        verseNumberPrefix(slide.sectionLabel) +
-        slide.lines.map((group) => group.map((line) => line.text).join(' / ')).join(' · ')
-      );
+    case 'song': {
+      // 몇 절인지 가사 앞에 붙인다 — 목록에서 가사만 보면 절을 구분할 수 없다.
+      // 이어지는 장에는 붙이지 않는다(같은 번호가 연달아 보이면 절이 바뀐 것처럼 읽힌다).
+      const prefix = isSectionStart(slide, previous) ? verseNumberPrefix(slide.sectionLabel) : '';
+      return prefix + slide.lines.map((group) => group.map((line) => line.text).join(' / ')).join(' · ');
+    }
     case 'text':
       return slide.lines.join(' · ');
     case 'order':
@@ -1280,7 +1283,9 @@ export function PlanPanel({
                     >
                       <span className="live-dot" title={isLiveSlide ? '송출 중' : undefined} />
                       <span className="num">{preview?.labels[row.slideIndex] || row.slideIndex + 1}</span>
-                      <span className="text">{slide ? slideSummary(slide) : ''}</span>
+                      <span className="text">
+                        {slide ? slideSummary(slide, preview?.slides[row.slideIndex - 1]) : ''}
+                      </span>
                     </div>
                   );
                 }

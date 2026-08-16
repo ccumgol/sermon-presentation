@@ -214,6 +214,21 @@ export function buildSongSlides(
  * 후렴·브리지처럼 **번호가 없는 섹션은 접두사를 붙이지 않는다** — 목록의 라벨 칸에
  * 이미 '후렴' 이 보이므로, 없는 번호를 지어내는 것보다 비워 두는 편이 정확하다.
  */
+/**
+ * 이 슬라이드가 **그 절의 첫 장**인가.
+ *
+ * 절이 길면 여러 장으로 나뉘는데(`1절 1/2`, `1절 2/2`), 번호는 첫 장에만 붙인다.
+ * 이어지는 장에도 붙으면 같은 번호가 연달아 보여 절이 바뀐 것처럼 읽힌다.
+ *
+ * 라벨 문자열('1절 1/2')을 파싱하지 않고 **앞 슬라이드와 섹션을 비교**한다 —
+ * 라벨 형식이 바뀌어도 판정이 깨지지 않는다.
+ */
+export function isSectionStart(slide: SlidePayload, previous: SlidePayload | undefined): boolean {
+  if (slide.kind !== 'song') return false;
+  if (!previous || previous.kind !== 'song') return true;
+  return previous.sectionLabel !== slide.sectionLabel;
+}
+
 export function verseNumberPrefix(sectionLabel: string | undefined): string {
   const matched = /(\d+)/.exec(sectionLabel ?? '');
   return matched ? `${matched[1]}. ` : '';
