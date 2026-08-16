@@ -68,6 +68,13 @@ export function isSkipped(value: MergePlan | Skipped): value is Skipped {
 export function planMerge(
   song: ReturnType<typeof store.getSong>,
   sections: readonly SectionRow[],
+  /**
+   * 사람이 손본 곡(`manual`)까지 병합한다.
+   *
+   * **곡을 콕 집어 지정했을 때만** 참이 된다(`--song <id>`). 일괄 실행에서는 언제나
+   * 거짓이라, 승인한 가사가 자동 작업에 휩쓸리는 일이 없다(협업 규칙 0.2).
+   */
+  includeManual = false,
 ): MergePlan | Skipped {
   if (!song) return { reference: '?', title: '?', reason: '곡을 찾을 수 없음' };
 
@@ -81,8 +88,11 @@ export function planMerge(
   const verses = sections.filter((section) => section.kind === 'verse');
   if (verses.length === 0) return skip('절이 없음 — 후렴만 있는 곡');
 
-  // 사람이 손본 곡은 건드리지 않는다 (절·후렴 어느 쪽이든)
-  if (sections.some((section) => section.linesSource !== 'auto')) return skip('사람이 확인한 곡');
+  // 사람이 손본 곡은 건드리지 않는다 (절·후렴 어느 쪽이든).
+  // 사람이 그 곡을 직접 지정한 경우에만 예외로 둔다.
+  if (!includeManual && sections.some((section) => section.linesSource !== 'auto')) {
+    return skip('사람이 확인한 곡');
+  }
 
   // 두 언어가 섞이면 줄 짝(lineIndex)이 깨지므로 손대지 않는다
   const langs = new Set(sections.flatMap((section) => section.lines.map((line) => line.lang)));
@@ -138,13 +148,26 @@ function main(): void {
   const bookIndex = args.indexOf('--book');
   const book = bookIndex >= 0 ? args[bookIndex + 1] : undefined;
 
+  /**
+   * `--song <id>` — 그 곡 하나만 다룬다. 이때는 **승인한 곡도 병합한다.**
+   * 사람이 id 를 직접 적어 넣은 경우이므로 의도가 분명하다.
+   */
+  const songIndex = args.indexOf('--song');
+  const onlySong = songIndex >= 0 ? Number(args[songIndex + 1]) : undefined;
+  if (songIndex >= 0 && (!Number.isInteger(onlySong) || onlySong! <= 0)) {
+    process.stderr.write('--song 에는 곡 id 를 숫자로 주세요\n');
+    process.exitCode = 1;
+    return;
+  }
+
   store.initSongsDb();
 
   const plans: MergePlan[] = [];
   const skipped: Skipped[] = [];
 
-  for (const songId of store.listSongIds(book)) {
-    const result = planMerge(store.getSong(songId), store.listSectionRows(songId));
+  const targets = onlySong !== undefined ? [onlySong] : store.listSongIds(book);
+  for (const songId of targets) {
+    const result = planMerge(store.getSong(songId), store.listSectionRows(songId), onlySong !== undefined);
     if (isSkipped(result)) skipped.push(result);
     else plans.push(result);
   }
