@@ -7,8 +7,14 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 - 찬양 가사 2개 언어 동시 표시 (줄 단위 페어링)
 - 위치·글자 크기·색상·외곽선을 템플릿으로 지정, **배경 투명 송출**
 
-전체 설계는 [PLAN.md](PLAN.md), 원본 데이터의 알려진 문제는
-[docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md)를 참고하세요.
+| 문서 | 내용 |
+|------|------|
+| [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | **탭별 사용법·기능·단축키** — 예배를 진행하는 사람이 보는 문서 |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | **문제 해결** — 증상 → 원인 → 조치 (실제로 겪은 것만) |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 변경 이력 |
+| [PLAN.md](PLAN.md) | 전체 설계와 판단 근거 |
+| [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) | 원본 데이터의 알려진 문제 |
+| [docs/collaboration-report.md](docs/collaboration-report.md) | 여러 Agent 협업 규칙·작업 보드 |
 
 저장소: https://github.com/ccumgol/sermon-presentation
 

@@ -1,10 +1,11 @@
 # 협력 보고서 (Collaboration Report)
 
 > **여러 AI Agent / 개발자가 이 프로젝트를 동시에 작업할 때 상태를 공유하는 문서입니다.**
-> 관련 문서: [README.md](../README.md) (사용법·구조) · [PLAN.md](../PLAN.md) (전체 설계와 판단 근거) ·
+> 관련 문서: [USER-GUIDE.md](USER-GUIDE.md) (탭별 사용법) · [TROUBLESHOOTING.md](TROUBLESHOOTING.md) (증상별 해결) ·
+> [CHANGELOG.md](CHANGELOG.md) (변경 이력) · [README.md](../README.md) (설치·구조) · [PLAN.md](../PLAN.md) (설계 근거) ·
 > [KNOWN-DATA-ISSUES.md](KNOWN-DATA-ISSUES.md) (원본 데이터의 알려진 문제)
 
-**최근 갱신**: 2026-08-15 · 갱신자: Claude (Agent J, Opus 5) · 기준 커밋: `0f7e465`
+**최근 갱신**: 2026-08-16 · 갱신자: Claude (Agent J, Opus 5) · 기준 커밋: `08d48b5`
 
 > 이 문서는 다른 프로젝트(translateviewer)의 협업 규칙을 이 프로젝트에 맞게 옮겨온 것입니다.
 > **0~1장의 협업 방식은 그대로**, 2장 이하의 구체적인 내용은 이 프로젝트 것으로 새로 썼습니다.
@@ -181,7 +182,7 @@ lsof -ti:7777 | xargs kill -9    # 내 서버를 띄우기 전에 확인
 |---|---|---|
 | **사용자 (소유자)** | 요구사항 정의·우선순위 결정, 실제 예배 운영 검증, 가사 검토·승인, 방향 승인 | 계속 |
 | **Agent C / Claude** (Opus 5) | Phase 0~5 전체 구현, 곡집 구조, 가사 줄나눔 재정렬, 검토 화면, git 도입, 협업 문서 이식, 예배 순서 탭 재설계 | 2026-08-15 |
-| **Agent J / Claude** (Opus 5) | 예배 순서 2~3차 개선(유형 템플릿·순서 표시·한 열 재설계·항목별 템플릿), 배경 그림·동영상, 예배 전 안내, 글자 리듬·명조, 옛 판 출력 감지, 버그 4건(광고 Enter·추가 바 포커스·공백 무효·템플릿 미적용) | 2026-08-15 |
+| **Agent J / Claude** (Opus 5) | 예배 순서 2~3차 개선(유형 템플릿·순서 표시·한 열 재설계·항목별 템플릿·예배 기본 설정), 배경 그림·동영상, 예배 전 안내, 글자 리듬·명조·글자별 조정, 역본 선택, 찬송가 절 번호, 옛 판 출력 감지, 버그 8건, 운영 문서 3종 | 2026-08-16 |
 
 > 이 프로젝트는 **예배 중 사고가 최악의 결과**이므로, 편의 기능이라도 송출을 막지 않는지
 > 먼저 확인하고 넣습니다.
@@ -195,8 +196,8 @@ lsof -ti:7777 | xargs kill -9    # 내 서버를 띄우기 전에 확인
 | 무엇인가 | OBS Studio **브라우저 소스**로 성경 본문·찬양 가사를 송출하는 로컬 앱 |
 | 기술 | Node.js 26(TypeScript 네이티브 실행, 빌드 없음) · Fastify 5 · `node:sqlite` · React 19 + Vite |
 | 기능 완성도 | **실사용 가능**. 성경 12역본, 찬양 1,202곡, 템플릿 9종, 예배 순서(유형·저장·자동 진행·배경), 줄나눔 검토 |
-| 테스트 | **518개 통과** (단위 + 통합, `npx vitest run` 약 3초) |
-| 문서 | **3종으로 유지**(2026-08-14 결정) — README(사용법·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제). 별도 analysis·handover·setup-guide 는 만들지 않습니다(PLAN 이 그 역할을 겸함) |
+| 테스트 | **556개 통과** (단위 + 통합, `npx vitest run` 약 3초) |
+| 문서 | README(설치·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제) + **운영 3종**(2026-08-16 사용자 요청으로 신설) — [USER-GUIDE](USER-GUIDE.md)(탭별 사용법) · [TROUBLESHOOTING](TROUBLESHOOTING.md)(증상별 해결) · [CHANGELOG](CHANGELOG.md)(변경 이력). analysis·handover·setup-guide 처럼 **겹치는 문서는 여전히 만들지 않습니다** |
 | 저장소 | `github.com/ccumgol/sermon-presentation` (**PRIVATE**) · `main` 직통 |
 | 실행 환경 | **모든 Agent 가 사용자의 같은 맥·같은 `data/` 를 공유** (0.3 참고) |
 | 배포 | 아직 로컬 실행만. **Phase 6(Electron 패키징) 미착수** — 다른 봉사자 PC 배포용 |
