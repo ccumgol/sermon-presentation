@@ -211,3 +211,27 @@ SERMON_DATA_DIR=$SCRATCH SERMON_BIBLE_DB=$PWD/data/bible.sqlite node server/inde
 ```bash
 npx tsc --noEmit && npx vitest run && npx vite build
 ```
+
+
+---
+
+## 태블릿에서 접속이 안 된다 (2026-08-16 이후)
+
+**증상**: 전에는 태블릿으로 컨트롤 패널이 열렸는데 갑자기 연결되지 않는다.
+
+**원인**: 보안 조치로 **기본 접속 범위가 이 PC 안으로** 바뀌었습니다. 이 앱에는 인증이
+없어서, LAN 에 상시 열려 있으면 같은 WiFi 의 누구나 예배 중 화면을 바꾸거나 찬양 가사를
+지울 수 있었습니다([보안 감사](SECURITY-AUDIT.md) H-1·H-2).
+
+**해결**: 태블릿을 쓸 때만 엽니다.
+
+```bash
+npm run start:lan
+```
+
+기동 로그에서 어느 모드인지 항상 확인할 수 있습니다.
+
+```
+접속 범위        : 이 PC 안에서만 (태블릿으로 조작하려면 npm run start:lan)   ← 닫힘
+태블릿 접속      : http://192.168.1.190:7777/                                  ← 열림
+```

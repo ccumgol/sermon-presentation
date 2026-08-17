@@ -12,7 +12,7 @@ import path from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
-import { DEFAULT_PRIMARY_TRANSLATION } from './config.ts';
+import { DEFAULT_PRIMARY_TRANSLATION, IS_LAN_OPEN } from './config.ts';
 import { initAppDb } from './db/app.ts';
 import { initPlanStore, countPlans } from './db/plans.ts';
 import { initSongsDb, countSongs } from './db/songs.ts';
@@ -159,7 +159,10 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
       outputUrl: `http://localhost:${options.getPort()}/output/?layer=main`,
       controlUrl: `http://localhost:${options.getPort()}/`,
       wsUrl: `ws://localhost:${options.getPort()}/ws`,
-      lanAddresses: lanHosts().map((h) => `http://${h}:${options.getPort()}/`),
+      // LAN 에 열려 있을 때만 태블릿 주소를 준다. 닫혀 있는데 주소를 보여 주면
+      // '주소는 있는데 접속이 안 된다' 가 된다.
+      lanAddresses: IS_LAN_OPEN ? lanHosts().map((h) => `http://${h}:${options.getPort()}/`) : [],
+      lanOpen: IS_LAN_OPEN,
       dataDir: paths.dataDir,
       bibleSourceDir: paths.bibleSourceDir,
       bibleReady,

@@ -5,7 +5,7 @@
  */
 
 import { buildApp, lanHosts } from './app.ts';
-import { DEFAULT_PORT, HOST, PORT_SCAN_RANGE } from './config.ts';
+import { DEFAULT_PORT, HOST, IS_LAN_OPEN, PORT_SCAN_RANGE } from './config.ts';
 import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
 import { paths } from './paths.ts';
@@ -61,8 +61,19 @@ hub = createWsHub(app.server, {
 
 app.log.info(`컨트롤 패널      : http://localhost:${actualPort}/`);
 app.log.info(`OBS 브라우저 소스: http://localhost:${actualPort}/output/?layer=main`);
-for (const host of lanHosts()) {
-  app.log.info(`태블릿 접속      : http://${host}:${actualPort}/`);
+
+// 어느 모드로 떠 있는지 반드시 알려 준다.
+//
+// 기본을 localhost 로 바꾸면서, 태블릿을 쓰던 사람에게는 '갑자기 안 되는' 상황이
+// 된다. 원인과 여는 방법을 기동 때 바로 보여 주지 않으면 예배 직전에 헤맨다.
+if (IS_LAN_OPEN) {
+  for (const host of lanHosts()) {
+    app.log.info(`태블릿 접속      : http://${host}:${actualPort}/`);
+  }
+  app.log.warn('LAN 에 열려 있습니다 — 이 앱은 인증이 없어 같은 WiFi 의 누구나 조작할 수 있습니다');
+  app.log.warn('예배가 끝나면 닫으세요 (그냥 npm start 로 실행하면 이 PC 안에서만 열립니다)');
+} else {
+  app.log.info('접속 범위        : 이 PC 안에서만 (태블릿으로 조작하려면 npm run start:lan)');
 }
 if (!bibleReady) {
   app.log.warn(

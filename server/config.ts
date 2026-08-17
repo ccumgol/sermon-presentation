@@ -14,4 +14,20 @@ export const DEFAULT_CANVAS = { width: 1920, height: 1080 } as const;
 /** 기본 주 역본 (계획서 D2) */
 export const DEFAULT_PRIMARY_TRANSLATION = 'nkrv';
 
-export const HOST = '0.0.0.0'; // 태블릿에서 접속 가능하도록 (계획서 D5)
+/**
+ * 바인딩 주소. **기본은 이 PC 안에서만** 열린다.
+ *
+ * 예전 기본값은 `0.0.0.0`(태블릿 접속용, 계획서 D5)이었는데, 이 앱에는 인증이 없어
+ * **같은 WiFi 의 누구나 예배 중 화면을 바꾸거나 찬양 가사를 통째로 지울 수 있었다**
+ * (SECURITY-AUDIT H-1·H-2 — 격리 서버에서 실증됨).
+ *
+ * 태블릿으로 조작하려면 그때만 연다:
+ *
+ *   npm run start:lan          (SERMON_HOST=0.0.0.0 npm start 와 같다)
+ *
+ * 여는 순간 인증 없이 노출되므로, 신뢰할 수 있는 망에서만 쓰고 예배가 끝나면 닫는다.
+ */
+export const HOST = process.env.SERMON_HOST ?? '127.0.0.1';
+
+/** LAN 에 열려 있는가 — 기동 로그와 `/api/info` 가 이 값으로 안내한다 */
+export const IS_LAN_OPEN = HOST !== '127.0.0.1' && HOST !== 'localhost';

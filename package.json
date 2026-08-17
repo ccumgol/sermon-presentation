@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "npm run app:build && node server/index.ts",
+    "start:lan": "SERMON_HOST=0.0.0.0 npm start",
     "serve": "node server/index.ts",
     "dev": "concurrently -n app,srv -c cyan,green \"vite build --watch\" \"node --watch server/index.ts\"",
     "app:build": "vite build",
