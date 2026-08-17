@@ -1634,6 +1634,36 @@ button.link-inline {
 .detail-controls label { font-size: 0.8rem; opacity: 0.7; }
 .detail-text { width: 100%; margin-top: 8px; resize: vertical; }
 
+/* ── 주기도문·사도신경 ─────────────────────────────────────── */
+
+/* 추가 바 안에서는 위 여백이 필요 없다 (입력창 자리를 대신한다) */
+.add-bar .candidates.liturgy-add { margin-top: 0; flex: 1; }
+
+/* 판본 토글 — 두 판본이 **동시에 보여야** 무엇을 고르는지 알 수 있다.
+   select 로 접어 두면 다른 판본이 있다는 것 자체를 모르고 지나친다. */
+.toggle-row { display: inline-flex; gap: 4px; }
+
+.toggle {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+}
+
+.toggle.active {
+  border-color: var(--accent, #4a9eff);
+  background: rgba(74, 158, 255, 0.15);
+}
+
+.detail-block { margin-top: 10px; }
+.detail-block > summary { cursor: pointer; font-size: 0.8rem; opacity: 0.75; }
+.detail-block > summary .tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(74, 158, 255, 0.18);
+  font-size: 0.72rem;
+}
+
 .plan-keys { flex: 0 0 auto; margin: 0; text-align: center; opacity: 0.5; }
 
 @media (max-width: 900px) {

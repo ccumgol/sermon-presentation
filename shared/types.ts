@@ -494,6 +494,30 @@ export type CueItem =
       templateId?: number;
       note?: string;
     }
+  /**
+   * 주기도문·사도신경 — 회중이 함께 읽는 고정 본문.
+   *
+   * **본문을 담지 않고 어느 것인지만 담는다.** 실제 글은 `lib/liturgy-texts.ts` 에서
+   * 온다. 찬양이 가사 대신 `songId` 를 담는 것과 같은 이유로, 판본 바꾸기가 한 글자로
+   * 끝나고 오탈자를 고치면 지난 순서표까지 함께 고쳐진다.
+   */
+  | {
+      id: string;
+      type: 'liturgy';
+      /** `lib/liturgy-texts.ts` 의 LiturgyId */
+      textId: string;
+      /** 'new'(새번역, 기본) | 'traditional'(전통) */
+      version: 'new' | 'traditional';
+      /** 한 장에 몇 줄 — `0` 은 전체를 한 장에. 없으면 기본 4줄 */
+      perSlide?: 0 | 2 | 4 | 6;
+      /**
+       * 직접 고친 본문 — 교회 판본이 내장본과 다를 때만 찬다.
+       * 있으면 **이것이 이긴다.** 찬양의 '승인'과 같은 원칙이다.
+       */
+      overrideLines?: string[];
+      templateId?: number;
+      note?: string;
+    }
   | { id: string; type: 'blank'; note?: string }
   /**
    * 그룹 머리글 — '예배 부름 / 찬양 / 말씀 / 광고' 처럼 순서를 구획한다.
@@ -555,6 +579,14 @@ export interface PlanDefaults {
   };
   bible?: { primary?: string; secondary?: string[]; paging?: string };
   song?: { langs?: LangCode[]; lines?: string };
+  /**
+   * 주기도문·사도신경의 기본 판본. 교회가 쓰는 판본은 좀처럼 바뀌지 않으므로
+   * 넣을 때마다 고르게 하지 않고 예배 기본값으로 둔다.
+   *
+   * 자세한 값은 `lib/liturgy-texts.ts` — 여기서 import 하면 순환이 되므로
+   * 리터럴로 적는다 (lib 가 이 파일을 import 한다).
+   */
+  liturgy?: { version?: 'new' | 'traditional'; perSlide?: 0 | 2 | 4 | 6 };
 }
 
 export interface ServicePlan {

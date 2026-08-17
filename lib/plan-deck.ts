@@ -10,6 +10,7 @@
  * 그래서 이 모듈은 순수하고 테스트로 고정할 수 있다.
  */
 
+import { findLiturgy } from './liturgy-texts.ts';
 import type { CueItem, Deck, DeckGroup, SlidePayload } from '../shared/types.ts';
 
 /** 항목 하나를 푼 결과 */
@@ -37,6 +38,8 @@ export function describeItem(item: CueItem): string {
       return item.songTitle;
     case 'text':
       return item.content.split(/\r?\n/)[0]?.slice(0, 24) ?? '텍스트';
+    case 'liturgy':
+      return findLiturgy(item.textId)?.title ?? '본문';
     case 'divider':
       return item.label;
     case 'blank':
@@ -151,12 +154,12 @@ export function itemsInGroup(items: readonly CueItem[], dividerId: string): CueI
 /**
  * 펼칠 수 있는 항목인가 — **여러 장이 나올 수 있는** 항목이다.
  *
- * 성경·찬양은 장수가 내용에 따라 달라지므로 펼쳐서 골라야 한다.
+ * 성경·찬양·주기도문/사도신경은 장수가 내용에 따라 달라지므로 펼쳐서 골라야 한다.
  * 광고·순서 표시·공백은 언제나 한 장이라, 그 줄이 곧 슬라이드다
  * (그래서 한 번 클릭으로 바로 송출한다).
  */
 export function isExpandable(item: CueItem): boolean {
-  return item.type === 'bible' || item.type === 'song';
+  return item.type === 'bible' || item.type === 'song' || item.type === 'liturgy';
 }
 
 /** 목록의 한 줄 */

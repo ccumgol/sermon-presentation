@@ -27,6 +27,16 @@ import {
 } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { isComposing } from '../ime.ts';
+import {
+  DEFAULT_LITURGY_PER_SLIDE,
+  DEFAULT_LITURGY_VERSION,
+  LITURGY_TEXTS,
+  findLiturgy,
+  liturgyLines,
+  liturgySlides,
+  type LiturgyPerSlide,
+  type LiturgyVersion,
+} from '../../../lib/liturgy-texts.ts';
 import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
 import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
@@ -46,11 +56,12 @@ interface Props {
 const MAX_SECONDARY = 2;
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
-type AddKind = 'bible' | 'song' | 'order' | 'notice' | 'quote' | 'blank' | 'divider';
+type AddKind = 'bible' | 'song' | 'liturgy' | 'order' | 'notice' | 'quote' | 'blank' | 'divider';
 
 const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hint: string }> = [
   { kind: 'bible', icon: '📖', label: '성경', hint: '요 3:16 · 시 23 · 롬 8:28-30' },
   { kind: 'song', icon: '🎵', label: '찬양', hint: '새 305 · 나 같은 죄인 · 은혜' },
+  { kind: 'liturgy', icon: '🙏', label: '주기도문·사도신경', hint: '본문 전체 · 새번역 / 전통 선택' },
   { kind: 'order', icon: '📋', label: '순서 표시', hint: '대표기도 · 설교 제목(둘째 줄에 설교자)' },
   { kind: 'notice', icon: '📝', label: '광고', hint: '여러 줄로 쓰면 그대로 나갑니다' },
   { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 잠깐 띄울 내용' },
@@ -63,12 +74,13 @@ const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hin
  *
  * 예배 순서 이름은 교회마다 다르므로 **고정 목록이 아니라 시작점**이다.
  * 여기 없는 순서는 입력창에 직접 쓴다.
+ *
+ * 주기도문·사도신경은 여기 없다 — 제목만 띄우는 것이 아니라 **본문 전체**를 띄우므로
+ * 별도 항목(🙏)이다. 제목만 띄우고 싶다면 입력창에 직접 쓰면 된다.
  */
 const ORDER_PRESETS = [
   '예배 부름',
   '대표기도',
-  '주기도문',
-  '사도신경',
   '성경 봉독',
   '봉헌',
   '성찬',
@@ -81,6 +93,7 @@ const ITEM_ICONS: Record<CueItem['type'], string> = {
   bible: '📖',
   song: '🎵',
   text: '📝',
+  liturgy: '🙏',
   blank: '⬛',
   divider: '▾',
 };
@@ -210,6 +223,16 @@ export function PlanPanel({
   const [liveItemId, setLiveItemId] = useState<string | null>(null);
 
   // 추가 바
+  /**
+   * 전례문 본문을 고치는 동안의 **날것 그대로의 입력**.
+   *
+   * 항목에는 빈 줄을 걸러낸 결과만 담긴다. 그 값을 그대로 textarea 에 되돌리면
+   * Enter 를 눌러도 빈 줄이 즉시 지워져 줄을 늘릴 수 없다. 그래서 고치는 동안은
+   * 입력한 글자를 그대로 보여 주고, 항목에는 걸러낸 결과를 함께 반영한다
+   * (미리보기는 타이핑하는 대로 따라온다).
+   */
+  const [liturgyDraft, setLiturgyDraft] = useState<{ id: string; text: string } | null>(null);
+
   const [addKind, setAddKind] = useState<AddKind>('bible');
   const [addInput, setAddInput] = useState('');
   const [songHits, setSongHits] = useState<Array<{ id: number; title: string; label?: string }>>([]);
@@ -410,6 +433,17 @@ export function PlanPanel({
         return { slides: [{ kind: 'text', lines }], labels: [textVariantLabel(item.variant)] };
       }
 
+      if (item.type === 'liturgy') {
+        const lines = liturgyLines(item.textId, item.version, item.overrideLines);
+        if (!lines) return { slides: [], labels: [], error: '본문을 찾지 못했습니다' };
+
+        const pages = liturgySlides(lines, item.perSlide ?? DEFAULT_LITURGY_PER_SLIDE);
+        return {
+          slides: pages.map((page) => ({ kind: 'text' as const, lines: [...page] })),
+          labels: pages.map((_, index) => `${index + 1}`),
+        };
+      }
+
       if (item.type === 'blank') return { slides: [{ kind: 'blank' }], labels: ['공백'] };
 
       // 구분은 슬라이드가 없다 (buildPlanDeck 도 건너뛴다)
@@ -420,6 +454,14 @@ export function PlanPanel({
 
   // 펼친 항목을 풀어 슬라이드 줄로 보여 준다. **송출하지 않는다.**
   const expandedItem = items.find((item) => item.id === expandedId);
+  /**
+   * 항목 **내용**이 바뀌어도 다시 풀어야 한다.
+   *
+   * 전에는 `id` 만 봤다. 그래서 판본이나 화면 넘김을 바꿔도 미리보기가 그대로라
+   * 방금 만진 설정이 먹히지 않은 것처럼 보였다. 항목 하나를 직렬화하는 비용은
+   * 무시할 만하고, 이 값이 같으면 결과도 같다.
+   */
+  const expandedSignature = expandedItem ? JSON.stringify(expandedItem) : null;
   useEffect(() => {
     if (!expandedItem) {
       setPreview(null);
@@ -445,7 +487,7 @@ export function PlanPanel({
     return () => {
       cancelled = true;
     };
-  }, [expandedItem?.id, resolveItem]);
+  }, [expandedSignature, resolveItem]);
 
   // 템플릿 목록 — 항목마다 지정할 수 있게 이름을 보여 준다
   useEffect(() => {
@@ -751,6 +793,22 @@ export function PlanPanel({
       type: 'text',
       content,
       ...(kind === 'notice' ? {} : { variant: kind }),
+    });
+  }
+
+  /**
+   * 주기도문·사도신경 추가. 판본은 기본(새번역)으로 넣고 오른쪽에서 토글로 바꾼다 —
+   * 넣을 때마다 판본을 묻게 하면 매주 같은 답을 하게 된다.
+   */
+  function addLiturgy(textId: string): void {
+    insertItem({
+      id: newItemId(),
+      type: 'liturgy',
+      textId,
+      version: plan?.defaults?.liturgy?.version ?? DEFAULT_LITURGY_VERSION,
+      ...(plan?.defaults?.liturgy?.perSlide !== undefined
+        ? { perSlide: plan.defaults.liturgy.perSlide }
+        : {}),
     });
   }
 
@@ -1368,6 +1426,14 @@ export function PlanPanel({
 
               {addKind === 'blank' ? (
                 <button type="button" className="grow" onClick={() => addFromInput()}>공백 추가</button>
+              ) : addKind === 'liturgy' ? (
+                <div className="candidates liturgy-add">
+                  {LITURGY_TEXTS.map((text) => (
+                    <button key={text.id} type="button" onClick={() => addLiturgy(text.id)}>
+                      {text.title}
+                    </button>
+                  ))}
+                </div>
               ) : isMultiline ? (
                 <textarea
                   ref={addRef}
@@ -1641,6 +1707,104 @@ export function PlanPanel({
               </span>
             </div>
           )}
+
+          {current.type === 'liturgy' &&
+            (() => {
+              const liturgy = current;
+              const builtin = findLiturgy(liturgy.textId)?.versions[liturgy.version]?.lines ?? [];
+              const edited = (liturgy.overrideLines?.length ?? 0) > 0;
+              const shown = liturgyLines(liturgy.textId, liturgy.version, liturgy.overrideLines) ?? [];
+
+              function patchLiturgy(patch: Partial<Extract<CueItem, { type: 'liturgy' }>>): void {
+                // type 까지 좁혀야 유니온 전체로 퍼지지 않는다
+                patchItems(
+                  items.map((i) =>
+                    i.id === liturgy.id && i.type === 'liturgy' ? { ...i, ...patch } : i,
+                  ),
+                );
+              }
+
+              /**
+               * 고친 본문을 담는다. 내장 본문과 똑같아지면 **지운다** —
+               * 같은 글을 굳이 항목에 박아 두면, 나중에 내장 본문의 오탈자를
+               * 고쳐도 이 항목만 옛 글자로 남는다.
+               */
+              function editLines(raw: string): void {
+                setLiturgyDraft({ id: liturgy.id, text: raw });
+                const lines = raw
+                  .split(/\r?\n/)
+                  .map((line) => line.trim())
+                  .filter((line) => line.length > 0);
+                const same =
+                  lines.length === builtin.length && lines.every((line, i) => line === builtin[i]);
+                patchLiturgy({ overrideLines: same || lines.length === 0 ? undefined : lines });
+              }
+
+              return (
+                <>
+                  <div className="row detail-controls">
+                    <label>판본</label>
+                    <div className="toggle-row">
+                      {(Object.entries(findLiturgy(liturgy.textId)?.versions ?? {}) as Array<
+                        [LiturgyVersion, { label: string }]
+                      >).map(([key, version]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`toggle${liturgy.version === key ? ' active' : ''}`}
+                          onClick={() => patchLiturgy({ version: key })}
+                        >
+                          {version.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <label>화면 넘김</label>
+                    <select
+                      value={String(liturgy.perSlide ?? DEFAULT_LITURGY_PER_SLIDE)}
+                      onChange={(e) =>
+                        patchLiturgy({ perSlide: Number(e.target.value) as LiturgyPerSlide })
+                      }
+                    >
+                      <option value="2">2줄씩</option>
+                      <option value="4">4줄씩</option>
+                      <option value="6">6줄씩</option>
+                      <option value="0">전체 한 장</option>
+                    </select>
+                  </div>
+
+                  {/* 교회마다 '나라이/나라가' 처럼 갈리는 자리가 있어 직접 고칠 길을 둔다 */}
+                  <details className="detail-block">
+                    <summary>
+                      본문 고치기{edited && <span className="tag"> 직접 고침</span>}
+                    </summary>
+                    <textarea
+                      className="detail-text"
+                      rows={Math.min(shown.length + 1, 12)}
+                      value={liturgyDraft?.id === liturgy.id ? liturgyDraft.text : shown.join('\n')}
+                      onChange={(e) => editLines(e.target.value)}
+                      // 손을 떼면 정리된 본문으로 맞춘다 — 무엇이 저장됐는지 눈으로 확인된다
+                      onBlur={() => setLiturgyDraft(null)}
+                      spellCheck={false}
+                    />
+                    <p className="hintline muted">
+                      한 줄이 화면의 한 줄입니다. 고치면 이 항목에만 적용됩니다.
+                    </p>
+                    {edited && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLiturgyDraft(null);
+                          patchLiturgy({ overrideLines: undefined });
+                        }}
+                      >
+                        내장 본문으로 되돌리기
+                      </button>
+                    )}
+                  </details>
+                </>
+              );
+            })()}
 
           {current.type === 'bible' && (
             <div className="row detail-controls">

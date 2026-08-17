@@ -8,6 +8,12 @@
 import type { FastifyInstance } from 'fastify';
 
 import {
+  DEFAULT_LITURGY_VERSION,
+  isLiturgyId,
+  isLiturgyPerSlide,
+  isLiturgyVersion,
+} from '../../lib/liturgy-texts.ts';
+import {
   normalizeCharStyles, normalizePresenterScale, normalizeStroke,
 } from '../../lib/order-rhythm.ts';
 
@@ -146,6 +152,37 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         break;
       }
 
+      case 'liturgy': {
+        const liturgy = item as Extract<CueItem, { type: 'liturgy' }>;
+        if (!isLiturgyId(liturgy.textId)) {
+          rejected.push(`${index + 1}번째 항목: 모르는 본문 '${String(liturgy.textId)}'`);
+          continue;
+        }
+        // 판본·장수는 모르는 값이면 기본으로 떨어뜨린다. 항목을 버릴 일은 아니다 —
+        // 무엇을 띄울지(textId)만 맞으면 예배는 진행된다.
+        const version = isLiturgyVersion(liturgy.version) ? liturgy.version : DEFAULT_LITURGY_VERSION;
+        const perSlide = isLiturgyPerSlide(fields.perSlide) ? fields.perSlide : undefined;
+        // 빈 배열은 '고치지 않음'으로 본다 — 실수로 다 지웠을 때 빈 화면이 나가면 안 된다
+        const overrideLines = Array.isArray(fields.overrideLines)
+          ? fields.overrideLines
+              .filter((line): line is string => typeof line === 'string')
+              .map((line) => line.trim())
+              .filter((line) => line.length > 0)
+          : [];
+
+        items.push({
+          id,
+          type: 'liturgy',
+          textId: liturgy.textId,
+          version,
+          ...(perSlide !== undefined ? { perSlide } : {}),
+          ...(overrideLines.length > 0 ? { overrideLines } : {}),
+          ...(templateId !== undefined ? { templateId } : {}),
+          ...(note ? { note } : {}),
+        });
+        break;
+      }
+
       case 'blank':
         items.push({ id, type: 'blank', ...(note ? { note } : {}) });
         break;
@@ -210,6 +247,14 @@ function readDefaults(raw: unknown): PlanDefaults | undefined {
     }
     if (typeof song.lines === 'string') picked.lines = song.lines;
     if (Object.keys(picked).length > 0) out.song = picked;
+  }
+
+  const liturgy = value.liturgy as Record<string, unknown> | undefined;
+  if (liturgy && typeof liturgy === 'object') {
+    const picked: NonNullable<PlanDefaults['liturgy']> = {};
+    if (isLiturgyVersion(liturgy.version)) picked.version = liturgy.version;
+    if (isLiturgyPerSlide(liturgy.perSlide)) picked.perSlide = liturgy.perSlide;
+    if (Object.keys(picked).length > 0) out.liturgy = picked;
   }
 
   return Object.keys(out).length > 0 ? out : undefined;

@@ -124,7 +124,7 @@ function distribute<T>(items: T[], pages: number): T[][] {
  *  2. 그래도 마지막 장이 한 줄뿐이면 장수를 하나 줄인다
  *     (한 장에 `size + 1` 줄까지만 허용 — 넘치면 출력 페이지가 배율로 줄인다)
  */
-function chunk<T>(items: T[], size: number): T[][] {
+export function chunkWithoutOrphans<T>(items: T[], size: number): T[][] {
   if (!Number.isFinite(size) || size <= 0) return items.length > 0 ? [items] : [];
   if (items.length === 0) return [];
 
@@ -172,7 +172,7 @@ export function buildSectionSlides(
   const groups = fitLinesToWidth(paired, options.maxCharsPerLine ?? DEFAULT_MAX_CHARS_PER_LINE);
 
   const perSlide = options.linesPerSlide ?? 2;
-  const pages = perSlide === 'section' ? [groups] : chunk(groups, perSlide);
+  const pages = perSlide === 'section' ? [groups] : chunkWithoutOrphans(groups, perSlide);
   const credit = options.includeCredit ? creditOf(song) : undefined;
 
   return pages.map((lines, index) => ({
