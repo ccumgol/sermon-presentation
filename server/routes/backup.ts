@@ -17,6 +17,7 @@ import type { FastifyInstance } from 'fastify';
 
 import type { ApiResponse, Song, Template } from '../../shared/types.ts';
 import { getConnection } from '../db/app.ts';
+import { snapshotDatabases } from '../db/snapshot.ts';
 import * as plans from '../db/plans.ts';
 import * as songs from '../db/songs.ts';
 import * as templates from '../db/templates.ts';
@@ -106,6 +107,8 @@ export interface ImportResult {
   templates: number;
   plans: number;
   settings: number;
+  /** replace 로 지우기 전에 뜬 백업 파일 (merge 면 없다) */
+  backupFiles?: string[];
   fonts: number;
   /** 건너뛴 항목 — 조용히 넘기지 않고 알린다 */
   skipped: string[];
@@ -133,6 +136,21 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
   const result: ImportResult = { songs: 0, templates: 0, plans: 0, settings: 0, fonts: 0, skipped: [] };
 
   if (mode === 'replace') {
+    // 지우기 **전에** 스냅샷을 남긴다.
+    //
+    // 가사는 git 에 없어 되돌릴 방법이 백업뿐이다. 백업을 못 뜨면 **가져오기를
+    // 중단한다** — 보호 없이 지우는 것이 이 조치가 막으려는 위험 자체다.
+    // (SECURITY-AUDIT H-2: 무인증으로 순서표 4개가 0개가 된 것이 실증됐다)
+    try {
+      const snapshot = snapshotDatabases('before-import');
+      result.backupFiles = snapshot.files;
+    } catch (err) {
+      throw new Error(
+        '가져오기 전 백업에 실패해 중단했습니다. 기존 데이터는 그대로입니다. ' +
+          `(${err instanceof Error ? err.message : '알 수 없는 오류'})`,
+      );
+    }
+
     // 사용자 데이터만 지운다. 성경 DB 와 내장 프리셋은 건드리지 않는다.
     for (const song of songs.listSongs(100000)) songs.deleteSong(song.id);
     for (const template of templates.listTemplates().filter((t) => !t.isBuiltin)) {
