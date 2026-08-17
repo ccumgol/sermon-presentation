@@ -9,9 +9,11 @@
  *  - 잘못된 메시지 하나가 연결을 끊지 않는다. 무시하고 오류만 되돌려준다.
  */
 
-import type { Server } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
 
 import { WebSocket, WebSocketServer } from 'ws';
+
+import { isAllowedOrigin, parseAllowedOrigins } from '../lib/origin-check.ts';
 
 import { templateToCssVars } from '../lib/template-css.ts';
 import type { ClientMsg, ClientRole, Deck, LiveState, ServerMsg, Template } from '../shared/types.ts';
@@ -36,7 +38,25 @@ export interface WsHub {
 type Logger = { info: (msg: string) => void; warn: (msg: string) => void };
 
 export function createWsHub(server: Server, log: Logger): WsHub {
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const allowedOrigins = parseAllowedOrigins(process.env.SERMON_ALLOWED_ORIGINS);
+
+  /**
+   * 외부 웹페이지가 붙어 송출 화면을 바꾸는 것을 막는다 (SECURITY-AUDIT H-3).
+   *
+   * 브라우저의 CORS 는 WebSocket 에 적용되지 않으므로, 오퍼레이터가 예배 중 아무
+   * 사이트나 열어도 그 페이지가 여기에 접속할 수 있었다. 판단 규칙은
+   * `lib/origin-check.ts` 참고 — Origin 이 없으면 허용(OBS·도구)이고,
+   * 있으면 우리 서버가 내보낸 페이지여야 한다.
+   */
+  const wss = new WebSocketServer({
+    server,
+    path: '/ws',
+    verifyClient: ({ origin, req }: { origin?: string; req: IncomingMessage }) => {
+      if (isAllowedOrigin(origin, req.headers.host, allowedOrigins)) return true;
+      log.warn(`WS 접속 거부 — 허용되지 않은 Origin: ${origin}`);
+      return false;
+    },
+  });
   const clients = new Map<WebSocket, Client>();
 
   function send(socket: WebSocket, msg: ServerMsg): void {

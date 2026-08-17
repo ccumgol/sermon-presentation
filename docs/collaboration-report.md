@@ -276,6 +276,20 @@ npm start               # http://localhost:7777
 - **프리셋만 고쳐서는 부족했음** — 저장된 사본은 JSON 으로 굳어 있어, 초기화 때
   **옛 문자열과 정확히 같을 때만** 새 체인으로 올리는 마이그레이션을 넣음.
 
+### 3.15 H-3 WebSocket Origin 검사 (2026-08-16, Agent C)
+
+브라우저의 CORS 는 WebSocket 에 적용되지 않는다. 오퍼레이터가 예배 중 아무 사이트나
+열어도 그 페이지가 `ws://localhost:7777/ws` 로 붙어 송출 화면을 바꿀 수 있었다.
+
+- `verifyClient` + `lib/origin-check.ts`(순수 함수). Origin 없으면 허용(OBS·도구),
+  있으면 Host 와 같아야 한다. `SERMON_ALLOWED_ORIGINS` 로 예외를 연다
+- Origin 없는 접속을 허용하는 것은 약점이 아니다 — 비브라우저는 Origin 을 마음대로
+  정하므로 막아도 얻는 것이 없고, OBS·테스트만 끊긴다
+
+**검증**: 격리 서버에서 감사의 공격 재현 — 외부 Origin 401 거부, `show` 를 보낼 수 없어
+슬라이드가 `null` 그대로. **실제 브라우저에서도 확인**(끊기면 예배 중 화면이 멈추므로 필수)
+— 컨트롤 패널 연결·출력 페이지·WS 송출 모두 정상. 단위 테스트 14개. 579 passed.
+
 ### 3.14 H-2 replace 가져오기 직전 자동 백업 (2026-08-16, Agent C)
 
 `replace` 는 사용자 가사·순서표를 통째로 지운다. 가사는 git 에 없어 되돌릴 방법이 백업뿐이다.
@@ -534,7 +548,7 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 |---|---|---|---|---|
 | 1 | **H-1** | 기본 바인딩을 `127.0.0.1` 로, 태블릿은 환경변수로 열기 | 🟢 완료 | Agent C (2026-08-16) |
 | 2 | **H-2** | `replace` 가져오기 직전 서버가 자동 백업 | 🟢 완료 | Agent C (2026-08-16) |
-| 3 | **H-3** | WebSocket Origin 검사 (Origin 이 있을 때만) | 🟡 진행중 | Agent C (2026-08-16) |
+| 3 | **H-3** | WebSocket Origin 검사 (Origin 이 있을 때만) | 🟢 완료 | Agent C (2026-08-16) |
 | 4 | **S-1** | 배경 삭제 API + 총량 상한 (Agent C 가 감사 이후 발견) | 🔴 미착수 | — |
 | 5 | M-2·L-2 | 요청 수 제한 | 🔴 미착수 | — |
 
@@ -659,7 +673,10 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
-- [시작 2026-08-16 / Agent C] H-3 WebSocket Origin 검사
+(진행 중 작업 없음 — 감사 높음 3건 모두 완료. 다음은 S-1 배경 삭제·총량 상한)
+
+--- 끝난 기록 ---
+- [완료 2026-08-16 / Agent C] H-3 WebSocket Origin 검사
   계획: lib/origin-check.ts 에 순수 함수 → server/ws.ts 의 verifyClient 에 연결.
         규칙: Origin 이 없으면 허용(비브라우저·OBS 스크립트), 있으면 Host 와 같아야 함.
         SERMON_ALLOWED_ORIGINS 로 예외를 열 수 있게.
