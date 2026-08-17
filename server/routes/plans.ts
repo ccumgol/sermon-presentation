@@ -184,6 +184,27 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         break;
       }
 
+      case 'reading': {
+        const reading = item as Extract<CueItem, { type: 'reading' }>;
+        if (!Number.isInteger(reading.readingNumber) || reading.readingNumber <= 0) {
+          rejected.push(`${index + 1}번째 항목: 교독문 번호가 올바르지 않습니다`);
+          continue;
+        }
+        items.push({
+          id,
+          type: 'reading',
+          readingNumber: reading.readingNumber,
+          // 제목은 표시용이다. DB 에 없어도 순서표에 무엇이었는지 남는다 —
+          // 가져오기를 안 한 PC 로 순서표를 옮겼을 때 번호만 남으면 알 수 없다.
+          ...(typeof reading.readingTitle === 'string' && reading.readingTitle.trim().length > 0
+            ? { readingTitle: reading.readingTitle.trim() }
+            : {}),
+          ...(templateId !== undefined ? { templateId } : {}),
+          ...(note ? { note } : {}),
+        });
+        break;
+      }
+
       case 'media': {
         const media = item as Extract<CueItem, { type: 'media' }>;
         // 배경과 같은 폴더를 쓰므로 이름 검증도 같은 함수를 쓴다 —

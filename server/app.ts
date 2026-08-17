@@ -15,6 +15,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import { DEFAULT_PRIMARY_TRANSLATION, IS_LAN_OPEN } from './config.ts';
 import { initAppDb } from './db/app.ts';
 import { initPlanStore, countPlans } from './db/plans.ts';
+import { initReadingStore } from './db/readings.ts';
 import { initSongsDb, countSongs } from './db/songs.ts';
 import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
@@ -23,6 +24,7 @@ import { registerBibleRoutes } from './routes/bible.ts';
 import { registerBackgroundRoutes } from './routes/backgrounds.ts';
 import { registerBackupRoutes } from './routes/backup.ts';
 import { registerPlanRoutes } from './routes/plans.ts';
+import { registerReadingRoutes } from './routes/readings.ts';
 import { registerSongbookRoutes } from './routes/songbooks.ts';
 import { registerSongRoutes } from './routes/songs.ts';
 import { registerTemplateRoutes } from './routes/templates.ts';
@@ -71,6 +73,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   initAppDb();
   initTemplateStore();
   initPlanStore();
+  initReadingStore();
   initSongsDb();
 
   let bibleReady = false;
@@ -178,6 +181,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   await registerSongRoutes(app);
   await registerSongbookRoutes(app);
   await registerPlanRoutes(app);
+  await registerReadingRoutes(app);
   await registerBackupRoutes(app);
   await registerBackgroundRoutes(app);
 

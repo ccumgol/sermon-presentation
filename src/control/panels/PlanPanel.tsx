@@ -27,7 +27,7 @@ import {
   type ClientMsg, type CueItem, type Deck, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
-import { api, ApiError, type BackgroundFile } from '../api.ts';
+import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE,
@@ -58,12 +58,14 @@ interface Props {
 const MAX_SECONDARY = 2;
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
-type AddKind = 'bible' | 'song' | 'liturgy' | 'order' | 'notice' | 'quote' | 'media' | 'blank' | 'divider';
+type AddKind =
+  | 'bible' | 'song' | 'liturgy' | 'reading' | 'order' | 'notice' | 'quote' | 'media' | 'blank' | 'divider';
 
 const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hint: string }> = [
   { kind: 'bible', icon: '📖', label: '성경', hint: '요 3:16 · 시 23 · 롬 8:28-30' },
   { kind: 'song', icon: '🎵', label: '찬양', hint: '새 305 · 나 같은 죄인 · 은혜' },
-  { kind: 'liturgy', icon: '🙏', label: '주기도문·사도신경', hint: '본문 전체 · 새번역 / 전통 선택' },
+  { kind: 'liturgy', icon: '🙏', label: '주기도문·사도신경', hint: '본문 전체 · 개역개정 / 개역한글' },
+  { kind: 'reading', icon: '🔁', label: '교독문', hint: '번호나 제목 · 인도자와 회중이 한 화면에' },
   { kind: 'order', icon: '📋', label: '순서 표시', hint: '대표기도 · 설교 제목(둘째 줄에 설교자)' },
   { kind: 'notice', icon: '📝', label: '광고', hint: '여러 줄로 쓰면 그대로 나갑니다' },
   { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 잠깐 띄울 내용' },
@@ -97,6 +99,7 @@ const ITEM_ICONS: Record<CueItem['type'], string> = {
   song: '🎵',
   text: '📝',
   liturgy: '🙏',
+  reading: '🔁',
   media: '🖼',
   blank: '⬛',
   divider: '▾',
@@ -136,6 +139,9 @@ function slideSummary(slide: SlidePayload, previous?: SlidePayload): string {
       return slide.presenter ? `${slide.title} — ${slide.presenter}` : slide.title;
     case 'media':
       return `${slide.mediaKind === 'video' ? '동영상' : '그림'} · ${slide.src}`;
+    case 'reading':
+      // 인도자 / 회중 두 줄이 한 화면이므로 목록에서도 함께 보여 준다
+      return slide.people ? `${slide.leader} / ${slide.people}` : slide.leader;
     case 'bible':
       return slide.blocks
         .flatMap((block) => block.verses.map((verse) => verse.text))
@@ -241,6 +247,10 @@ export function PlanPanel({
    * (미리보기는 타이핑하는 대로 따라온다).
    */
   const [liturgyDraft, setLiturgyDraft] = useState<{ id: string; text: string } | null>(null);
+
+  /** 교독문 검색 결과 — 입력에 따라 좁혀진다 */
+  const [readingHits, setReadingHits] = useState<ReadingSummary[]>([]);
+  const [readingTotal, setReadingTotal] = useState<number | null>(null);
 
   /** `data/backgrounds/` 파일 목록 — 그림·동영상 항목이 여기서 고른다 */
   const [bgFiles, setBgFiles] = useState<BackgroundFile[]>([]);
@@ -541,6 +551,31 @@ export function PlanPanel({
         };
       }
 
+      if (item.type === 'reading') {
+        try {
+          const reading = await api.reading(item.readingNumber);
+          if (reading.slides.length === 0) {
+            return { slides: [], labels: [], error: '본문이 비어 있습니다' };
+          }
+          return {
+            slides: reading.slides.map((slide) => ({
+              kind: 'reading' as const,
+              leader: slide.leader,
+              ...(slide.people !== undefined ? { people: slide.people } : {}),
+              reference: reading.title,
+            })),
+            labels: reading.slides.map((_, index) => `${index + 1}`),
+          };
+        } catch (err) {
+          // 가져오기를 안 한 PC 면 여기로 온다 — 조용히 빈 화면을 내보내지 않는다
+          return {
+            slides: [],
+            labels: [],
+            error: err instanceof ApiError ? err.message : '교독문을 불러오지 못했습니다',
+          };
+        }
+      }
+
       if (item.type === 'media') {
         if (item.src.length === 0) return { slides: [], labels: [], error: '파일을 고르지 않았습니다' };
         return {
@@ -757,6 +792,32 @@ export function PlanPanel({
   }, [auto, connected, currentIndex, slideCount, hold, send]);
 
   /**
+   * 교독문 검색. 번호('23')와 제목('시편 98')과 본문 낱말 모두로 찾는다.
+   *
+   * 가져오기를 안 했으면 `total` 이 0 이다 — 그때는 '무엇을 해야 하는지' 를
+   * 알려야 한다(빈 목록만 보여 주면 고장으로 보인다).
+   */
+  useEffect(() => {
+    if (addKind !== 'reading') return;
+    let cancelled = false;
+    void api
+      .readings(addInput.trim() || undefined)
+      .then((result) => {
+        if (cancelled) return;
+        setReadingHits(result.items.slice(0, 40));
+        setReadingTotal(result.total);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setReadingHits([]);
+        setReadingTotal(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [addKind, addInput]);
+
+  /**
    * 배경 폴더 파일 목록. 템플릿 탭에서 올린 것을 여기서도 골라야 하므로
    * 그림·동영상 칸을 열 때마다 다시 읽는다.
    */
@@ -950,6 +1011,17 @@ export function PlanPanel({
         ? { perSlide: plan.defaults.liturgy.perSlide }
         : {}),
     });
+  }
+
+  /** 교독문 추가 — 제목을 함께 담는다 (다른 PC 에서도 무엇이었는지 남는다) */
+  function addReading(hit: ReadingSummary): void {
+    insertItem({
+      id: newItemId(),
+      type: 'reading',
+      readingNumber: hit.number,
+      readingTitle: hit.title,
+    });
+    setAddInput('');
   }
 
   /** 그림·동영상 한 장 추가 (예배 전 안내) */
@@ -1743,6 +1815,37 @@ export function PlanPanel({
                     </button>
                   ))}
                 </div>
+              )}
+
+              {addKind === 'reading' && (
+                <>
+                  {readingTotal === 0 && (
+                    <p className="hintline error">
+                      교독문이 없습니다. 터미널에서{' '}
+                      <code>node scripts/import-responsive.ts --apply</code> 를 실행해
+                      <code>~/Desktop/Data/교독문_개역개정.txt</code> 를 가져오세요.
+                    </p>
+                  )}
+                  {readingHits.length > 0 && (
+                    <div className="candidates">
+                      {readingHits.map((hit) => (
+                        <button
+                          key={hit.number}
+                          type="button"
+                          onClick={() => addReading(hit)}
+                          title={`줄 ${hit.lineCount}개 · 화면 ${hit.slideCount}장`}
+                        >
+                          {hit.number}. {hit.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {readingTotal !== null && readingTotal > 0 && readingHits.length === 0 && (
+                    <p className="hintline muted">
+                      찾는 교독문이 없습니다 (전체 {readingTotal}편). 번호나 제목으로 찾아 보세요.
+                    </p>
+                  )}
+                </>
               )}
 
               {addKind === 'song' && songHits.length > 0 && (

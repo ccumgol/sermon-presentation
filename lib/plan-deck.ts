@@ -42,6 +42,10 @@ export function describeItem(item: CueItem): string {
       return findLiturgy(item.textId)?.title ?? '본문';
     case 'media':
       return item.src;
+    case 'reading':
+      return item.readingTitle
+        ? `교독문 ${item.readingNumber}. ${item.readingTitle}`
+        : `교독문 ${item.readingNumber}번`;
     case 'divider':
       return item.label;
     case 'blank':
@@ -161,7 +165,9 @@ export function itemsInGroup(items: readonly CueItem[], dividerId: string): CueI
  * (그래서 한 번 클릭으로 바로 송출한다).
  */
 export function isExpandable(item: CueItem): boolean {
-  return item.type === 'bible' || item.type === 'song' || item.type === 'liturgy';
+  return (
+    item.type === 'bible' || item.type === 'song' || item.type === 'liturgy' || item.type === 'reading'
+  );
 }
 
 /** 목록의 한 줄 */

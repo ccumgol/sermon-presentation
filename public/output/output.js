@@ -478,6 +478,36 @@
   }
 
   /**
+   * 교독문 한 화면 — 인도자 줄과 회중 줄을 **함께** 그린다.
+   *
+   * 회중은 자기 차례 줄이 화면에 있어야 읽을 수 있다. 한 줄씩 넘기면 인도자가
+   * 읽는 동안 회중 줄이 안 보인다.
+   *
+   * 누가 읽을 차례인지 보이도록 템플릿의 **주 / 보조 텍스트 역할**로 나눈다
+   * (성경 다역본과 같은 장치라 어느 템플릿에서도 이미 스타일이 잡혀 있다).
+   * 마지막 '다같이' 줄은 짝이 없으므로 주 역할 한 줄만 그린다.
+   */
+  function renderReading(payload) {
+    clearChildren(el.blocks);
+
+    var leader = document.createElement('div');
+    leader.className = 'line-primary reading-leader';
+    leader.textContent = payload.leader;
+    el.blocks.appendChild(leader);
+
+    if (payload.people) {
+      var people = document.createElement('div');
+      people.className = 'line-secondary reading-people';
+      people.textContent = payload.people;
+      el.blocks.appendChild(people);
+    }
+
+    setOptional(el.heading, null);
+    setOptional(el.reference, payload.reference || null);
+    setOptional(el.credit, null);
+  }
+
+  /**
    * 그림·동영상 한 장 (예배 전 안내).
    *
    * 배경 장치(`applyBackdrop`)를 그대로 쓴다 — 파일을 못 읽어도 화면을 비우지 않고,
@@ -495,7 +525,8 @@
   }
 
   var RENDERERS = {
-    bible: renderBible, song: renderSong, text: renderText, order: renderOrder, media: renderMedia,
+    bible: renderBible, song: renderSong, text: renderText, order: renderOrder,
+    reading: renderReading, media: renderMedia,
   };
 
   /**

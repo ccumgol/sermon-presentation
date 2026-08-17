@@ -21,6 +21,14 @@ export interface ServerInfo {
   connections: { control: number; output: number };
 }
 
+/** 교독문 목록의 한 줄 — 본문 줄은 담지 않는다 (고르는 데 필요 없다) */
+export interface ReadingSummary {
+  number: number;
+  title: string;
+  lineCount: number;
+  slideCount: number;
+}
+
 /** `data/backgrounds/` 안의 배경 파일 하나 */
 export interface BackgroundFile {
   name: string;
@@ -170,6 +178,15 @@ export const api = {
   importBundle: (bundle: unknown, mode: 'merge' | 'replace') =>
     send<{ songs: number; templates: number; plans: number; settings: number; fonts: number; skipped: string[] }>(
       'POST', '/api/backup/import', { bundle, mode },
+    ),
+
+  readings: (q?: string) =>
+    get<{ total: number; items: ReadingSummary[] }>(
+      '/api/readings' + (q ? `?q=${encodeURIComponent(q)}` : ''),
+    ),
+  reading: (number: number) =>
+    get<{ number: number; title: string; lines: string[]; slides: Array<{ leader: string; people?: string }> }>(
+      `/api/readings/${number}`,
     ),
 
   backgrounds: () =>

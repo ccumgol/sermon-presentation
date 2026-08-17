@@ -545,6 +545,23 @@ export type CueItem =
       templateId?: number;
       note?: string;
     }
+  /**
+   * 교독문 — 인도자와 회중이 번갈아 읽는다.
+   *
+   * **본문을 담지 않고 번호만 담는다.** 글은 `responsive_readings` 테이블에서 온다
+   * (찬양이 `songId` 를 담는 것과 같다). 제목은 표시용으로만 함께 둔다 —
+   * 가져오기를 안 한 PC 에서도 순서표에 무엇이었는지 남는다.
+   */
+  | {
+      id: string;
+      type: 'reading';
+      /** 교독문 번호 (1~76) */
+      readingNumber: number;
+      /** 표시용 — DB 에 없어도 순서표에 무엇이었는지 남는다 */
+      readingTitle?: string;
+      templateId?: number;
+      note?: string;
+    }
   | { id: string; type: 'blank'; note?: string }
   /**
    * 그룹 머리글 — '예배 부름 / 찬양 / 말씀 / 광고' 처럼 순서를 구획한다.
@@ -684,6 +701,20 @@ export type SlidePayload =
       /** 외곽선 두께(px). 없으면 템플릿 값을 쓴다 */
       titleStroke?: number;
       presenterStroke?: number;
+    }
+  /**
+   * 교독문 한 화면 — 인도자 줄과 회중 줄이 **함께** 나온다.
+   *
+   * 회중은 자기 차례 줄이 화면에 있어야 읽을 수 있다. 두 줄을 템플릿의
+   * 주/보조 텍스트 역할로 그려 누가 읽을 차례인지 눈에 보이게 한다.
+   */
+  | {
+      kind: 'reading';
+      leader: string;
+      /** 없으면 마지막 '다같이' 줄 — 혼자 한 화면을 쓴다 */
+      people?: string;
+      /** '시편 1편' 처럼 작게 붙는 표기 */
+      reference?: string;
     }
   /** 그림·동영상 한 장 (예배 전 안내). 글자를 얹지 않는다. */
   | {

@@ -1639,6 +1639,19 @@ button.link-inline {
 /* 추가 바 안에서는 위 여백이 필요 없다 (입력창 자리를 대신한다) */
 .add-bar .candidates.liturgy-add { margin-top: 0; flex: 1; }
 
+/*
+ * 후보 목록은 스스로 스크롤한다.
+ *
+ * 교독문은 76편이 한 번에 나온다. 높이를 두지 않으면 목록이 패널을 넘쳐
+ * 아래 내용과 겹친다(실측). 잘라서 감추는 대신 스크롤하는 쪽이 맞다 —
+ * 목록에서 사라진 항목은 없는 것처럼 보인다.
+ */
+.add-bar .candidates {
+  max-height: 22vh;
+  overflow-y: auto;
+  align-content: flex-start;
+}
+
 /* 판본 토글 — 두 판본이 **동시에 보여야** 무엇을 고르는지 알 수 있다.
    select 로 접어 두면 다른 판본이 있다는 것 자체를 모르고 지나친다. */
 .toggle-row { display: inline-flex; gap: 4px; }
