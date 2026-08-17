@@ -190,11 +190,41 @@
     node.src = '/backgrounds/' + encodeURIComponent(src);
     el.backdrop.appendChild(node);
 
-    if (mode === 'video' && typeof node.play === 'function') {
-      // 자동 재생이 막히면 조용히 넘어간다 — 배경 때문에 송출이 멈추면 안 된다
-      var started = node.play();
-      if (started && typeof started.catch === 'function') started.catch(function () {});
-    }
+    if (mode === 'video' && typeof node.play === 'function') tryPlay(node);
+  }
+
+  /**
+   * 배경 동영상 재생 시도.
+   *
+   * **송출을 멈추지 않는다** — 자동 재생이 막혀도 배경만 첫 프레임에서 멈춘다.
+   * 그런데 그냥 삼키면 '동영상이 왜 안 움직이나' 를 알 길이 없다. 브라우저는
+   * 화면에 그려지지 않는 동안(OBS 소스가 감춰졌거나 장면이 바뀐 동안) 재생을
+   * 미루므로, **다시 보이게 될 때 한 번 더 시도한다.** 그래야 장면을 되돌렸을 때
+   * 얼어붙은 그림이 남지 않는다.
+   */
+  function tryPlay(node) {
+    var started = node.play();
+    if (!started || typeof started.catch !== 'function') return;
+
+    started.catch(function () {
+      if (document.visibilityState === 'visible') {
+        // 보이는데도 막혔다 — 조작자가 알아야 한다 (진단 배지·컨트롤 패널)
+        diag.errors++;
+        pendingErrors.push({
+          message: '배경 동영상 자동 재생이 막혀 첫 화면에서 멈췄습니다',
+          url: location.href,
+        });
+        renderDebug();
+        return;
+      }
+      // 아직 안 보이는 것뿐이다 — 보이게 되면 다시 시도한다
+      document.addEventListener('visibilitychange', function retry() {
+        if (document.visibilityState !== 'visible') return;
+        document.removeEventListener('visibilitychange', retry);
+        // 그 사이 배경이 바뀌었으면 이 노드는 이미 떨어져 나갔다
+        if (node.isConnected) tryPlay(node);
+      });
+    });
   }
 
 

@@ -1654,6 +1654,10 @@ button.link-inline {
   background: rgba(74, 158, 255, 0.15);
 }
 
+/* 배경 파일 고르기 — 드롭다운과 삭제를 한 줄에 */
+.file-row { align-items: center; gap: 6px; }
+.file-row > select { min-width: 0; }
+
 .detail-block { margin-top: 10px; }
 .detail-block > summary { cursor: pointer; font-size: 0.8rem; opacity: 0.75; }
 .detail-block > summary .tag {

@@ -7,6 +7,9 @@
  *
  * 고른 파일이 목록에 없으면(다른 PC 에서 가져온 순서표 등) **조용히 넘기지 않고**
  * 그 사실을 알린다. 배경이 빠진 채로 예배가 시작되는 것보다 낫다.
+ *
+ * 폴더 총량도 함께 보여 준다. 상한(기본 2GB)을 넘으면 서버가 업로드를 막는데,
+ * 지금 얼마를 쓰는지 안 보이면 그 거절이 갑작스럽다 (SECURITY-AUDIT S-1).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -35,13 +38,21 @@ function readAsBase64(file: File): Promise<string> {
   });
 }
 
-function formatMb(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+/**
+ * 사람이 읽는 용량. MB 로 고정하면 작은 그림이 `0.0MB` 가 되고 2GB 한도가
+ * `2048.0MB` 로 나온다 (서버 메시지도 같은 이유로 단위를 맞춘다).
+ */
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`;
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${bytes}B`;
 }
 
 export function BackgroundPicker({ background, onChange }: Props): React.JSX.Element {
   const [files, setFiles] = useState<BackgroundFile[]>([]);
   const [maxBytes, setMaxBytes] = useState(0);
+  const [total, setTotal] = useState<{ used: number; max: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -51,6 +62,7 @@ export function BackgroundPicker({ background, onChange }: Props): React.JSX.Ele
       const result = await api.backgrounds();
       setFiles(result.files);
       setMaxBytes(result.maxUploadBytes);
+      setTotal({ used: result.totalBytes, max: result.maxTotalBytes });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '배경 목록을 불러오지 못했습니다');
     }
@@ -69,7 +81,7 @@ export function BackgroundPicker({ background, onChange }: Props): React.JSX.Ele
     try {
       if (maxBytes > 0 && file.size > maxBytes) {
         setError(
-          `${formatMb(file.size)} 는 너무 큽니다 (한도 ${formatMb(maxBytes)}). ` +
+          `${formatSize(file.size)} 는 너무 큽니다 (한도 ${formatSize(maxBytes)}). ` +
             `data/backgrounds/ 폴더에 직접 넣으세요.`,
         );
         return;
@@ -90,18 +102,70 @@ export function BackgroundPicker({ background, onChange }: Props): React.JSX.Ele
     }
   }
 
+  /**
+   * 고른 배경 지우기.
+   *
+   * 쓰고 있는 템플릿이 있으면 서버가 **409 로 막고 그 이름들을 알려 준다.** 그 메시지를
+   * 그대로 보여 주고 강제 삭제를 물어본다 — 어느 템플릿이 깨질지 모른 채 지우면
+   * 예배 중에 발견하게 된다.
+   */
+  async function remove(name: string): Promise<void> {
+    if (!window.confirm(`배경 '${name}' 을(를) 지웁니다. 되돌릴 수 없습니다.`)) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteBackground(name);
+      if (background.src === name) onChange({ ...background, src: '' });
+      await reload();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : '지우지 못했습니다';
+      // 템플릿이 쓰고 있다는 거절이면 강제 삭제를 물어본다
+      if (message.includes('템플릿이 쓰고 있습니다') && window.confirm(`${message}\n\n그래도 지울까요?`)) {
+        try {
+          await api.deleteBackground(name, true);
+          if (background.src === name) onChange({ ...background, src: '' });
+          await reload();
+          return;
+        } catch (forced) {
+          setError(forced instanceof ApiError ? forced.message : '지우지 못했습니다');
+          return;
+        }
+      }
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <div className="field">
         <label>파일</label>
-        <select value={background.src} onChange={(e) => onChange({ ...background, src: e.target.value })}>
-          <option value="">— 고르세요 —</option>
-          {matching.map((file) => (
-            <option key={file.name} value={file.name}>
-              {file.name} ({formatMb(file.bytes)})
-            </option>
-          ))}
-        </select>
+        {/* .field 는 세로로 쌓으므로, 고르기와 지우기는 한 줄로 묶는다 */}
+        <div className="row file-row">
+          <select
+            className="grow"
+            value={background.src}
+            onChange={(e) => onChange({ ...background, src: e.target.value })}
+          >
+            <option value="">— 고르세요 —</option>
+            {matching.map((file) => (
+              <option key={file.name} value={file.name}>
+                {file.name} ({formatSize(file.bytes)})
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="del"
+            onClick={() => void remove(background.src)}
+            disabled={busy || background.src.length === 0 || missing}
+            title="고른 배경 파일을 지웁니다"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div className="field">
@@ -155,6 +219,13 @@ export function BackgroundPicker({ background, onChange }: Props): React.JSX.Ele
       {matching.length === 0 && !error && (
         <p className="hintline muted">
           아직 파일이 없습니다. 위에서 올리거나 <code>data/backgrounds/</code> 폴더에 직접 넣으세요.
+        </p>
+      )}
+
+      {total && total.max > 0 && (
+        <p className={`hintline ${total.used / total.max > 0.9 ? 'warn' : 'muted'}`}>
+          배경 폴더 {formatSize(total.used)} / {formatSize(total.max)}
+          {total.used / total.max > 0.9 && ' — 거의 찼습니다. 쓰지 않는 배경을 지우세요.'}
         </p>
       )}
 

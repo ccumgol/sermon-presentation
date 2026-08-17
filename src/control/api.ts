@@ -172,9 +172,29 @@ export const api = {
       'POST', '/api/backup/import', { bundle, mode },
     ),
 
-  backgrounds: () => get<{ files: BackgroundFile[]; maxUploadBytes: number }>('/api/backgrounds'),
+  backgrounds: () =>
+    get<{
+      files: BackgroundFile[];
+      maxUploadBytes: number;
+      /** 배경 폴더가 지금 쓰는 총 바이트 · 한도 (SECURITY-AUDIT S-1) */
+      totalBytes: number;
+      maxTotalBytes: number;
+    }>('/api/backgrounds'),
   uploadBackground: (name: string, base64: string) =>
-    send<{ file: BackgroundFile | null }>('POST', '/api/backgrounds', { name, base64 }),
+    send<{ file: BackgroundFile | null; replaced?: boolean; totalBytes: number; maxTotalBytes: number }>(
+      'POST',
+      '/api/backgrounds',
+      { name, base64 },
+    ),
+  /**
+   * 배경 삭제. 쓰고 있는 템플릿이 있으면 서버가 **409 로 막고 그 이름들을 알려 준다** —
+   * `force` 로만 밀어붙인다 (배경은 이름으로만 참조되므로 그냥 지우면 템플릿이 조용히 깨진다).
+   */
+  deleteBackground: (name: string, force = false) =>
+    send<{ name: string; wasInUse: string[]; totalBytes: number }>(
+      'DELETE',
+      `/api/backgrounds/${encodeURIComponent(name)}${force ? '?force=true' : ''}`,
+    ),
 
   templates: () => get<Template[]>('/api/templates'),
   currentTemplate: () => get<Template>('/api/template/current'),
