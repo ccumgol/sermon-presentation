@@ -25,8 +25,12 @@ describe('본문 데이터', () => {
     }
   });
 
-  it('기본 판본은 새번역이다', () => {
+  it('기본 판본은 개역개정이다', () => {
     expect(DEFAULT_LITURGY_VERSION).toBe('new');
+    for (const text of LITURGY_TEXTS) {
+      expect(text.versions.new.label).toBe('개역개정');
+      expect(text.versions.traditional.label).toBe('개역한글');
+    }
   });
 
   /**
@@ -64,10 +68,15 @@ describe('본문 데이터', () => {
     }
   });
 
-  it('아멘으로 끝난다', () => {
+  /**
+   * 교회 본문은 '…아버지의 것입니다. 아멘.' 처럼 마지막 구와 아멘이 한 줄이다.
+   * 아멘만 따로 떼면 고아 줄이 되므로 붙여 둔 것이고, 그래서 '끝에 아멘' 을 본다.
+   */
+  it('마지막 줄이 아멘으로 끝난다', () => {
     for (const text of LITURGY_TEXTS) {
       for (const version of Object.values(text.versions)) {
-        expect(version.lines[version.lines.length - 1]).toMatch(/^아멘\.?$/);
+        const last = version.lines[version.lines.length - 1] ?? '';
+        expect(last, `${text.title}/${version.label}`).toMatch(/아멘\.?$/);
       }
     }
   });
@@ -96,10 +105,27 @@ describe('조회', () => {
   });
 
   it('판본을 바꾸면 본문이 바뀐다', () => {
-    const neu = liturgyLines('lords-prayer', 'new');
-    const old = liturgyLines('lords-prayer', 'traditional');
-    expect(neu?.[0]).toBe('하늘에 계신 우리 아버지,');
-    expect(old?.[0]).toBe('하늘에 계신 우리 아버지여');
+    expect(liturgyLines('lords-prayer', 'new')?.[0]).toBe('하늘에 계신 우리 아버지');
+    expect(liturgyLines('lords-prayer', 'traditional')?.[0]).toBe('하늘에 계신 우리 아버지여');
+  });
+
+  /**
+   * 교회 주보 그대로여야 하는 자리들. 흔히 다른 판본과 헷갈리는 대목이라
+   * 자동 정리나 오타로 조용히 바뀌면 예배에서 드러난다.
+   */
+  it('교회에서 쓰는 표기를 지킨다', () => {
+    const prayerOld = liturgyLines('lords-prayer', 'traditional')!.join(' ');
+    expect(prayerOld).toContain('나라이 임하옵시며');
+    expect(prayerOld).toContain('우리의 죄를 사하여 주옵시고');
+    expect(prayerOld).toContain('대개 나라와 권세와 영광이');
+
+    const creedNew = liturgyLines('apostles-creed', 'new')!.join(' ');
+    expect(creedNew).toContain('거기로부터 살아 있는 자와 죽은 자를');
+    expect(creedNew).toContain('거룩한 공교회와 성도의 교제와');
+
+    const creedOld = liturgyLines('apostles-creed', 'traditional')!.join(' ');
+    expect(creedOld).toContain('저리로서 산자와 죽은 자를');
+    expect(creedOld).toContain('거룩한 공회와');
   });
 
   /** 교회 판본이 다를 때 사용자가 고친 것이 자동 데이터를 이겨야 한다 */
@@ -107,7 +133,7 @@ describe('조회', () => {
     const mine = ['나라가 임하옵시며', '아멘'];
     expect(liturgyLines('lords-prayer', 'new', mine)).toEqual(mine);
     // 빈 배열은 '고치지 않음'으로 본다 — 실수로 다 지웠을 때 빈 화면이 나가면 안 된다
-    expect(liturgyLines('lords-prayer', 'new', [])?.[0]).toBe('하늘에 계신 우리 아버지,');
+    expect(liturgyLines('lords-prayer', 'new', [])?.[0]).toBe('하늘에 계신 우리 아버지');
   });
 });
 
