@@ -409,6 +409,50 @@ describe('구분·인용구 항목 저장', () => {
     expect(updated.body.data!.plan.items).toHaveLength(2);
   });
 
+  /**
+   * '이름 바꾸기' 가 기대는 길. 이름만 보내면 항목이 그대로여야 한다 —
+   * 여기서 항목이 비면 유형 하나가 통째로 날아간다.
+   */
+  it('이름만 바꾸면 항목과 기본 설정이 그대로 남는다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '주일예배',
+      kind: 'template',
+      items: [
+        { type: 'text', content: '대표기도', variant: 'order' },
+        { type: 'liturgy', textId: 'lords-prayer', version: 'new' },
+      ],
+      defaults: { liturgy: { version: 'traditional' } },
+    });
+    const id = created.body.data!.plan.id;
+    createdPlanIds.push(id);
+
+    const renamed = await send<PlanResponse>('PUT', `/api/plans/${id}`, { name: '주일 1부 예배' });
+    expect(renamed.body.data!.plan.name).toBe('주일 1부 예배');
+    expect(renamed.body.data!.plan.kind).toBe('template');
+    expect(renamed.body.data!.plan.items.map((i) => i.type)).toEqual(['text', 'liturgy']);
+    expect(renamed.body.data!.plan.defaults?.liturgy?.version).toBe('traditional');
+  });
+
+  /** '주일 1부' 를 놔둔 채 '2부' 를 만드는 길 — 사본이 '순서'로 떨어지면 안 된다 */
+  it('유형을 복제하면 사본도 유형이고 항목 id 는 새로 받는다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '복제 대상 유형',
+      kind: 'template',
+      items: [{ type: 'text', content: '대표기도', variant: 'order' }],
+    });
+    const source = created.body.data!.plan;
+    createdPlanIds.push(source.id);
+
+    const copy = await send<ServicePlan>('POST', `/api/plans/${source.id}/duplicate`, {});
+    createdPlanIds.push(copy.body.data!.id);
+
+    expect(copy.body.data!.kind).toBe('template');
+    expect(copy.body.data!.name).toBe('복제 대상 유형 사본');
+    expect(copy.body.data!.items).toHaveLength(1);
+    // 같은 항목 id 를 나눠 쓰면 한쪽을 옮길 때 다른 쪽이 꼬인다
+    expect(copy.body.data!.items[0]!.id).not.toBe(source.items[0]!.id);
+  });
+
   it('예배 전 안내 자동 진행 설정을 저장하고 범위를 지킨다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: '자동 진행',

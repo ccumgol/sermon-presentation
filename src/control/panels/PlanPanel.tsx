@@ -175,7 +175,10 @@ export function PlanPanel({
   const [items, setItems] = useState<CueItem[]>([]);
 
   /** 이름을 받아야 하는 저장 동작 (유형 만들기 / 순서 저장하기) */
-  const [nameBar, setNameBar] = useState<{ kind: PlanKind; value: string } | null>(null);
+  const [nameBar, setNameBar] = useState<{ kind: PlanKind; value: string; renameId?: number } | null>(
+    null,
+  );
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [loadOpen, setLoadOpen] = useState(false);
   /** 기본 설정 패널을 펼쳤는지 */
   const [defaultsOpen, setDefaultsOpen] = useState(false);
@@ -303,6 +306,24 @@ export function PlanPanel({
     setNameBar(null);
   }
 
+  /**
+   * '이름 바꾸기' 를 열 때 기존 이름을 전체 선택한다.
+   *
+   * 칸이 이미 차 있는데 선택돼 있지 않으면 커서가 끝에 붙어, 새 이름을 치는 순간
+   * 옛 이름 뒤에 이어 붙는다('주일예배' + '주일 1부 예배').
+   *
+   * **'순서 저장하기' 에는 걸지 않는다** — 거기는 '2026-08-17 주일 1부 예배' 처럼
+   * 날짜가 채워져 있어 대개 그대로 쓰거나 뒤에 덧붙인다. 전체 선택하면 날짜까지
+   * 다시 쳐야 한다.
+   *
+   * 의존성에 `value` 를 넣으면 안 된다 — 한 글자 칠 때마다 전체가 선택돼
+   * 다음 글자가 앞의 것을 지운다.
+   */
+  const renamingId = nameBar?.renameId;
+  useEffect(() => {
+    if (renamingId !== undefined) nameInputRef.current?.select();
+  }, [renamingId]);
+
   /** '템플릿 업데이트' — 지금 고친 내용을 이 유형의 원본으로 굳힌다 */
   async function updateTemplate(): Promise<void> {
     if (!plan || plan.kind !== 'template') return;
@@ -330,9 +351,14 @@ export function PlanPanel({
     }
   }
 
-  /** 같은 이름이 이미 있는지 — 있으면 버튼이 '덮어쓰기' 로 바뀐다 */
+  /**
+   * 같은 이름이 이미 있는지 — 있으면 버튼이 '덮어쓰기' 로 바뀐다.
+   * 이름을 바꾸는 중이면 **자기 자신은 빼고** 본다 (자기 이름과 겹친다고 막으면 안 된다).
+   */
   const nameBarTarget = nameBar
-    ? (nameBar.kind === 'template' ? templates : saved).find((p) => p.name === nameBar.value.trim())
+    ? (nameBar.kind === 'template' ? templates : saved).find(
+        (p) => p.name === nameBar.value.trim() && p.id !== nameBar.renameId,
+      )
     : undefined;
 
   /** 이름 입력 바 확정 — 새로 만들거나, 같은 이름이 있으면 덮어쓴다 */
@@ -344,6 +370,17 @@ export function PlanPanel({
     setBusy(true);
     setError(null);
     try {
+      // 이름만 바꾼다 — 항목은 건드리지 않는다.
+      // 지금 화면의 items 를 함께 보내면, 아직 저장하지 않은 편집까지 조용히 굳는다.
+      if (nameBar.renameId !== undefined) {
+        const renamed = await api.updatePlan(nameBar.renameId, { name });
+        if (plan?.id === nameBar.renameId) setPlan(renamed.plan);
+        setNameBar(null);
+        await reload();
+        setNotice(`이름을 '${name}' 으로 바꿨습니다`);
+        return;
+      }
+
       // 빈 상태에서 유형을 만들면 뼈대를 넣어 준다 — 빈 목록은 무엇을 할 수 있는지 알려주지 못한다
       const payload: CueItem[] =
         items.length === 0 && nameBar.kind === 'template'
@@ -365,6 +402,57 @@ export function PlanPanel({
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 유형 복제 — '주일 1부' 를 놔둔 채 '주일 2부' 를 만드는 길.
+   * 비슷한 유형을 여럿 두는 것이 실제 운영이라, 처음부터 짜는 것보다 이게 기본이다.
+   */
+  async function duplicateTemplate(): Promise<void> {
+    if (!plan || plan.kind !== 'template') return;
+    setBusy(true);
+    setError(null);
+    try {
+      const copy = await api.duplicatePlan(plan.id);
+      await reload();
+      openPlan(copy);
+      setNotice(`'${copy.name}' 을(를) 만들었습니다 — 이름을 바꿔 쓰세요`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '복제하지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 유형 삭제.
+   *
+   * 유형을 **전부** 지우면 다음 서버 시작 때 기본 넷이 되살아난다
+   * (`seedDefaultTemplates` 는 '하나도 없을 때'만 넣는다). 지우고 나서 되살아나면
+   * 고장으로 보이므로 미리 알린다.
+   */
+  async function removeTemplate(): Promise<void> {
+    if (!plan || plan.kind !== 'template') return;
+    const last = templates.length <= 1;
+    const warning = last
+      ? '\n\n마지막 유형입니다. 모두 지우면 다음 서버 시작 때 기본 유형이 되살아납니다.'
+      : '';
+    if (!window.confirm(`예배 유형 '${plan.name}' 을(를) 지웁니다. 되돌릴 수 없습니다.${warning}`)) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deletePlan(plan.id);
+      setPlan(null);
+      setItems([]);
+      setDirty(false);
+      await reload();
+      setNotice(`유형 '${plan.name}' 을(를) 지웠습니다`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
     } finally {
       setBusy(false);
     }
@@ -1028,6 +1116,41 @@ export function PlanPanel({
             >
               ＋
             </button>
+
+            {/*
+              유형 관리 — 지금 연 유형에만 쓴다.
+              전에는 만들기와 갱신뿐이라 '주일예배' 를 '주일 1부' 로 고칠 수도,
+              안 쓰는 기본 유형을 치울 수도 없었다.
+            */}
+            <button
+              type="button"
+              onClick={() => void duplicateTemplate()}
+              disabled={busy || plan?.kind !== 'template'}
+              title="이 유형을 복제합니다 (주일 1부 → 2부)"
+            >
+              ⧉
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!plan) return;
+                setLoadOpen(false);
+                setNameBar({ kind: 'template', value: plan.name, renameId: plan.id });
+              }}
+              disabled={busy || plan?.kind !== 'template'}
+              title="이 유형의 이름을 바꿉니다"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              className="del"
+              onClick={() => void removeTemplate()}
+              disabled={busy || plan?.kind !== 'template'}
+              title="이 유형을 지웁니다"
+            >
+              ✕
+            </button>
           </div>
 
           {plan && (
@@ -1214,6 +1337,7 @@ export function PlanPanel({
               <input
                 className="grow"
                 autoFocus
+                ref={nameInputRef}
                 value={nameBar.value}
                 onChange={(e) => setNameBar({ ...nameBar, value: e.target.value })}
                 onKeyDown={(e) => {
@@ -1228,9 +1352,15 @@ export function PlanPanel({
                 type="button"
                 className="primary"
                 onClick={() => void commitNameBar()}
-                disabled={busy || nameBar.value.trim().length === 0}
+                // 이름을 바꿀 때 다른 유형과 겹치면 막는다 — 이름이 곧 '덮어쓰기' 의 기준이라
+                // 같은 이름이 둘이면 어느 쪽을 덮어쓸지 알 수 없게 된다
+                disabled={
+                  busy ||
+                  nameBar.value.trim().length === 0 ||
+                  (nameBar.renameId !== undefined && nameBarTarget !== undefined)
+                }
               >
-                {nameBarTarget ? '덮어쓰기' : '저장'}
+                {nameBar.renameId !== undefined ? '이름 바꾸기' : nameBarTarget ? '덮어쓰기' : '저장'}
               </button>
               <button type="button" onClick={() => setNameBar(null)}>취소</button>
             </div>
@@ -1238,7 +1368,11 @@ export function PlanPanel({
 
           {nameBar && nameBarTarget && (
             <p className="hintline warn">
-              같은 이름이 이미 있습니다 — 누르면 그 {nameBar.kind === 'template' ? '유형' : '순서'}를 덮어씁니다.
+              {nameBar.renameId !== undefined
+                ? '같은 이름의 유형이 이미 있습니다 — 다른 이름을 쓰세요.'
+                : `같은 이름이 이미 있습니다 — 누르면 그 ${
+                    nameBar.kind === 'template' ? '유형' : '순서'
+                  }를 덮어씁니다.`}
             </p>
           )}
 

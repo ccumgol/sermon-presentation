@@ -159,6 +159,8 @@ export const api = {
     }),
   updatePlan: (id: number, patch: { name?: string; items?: unknown[]; defaults?: unknown }) =>
     send<{ plan: ServicePlan; rejected?: string[] }>('PUT', `/api/plans/${id}`, patch),
+  duplicatePlan: (id: number, name?: string) =>
+    send<ServicePlan>('POST', `/api/plans/${id}/duplicate`, name === undefined ? {} : { name }),
   deletePlan: (id: number) => send<{ deleted: number }>('DELETE', `/api/plans/${id}`),
 
   backupSummary: () =>
