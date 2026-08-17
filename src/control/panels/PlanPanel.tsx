@@ -15,17 +15,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
-  buildPlanDeck, buildPlanRows, describeItem, isExpandable, itemsInGroup, moveItem, newItemId,
+  buildPlanDeck, buildPlanRows, describeItem, holdMsFor, isExpandable, itemsInGroup, moveItem, newItemId,
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
+  AUTO_HOLD_MS_MAX,
+  AUTO_HOLD_MS_MIN,
   type ClientMsg, type CueItem, type Deck, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
-import { api, ApiError } from '../api.ts';
+import { api, ApiError, type BackgroundFile } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE,
@@ -56,7 +58,7 @@ interface Props {
 const MAX_SECONDARY = 2;
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
-type AddKind = 'bible' | 'song' | 'liturgy' | 'order' | 'notice' | 'quote' | 'blank' | 'divider';
+type AddKind = 'bible' | 'song' | 'liturgy' | 'order' | 'notice' | 'quote' | 'media' | 'blank' | 'divider';
 
 const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hint: string }> = [
   { kind: 'bible', icon: '📖', label: '성경', hint: '요 3:16 · 시 23 · 롬 8:28-30' },
@@ -65,6 +67,7 @@ const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hin
   { kind: 'order', icon: '📋', label: '순서 표시', hint: '대표기도 · 설교 제목(둘째 줄에 설교자)' },
   { kind: 'notice', icon: '📝', label: '광고', hint: '여러 줄로 쓰면 그대로 나갑니다' },
   { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 잠깐 띄울 내용' },
+  { kind: 'media', icon: '🖼', label: '그림·동영상', hint: '예배 전 안내 화면 · data/backgrounds/ 파일' },
   { kind: 'blank', icon: '⬛', label: '공백', hint: '화면을 비웁니다' },
   { kind: 'divider', icon: '▾', label: '구분', hint: '예배 부름 · 찬양 · 말씀 …' },
 ];
@@ -94,6 +97,7 @@ const ITEM_ICONS: Record<CueItem['type'], string> = {
   song: '🎵',
   text: '📝',
   liturgy: '🙏',
+  media: '🖼',
   blank: '⬛',
   divider: '▾',
 };
@@ -130,6 +134,8 @@ function slideSummary(slide: SlidePayload, previous?: SlidePayload): string {
       return slide.lines.join(' · ');
     case 'order':
       return slide.presenter ? `${slide.title} — ${slide.presenter}` : slide.title;
+    case 'media':
+      return `${slide.mediaKind === 'video' ? '동영상' : '그림'} · ${slide.src}`;
     case 'bible':
       return slide.blocks
         .flatMap((block) => block.verses.map((verse) => verse.text))
@@ -235,6 +241,9 @@ export function PlanPanel({
    * (미리보기는 타이핑하는 대로 따라온다).
    */
   const [liturgyDraft, setLiturgyDraft] = useState<{ id: string; text: string } | null>(null);
+
+  /** `data/backgrounds/` 파일 목록 — 그림·동영상 항목이 여기서 고른다 */
+  const [bgFiles, setBgFiles] = useState<BackgroundFile[]>([]);
 
   const [addKind, setAddKind] = useState<AddKind>('bible');
   const [addInput, setAddInput] = useState('');
@@ -532,6 +541,22 @@ export function PlanPanel({
         };
       }
 
+      if (item.type === 'media') {
+        if (item.src.length === 0) return { slides: [], labels: [], error: '파일을 고르지 않았습니다' };
+        return {
+          slides: [
+            {
+              kind: 'media',
+              src: item.src,
+              mediaKind: item.mediaKind,
+              ...(item.fit ? { fit: item.fit } : {}),
+              ...(item.holdMs !== undefined ? { holdMs: item.holdMs } : {}),
+            },
+          ],
+          labels: [item.mediaKind === 'video' ? '동영상' : '그림'],
+        };
+      }
+
       if (item.type === 'blank') return { slides: [{ kind: 'blank' }], labels: ['공백'] };
 
       // 구분은 슬라이드가 없다 (buildPlanDeck 도 건너뛴다)
@@ -699,6 +724,13 @@ export function PlanPanel({
   }
 
   /**
+   * 지금 슬라이드가 머무는 시간. 그림·동영상은 한 장만 따로 정할 수 있다
+   * (`lib/plan-deck.ts` 의 `holdMsFor`).
+   */
+  const slideCount = deck?.slides.length ?? 0;
+  const hold = holdMsFor(deck?.slides[currentIndex], auto?.holdMs ?? AUTO_HOLD_MS_DEFAULT);
+
+  /**
    * 자동 진행 타이머.
    *
    * 슬라이드가 바뀔 때마다 **다음 한 번**만 예약한다. 반복 타이머를 쓰면
@@ -706,7 +738,7 @@ export function PlanPanel({
    */
   useEffect(() => {
     if (!auto || !connected) return;
-    const total = deck?.slides.length ?? 0;
+    const total = slideCount;
     if (total === 0) return;
 
     const timer = setTimeout(() => {
@@ -717,10 +749,30 @@ export function PlanPanel({
       } else {
         send({ t: 'next' });
       }
-    }, auto.holdMs);
+    }, hold);
 
     return () => clearTimeout(timer);
-  }, [auto, connected, currentIndex, deck?.slides.length, send]);
+    // 의존성은 **원시값만** 둔다. 전에 `deck?.slides` 를 넣었는데 상태가 올 때마다
+    // 새 배열이라 타이머가 계속 처음부터 다시 걸렸다.
+  }, [auto, connected, currentIndex, slideCount, hold, send]);
+
+  /**
+   * 배경 폴더 파일 목록. 템플릿 탭에서 올린 것을 여기서도 골라야 하므로
+   * 그림·동영상 칸을 열 때마다 다시 읽는다.
+   */
+  const reloadBgFiles = useCallback(async () => {
+    try {
+      const result = await api.backgrounds();
+      setBgFiles(result.files);
+    } catch {
+      // 목록을 못 읽어도 순서표 작업은 계속돼야 한다 — 고를 파일이 없을 뿐이다
+      setBgFiles([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (addKind === 'media' || items.some((i) => i.type === 'media')) void reloadBgFiles();
+  }, [addKind, items, reloadBgFiles]);
 
   /** 순서표 전체를 하나의 덱으로 올린다 (순서대로 진행할 때) */
   async function loadForService(): Promise<void> {
@@ -898,6 +950,11 @@ export function PlanPanel({
         ? { perSlide: plan.defaults.liturgy.perSlide }
         : {}),
     });
+  }
+
+  /** 그림·동영상 한 장 추가 (예배 전 안내) */
+  function addMedia(file: BackgroundFile): void {
+    insertItem({ id: newItemId(), type: 'media', src: file.name, mediaKind: file.kind });
   }
 
   function addSong(songId: number, songTitle: string): void {
@@ -1560,6 +1617,27 @@ export function PlanPanel({
 
               {addKind === 'blank' ? (
                 <button type="button" className="grow" onClick={() => addFromInput()}>공백 추가</button>
+              ) : addKind === 'media' ? (
+                <div className="row file-row grow">
+                  <select
+                    className="grow"
+                    value=""
+                    onChange={(e) => {
+                      const file = bgFiles.find((f) => f.name === e.target.value);
+                      if (file) addMedia(file);
+                    }}
+                  >
+                    <option value="">— 파일을 고르세요 —</option>
+                    {bgFiles.map((file) => (
+                      <option key={file.name} value={file.name}>
+                        {file.kind === 'video' ? '🎬' : '🖼'} {file.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => void reloadBgFiles()} title="폴더 다시 읽기">
+                    새로 고침
+                  </button>
+                </div>
               ) : addKind === 'liturgy' ? (
                 <div className="candidates liturgy-add">
                   {LITURGY_TEXTS.map((text) => (
@@ -1784,6 +1862,94 @@ export function PlanPanel({
             </div>
           )}
 
+          {current.type === 'media' &&
+            (() => {
+              const media = current;
+              const exists = bgFiles.some((f) => f.name === media.src);
+
+              function patchMedia(patch: Partial<Extract<CueItem, { type: 'media' }>>): void {
+                patchItems(
+                  items.map((i) => (i.id === media.id && i.type === 'media' ? { ...i, ...patch } : i)),
+                );
+              }
+
+              return (
+                <>
+                  <div className="row detail-controls">
+                    <label>파일</label>
+                    <select
+                      value={media.src}
+                      onChange={(e) => {
+                        const file = bgFiles.find((f) => f.name === e.target.value);
+                        if (file) patchMedia({ src: file.name, mediaKind: file.kind });
+                      }}
+                    >
+                      {/* 목록에 없는 파일도 값으로 남겨 둔다 — 지우면 무엇을 쓰려 했는지 사라진다 */}
+                      {!exists && media.src.length > 0 && (
+                        <option value={media.src}>{media.src} (없음)</option>
+                      )}
+                      {bgFiles.map((file) => (
+                        <option key={file.name} value={file.name}>
+                          {file.kind === 'video' ? '🎬' : '🖼'} {file.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label>맞춤</label>
+                    <select
+                      value={media.fit ?? 'contain'}
+                      onChange={(e) =>
+                        patchMedia({ fit: e.target.value === 'cover' ? 'cover' : undefined })
+                      }
+                    >
+                      <option value="contain">전체 보이기 (여백 생김)</option>
+                      <option value="cover">화면 채우기 (넘치는 부분 잘림)</option>
+                    </select>
+                  </div>
+
+                  <div className="row detail-controls">
+                    {/*
+                      자동 진행 중 이 한 장만 다르게 머무는 시간.
+                      긴 안내 동영상이 구분에 설정한 8초에 잘리는 것을 막는다.
+                    */}
+                    <label title="자동 진행 중에만 쓰입니다. 비우면 구분에 설정한 시간을 씁니다.">
+                      머무는 시간
+                    </label>
+                    <input
+                      type="number"
+                      min={Math.round(AUTO_HOLD_MS_MIN / 1000)}
+                      max={Math.round(AUTO_HOLD_MS_MAX / 1000)}
+                      value={media.holdMs === undefined ? '' : Math.round(media.holdMs / 1000)}
+                      placeholder="구분 설정"
+                      onChange={(e) => {
+                        const seconds = Number(e.target.value);
+                        patchMedia({
+                          holdMs:
+                            e.target.value === '' || !Number.isFinite(seconds) || seconds <= 0
+                              ? undefined
+                              : seconds * 1000,
+                        });
+                      }}
+                    />
+                    <span className="muted">초</span>
+                  </div>
+
+                  {!exists && media.src.length > 0 && (
+                    <p className="hintline error">
+                      '{media.src}' 파일이 없습니다 — 이 순서는 건너뜁니다. 템플릿 탭에서 올리거나
+                      <code>data/backgrounds/</code> 폴더에 넣으세요.
+                    </p>
+                  )}
+                  {bgFiles.length === 0 && (
+                    <p className="hintline muted">
+                      배경 폴더가 비어 있습니다. 템플릿 탭 → 배경에서 올리거나{' '}
+                      <code>data/backgrounds/</code> 폴더에 직접 넣으세요.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+
           {current.type === 'bible' && (
             <div className="row detail-controls translation-pick">
               <label>역본</label>
@@ -1936,6 +2102,94 @@ export function PlanPanel({
                       </button>
                     )}
                   </details>
+                </>
+              );
+            })()}
+
+          {current.type === 'media' &&
+            (() => {
+              const media = current;
+              const exists = bgFiles.some((f) => f.name === media.src);
+
+              function patchMedia(patch: Partial<Extract<CueItem, { type: 'media' }>>): void {
+                patchItems(
+                  items.map((i) => (i.id === media.id && i.type === 'media' ? { ...i, ...patch } : i)),
+                );
+              }
+
+              return (
+                <>
+                  <div className="row detail-controls">
+                    <label>파일</label>
+                    <select
+                      value={media.src}
+                      onChange={(e) => {
+                        const file = bgFiles.find((f) => f.name === e.target.value);
+                        if (file) patchMedia({ src: file.name, mediaKind: file.kind });
+                      }}
+                    >
+                      {/* 목록에 없는 파일도 값으로 남겨 둔다 — 지우면 무엇을 쓰려 했는지 사라진다 */}
+                      {!exists && media.src.length > 0 && (
+                        <option value={media.src}>{media.src} (없음)</option>
+                      )}
+                      {bgFiles.map((file) => (
+                        <option key={file.name} value={file.name}>
+                          {file.kind === 'video' ? '🎬' : '🖼'} {file.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label>맞춤</label>
+                    <select
+                      value={media.fit ?? 'contain'}
+                      onChange={(e) =>
+                        patchMedia({ fit: e.target.value === 'cover' ? 'cover' : undefined })
+                      }
+                    >
+                      <option value="contain">전체 보이기 (여백 생김)</option>
+                      <option value="cover">화면 채우기 (넘치는 부분 잘림)</option>
+                    </select>
+                  </div>
+
+                  <div className="row detail-controls">
+                    {/*
+                      자동 진행 중 이 한 장만 다르게 머무는 시간.
+                      긴 안내 동영상이 구분에 설정한 8초에 잘리는 것을 막는다.
+                    */}
+                    <label title="자동 진행 중에만 쓰입니다. 비우면 구분에 설정한 시간을 씁니다.">
+                      머무는 시간
+                    </label>
+                    <input
+                      type="number"
+                      min={Math.round(AUTO_HOLD_MS_MIN / 1000)}
+                      max={Math.round(AUTO_HOLD_MS_MAX / 1000)}
+                      value={media.holdMs === undefined ? '' : Math.round(media.holdMs / 1000)}
+                      placeholder="구분 설정"
+                      onChange={(e) => {
+                        const seconds = Number(e.target.value);
+                        patchMedia({
+                          holdMs:
+                            e.target.value === '' || !Number.isFinite(seconds) || seconds <= 0
+                              ? undefined
+                              : seconds * 1000,
+                        });
+                      }}
+                    />
+                    <span className="muted">초</span>
+                  </div>
+
+                  {!exists && media.src.length > 0 && (
+                    <p className="hintline error">
+                      '{media.src}' 파일이 없습니다 — 이 순서는 건너뜁니다. 템플릿 탭에서 올리거나
+                      <code>data/backgrounds/</code> 폴더에 넣으세요.
+                    </p>
+                  )}
+                  {bgFiles.length === 0 && (
+                    <p className="hintline muted">
+                      배경 폴더가 비어 있습니다. 템플릿 탭 → 배경에서 올리거나{' '}
+                      <code>data/backgrounds/</code> 폴더에 직접 넣으세요.
+                    </p>
+                  )}
                 </>
               );
             })()}

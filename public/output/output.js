@@ -477,7 +477,38 @@
     }
   }
 
-  var RENDERERS = { bible: renderBible, song: renderSong, text: renderText, order: renderOrder };
+  /**
+   * 그림·동영상 한 장 (예배 전 안내).
+   *
+   * 배경 장치(`applyBackdrop`)를 그대로 쓴다 — 파일을 못 읽어도 화면을 비우지 않고,
+   * 같은 파일이면 노드를 다시 만들지 않아 동영상이 되감기지 않으며, 자동 재생이
+   * 막히면 보일 때 다시 시도한다. 그 성질이 전부 필요하다.
+   *
+   * 글자는 얹지 않는다. 맞춤은 기본 `contain` — 안내는 글자가 잘리면 안 된다.
+   * 불투명도는 템플릿 값을 쓰지 않고 1 로 고정한다(내용이므로 흐려지면 안 된다).
+   */
+  function renderMedia(payload) {
+    clearSlide();
+    el.backdrop.style.setProperty('--backdrop-fit', payload.fit === 'cover' ? 'cover' : 'contain');
+    el.backdrop.style.setProperty('--backdrop-opacity', '1');
+    applyBackdrop({ mode: payload.mediaKind === 'video' ? 'video' : 'image', src: payload.src });
+  }
+
+  var RENDERERS = {
+    bible: renderBible, song: renderSong, text: renderText, order: renderOrder, media: renderMedia,
+  };
+
+  /**
+   * 배경을 지금 슬라이드에 맞춘다.
+   *
+   * 안내 슬라이드가 배경 자리를 빌려 쓰므로, 다른 슬라이드로 넘어가면 **템플릿 배경을
+   * 되돌려야** 한다. 이게 없으면 안내 그림이 설교 본문 뒤에 그대로 남는다.
+   */
+  function restoreTemplateBackdrop() {
+    el.backdrop.style.removeProperty('--backdrop-fit');
+    el.backdrop.style.removeProperty('--backdrop-opacity');
+    applyBackdrop(template && template.canvas && template.canvas.background);
+  }
 
   /**
    * 슬라이드 내용을 실제로 비운다.
@@ -498,6 +529,9 @@
    * @returns {boolean} 성공 여부
    */
   function render(payload) {
+    // 안내 슬라이드가 아니면 템플릿 배경으로 되돌린다 (안내 그림이 남지 않게)
+    if (!payload || payload.kind !== 'media') restoreTemplateBackdrop();
+
     if (!payload || payload.kind === 'blank') {
       // 내용을 **지운다**. 예전에는 blanked 클래스(투명도 0)만 켰는데,
       // 곧이어 applyState 가 setBlank(live.blank=false) 로 그 클래스를 다시 꺼서

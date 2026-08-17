@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  buildPlanDeck, buildPlanRows, describeItem, isExpandable, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
+  buildPlanDeck, buildPlanRows, describeItem, holdMsFor, isExpandable, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
 import type { CueItem, SlidePayload } from '../../shared/types.ts';
 
 function bible(id: string, ref: string): CueItem {
@@ -282,5 +282,36 @@ describe('buildPlanRows — 한 열 목록', () => {
     const rows = buildPlanRows([bible('요 3:16')], 'b-요 3:16', 0);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ kind: 'item', expanded: true });
+  });
+});
+
+describe('holdMsFor — 자동 진행에서 머무는 시간', () => {
+  const media = (holdMs?: number): SlidePayload => ({
+    kind: 'media',
+    src: 'notice.png',
+    mediaKind: 'image',
+    ...(holdMs === undefined ? {} : { holdMs }),
+  });
+
+  it('기본은 구분에 설정한 시간', () => {
+    expect(holdMsFor(undefined, 8000)).toBe(8000);
+    expect(holdMsFor({ kind: 'text', lines: ['광고'] }, 8000)).toBe(8000);
+    expect(holdMsFor(media(), 8000)).toBe(8000);
+  });
+
+  it('그림·동영상이 따로 정하면 그것을 쓴다 — 긴 안내가 잘리면 안 된다', () => {
+    expect(holdMsFor(media(40_000), 8000)).toBe(40_000);
+  });
+
+  /** 0 을 그대로 쓰면 타이머가 즉시 터져 화면이 미친 듯이 넘어간다 */
+  it('0 이나 음수는 정하지 않은 것으로 본다', () => {
+    expect(holdMsFor(media(0), 8000)).toBe(8000);
+    expect(holdMsFor(media(-1), 8000)).toBe(8000);
+  });
+
+  it('글자 슬라이드는 자기 시간을 가질 수 없다 (그림·동영상만)', () => {
+    // text 에 holdMs 를 억지로 붙여도 무시된다 — 규칙이 한 종류에만 있다
+    const sneaky = { kind: 'text', lines: ['광고'], holdMs: 40_000 } as unknown as SlidePayload;
+    expect(holdMsFor(sneaky, 8000)).toBe(8000);
   });
 });

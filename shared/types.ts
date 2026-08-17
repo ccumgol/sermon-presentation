@@ -518,6 +518,33 @@ export type CueItem =
       templateId?: number;
       note?: string;
     }
+  /**
+   * 그림·동영상 한 장 — **예배 전 안내**에 쓴다.
+   *
+   * 템플릿 배경(`canvas.background`)과 다르다. 배경은 템플릿당 하나뿐이라
+   * 안내 그림 세 장을 돌리려면 템플릿을 세 개 만들어야 했다. 이건 순서 항목이라
+   * 여러 장을 나란히 두고 자동으로 넘길 수 있다.
+   *
+   * `src` 는 **파일 이름만** 담는다 (`data/backgrounds/` 안 — 배경과 같은 폴더를
+   * 쓰므로 올리기·삭제·총량 관리가 한 곳에서 된다).
+   */
+  | {
+      id: string;
+      type: 'media';
+      src: string;
+      mediaKind: 'image' | 'video';
+      /** 안내는 글자가 잘리면 안 되므로 기본이 `contain` (배경은 `cover`) */
+      fit?: BackgroundFit;
+      /**
+       * 이 한 장만 다르게 머무는 시간(ms). 자동 진행 중에만 뜻이 있다.
+       *
+       * 없으면 구분에 설정한 시간을 쓴다. 긴 안내 동영상이 8초에 잘리는 것을
+       * 막으려면 여기에 그 길이를 적는다.
+       */
+      holdMs?: number;
+      templateId?: number;
+      note?: string;
+    }
   | { id: string; type: 'blank'; note?: string }
   /**
    * 그룹 머리글 — '예배 부름 / 찬양 / 말씀 / 광고' 처럼 순서를 구획한다.
@@ -657,6 +684,14 @@ export type SlidePayload =
       /** 외곽선 두께(px). 없으면 템플릿 값을 쓴다 */
       titleStroke?: number;
       presenterStroke?: number;
+    }
+  /** 그림·동영상 한 장 (예배 전 안내). 글자를 얹지 않는다. */
+  | {
+      kind: 'media';
+      src: string;
+      mediaKind: 'image' | 'video';
+      fit?: BackgroundFit;
+      holdMs?: number;
     }
   | { kind: 'blank' };
 

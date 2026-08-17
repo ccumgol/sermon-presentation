@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from 'fastify';
 
+import { safeBackgroundName } from './backgrounds.ts';
 import {
   DEFAULT_LITURGY_VERSION,
   isLiturgyId,
@@ -177,6 +178,37 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           version,
           ...(perSlide !== undefined ? { perSlide } : {}),
           ...(overrideLines.length > 0 ? { overrideLines } : {}),
+          ...(templateId !== undefined ? { templateId } : {}),
+          ...(note ? { note } : {}),
+        });
+        break;
+      }
+
+      case 'media': {
+        const media = item as Extract<CueItem, { type: 'media' }>;
+        // 배경과 같은 폴더를 쓰므로 이름 검증도 같은 함수를 쓴다 —
+        // 경로가 들어오면 상위 폴더를 가리킬 수 있다
+        const src = safeBackgroundName(typeof media.src === 'string' ? media.src : '');
+        if (!src) {
+          rejected.push(`${index + 1}번째 항목: 파일 이름이 올바르지 않습니다`);
+          continue;
+        }
+        // 모르는 값은 그림으로 본다 — 동영상을 그림으로 그리면 첫 프레임이 나오지만,
+        // 항목을 버리면 안내 한 장이 통째로 사라진다
+        const mediaKind = media.mediaKind === 'video' ? 'video' : 'image';
+        const fit = media.fit === 'cover' ? 'cover' : undefined;
+        const holdMs =
+          typeof media.holdMs === 'number' && Number.isFinite(media.holdMs) && media.holdMs > 0
+            ? Math.min(Math.max(Math.round(media.holdMs), AUTO_HOLD_MS_MIN), AUTO_HOLD_MS_MAX)
+            : undefined;
+
+        items.push({
+          id,
+          type: 'media',
+          src,
+          mediaKind,
+          ...(fit ? { fit } : {}),
+          ...(holdMs !== undefined ? { holdMs } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
