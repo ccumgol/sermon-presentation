@@ -275,6 +275,14 @@ export function PlanPanel({
   const [loadOpen, setLoadOpen] = useState(false);
   /** 기본 설정 패널을 펼쳤는지 */
   const [defaultsOpen, setDefaultsOpen] = useState(false);
+  /**
+   * 항목 편집 칸을 펼쳤는지.
+   *
+   * 기본은 펼침 — 항목을 고르는 것은 대개 고치려는 것이다. 그런데 '순서 표시' 처럼
+   * 슬라이더가 많은 항목은 칸이 길어져 **순서 목록을 화면 밖으로 밀어낸다**
+   * (2026-08-18 실측). 접을 수 있게 하고 높이도 제한한다.
+   */
+  const [detailOpen, setDetailOpen] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1987,12 +1995,22 @@ export function PlanPanel({
         목록 안에 끼워 넣으면 줄을 옮길 때마다 목록이 출렁여 진행이 보이지 않는다.
       */}
       {plan && current && (
-        <div className="card plan-settings">
-          <h2 className="plan-detail-title">
+        <div className={`card plan-settings${detailOpen ? '' : ' collapsed'}`}>
+          {/* 제목 줄이 곧 접기 버튼이다 — 따로 아이콘을 두면 좁은 폭에서 자리를 또 쓴다 */}
+          <button
+            type="button"
+            className="plan-detail-title"
+            onClick={() => setDetailOpen((prev) => !prev)}
+            title={detailOpen ? '편집 칸 접기' : '편집 칸 펼치기'}
+          >
+            <span className="caret">{detailOpen ? '▾' : '▸'}</span>
             <span className="icon">{itemIcon(current)}</span>
-            {describeItem(current)}
+            <span className="plan-detail-name">{describeItem(current)}</span>
             {liveItemIndex === (currentRow?.itemIndex ?? -1) && <span className="live-tag">송출 중</span>}
-          </h2>
+          </button>
+
+          {detailOpen && (
+            <div className="plan-detail-body">
 
           {before && (
             <div className="row" style={{ marginBottom: 8 }}>
@@ -2599,6 +2617,8 @@ export function PlanPanel({
                 spellCheck={false}
               />
             </>
+          )}
+            </div>
           )}
         </div>
       )}

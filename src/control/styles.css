@@ -40,6 +40,24 @@
   /* 입력칸 바닥. 카드(--panel) 위에 놓이므로 그보다 살짝 눌러 준다 */
   --field: #ffffff;
 
+  /*
+   * 편집용 컨트롤 높이.
+   *
+   * 전에는 44px 이었다 — **태블릿 터치 타깃** 기준이었다. 태블릿 조작은 보류로
+   * 정했고(보드 5·6), 실제로는 랩탑에서 마우스로 쓴다. 순서 목록 한 줄(약 34px)에
+   * 맞추면 같은 화면에 훨씬 많이 들어간다 (2026-08-18 사용자 요청).
+   *
+   * **예배 중 누르는 버튼(송출 제어)은 여기서 빼고 크게 둔다** — 그 버튼은 급할 때
+   * 정확히 눌러야 하므로 48~56px 을 따로 지정한다.
+   */
+  --ctl-h: 34px;
+  --ctl-pad-y: 5px;
+  --ctl-pad-x: 10px;
+
+  /* 줄 강조 — 라이트에서는 어둡게 덮고 다크에서는 밝게 덮는다 */
+  --row-hover: rgba(0, 0, 0, 0.05);
+  --row-flat: rgba(0, 0, 0, 0.04);
+
   --radius: 10px;
   /* 좁은 화면에서만 쓰는 하단 바 높이 (넓은 화면은 오른쪽 열에 둔다) */
   --bar-height: 72px;
@@ -74,6 +92,9 @@
     --warn: #fbbf24;
 
     --field: #0d1117;
+
+    --row-hover: rgba(255, 255, 255, 0.06);
+    --row-flat: rgba(255, 255, 255, 0.05);
   }
 }
 
@@ -96,6 +117,9 @@
   --warn: #fbbf24;
 
   --field: #0d1117;
+
+  --row-hover: rgba(255, 255, 255, 0.06);
+  --row-flat: rgba(255, 255, 255, 0.05);
 }
 
 * {
@@ -122,9 +146,9 @@ button {
   background: var(--panel-2);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  padding: 10px 16px;
+  padding: var(--ctl-pad-y) var(--ctl-pad-x);
   cursor: pointer;
-  min-height: 44px;
+  min-height: var(--ctl-h);
 }
 button:hover:not(:disabled) {
   border-color: var(--accent);
@@ -158,8 +182,12 @@ select {
   background: var(--field);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  padding: 10px 12px;
-  min-height: 44px;
+  padding: var(--ctl-pad-y) var(--ctl-pad-x);
+  min-height: var(--ctl-h);
+}
+
+textarea {
+  padding: var(--ctl-pad-y) var(--ctl-pad-x);
 }
 input:focus,
 select:focus {
@@ -1238,7 +1266,7 @@ button.link-inline {
   cursor: pointer;
 }
 
-.review-row:hover { background: var(--row-hover, rgba(255, 255, 255, 0.05)); }
+.review-row:hover { background: var(--row-hover); }
 
 .review-row.current {
   border-color: var(--accent, #4a9eff);
@@ -1275,7 +1303,7 @@ button.link-inline {
   margin-bottom: 4px;
   padding: 1px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--row-flat);
   font-size: 0.75rem;
   opacity: 0.85;
 }
@@ -1306,7 +1334,7 @@ button.link-inline {
   flex: 1;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--row-hover);
   overflow: hidden;
 }
 
@@ -1331,7 +1359,7 @@ button.link-inline {
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--input-bg, rgba(0, 0, 0, 0.25));
+  background: var(--field);
   color: inherit;
   font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
   resize: vertical;
@@ -1340,7 +1368,7 @@ button.link-inline {
 .review-editor code {
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--row-flat);
   font-size: 0.9em;
 }
 
@@ -1492,16 +1520,73 @@ button.link-inline {
   padding: 12px;
 }
 
-/* 선택한 항목의 설정 — 목록 아래에 접히지 않고 붙는다 */
+/*
+ * 선택한 항목의 편집 칸.
+ *
+ * **높이를 제한한다.** 전에는 내용만큼 늘어나, '순서 표시' 처럼 슬라이더가 많은 항목을
+ * 고르면 순서 목록을 화면 밖으로 밀어냈다(2026-08-18 실측). 이 칸이 스스로 스크롤한다.
+ */
 .plan-settings {
-  flex: 0 0 auto;
-  padding: 10px 12px;
-  margin-top: 8px;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 42vh;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  margin-top: 6px;
 }
 
-.plan-settings .plan-detail-title {
-  margin: 0 0 6px;
-  font-size: 0.95rem;
+.plan-settings.collapsed {
+  max-height: none;
+  flex: 0 0 auto;
+}
+
+.plan-detail-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* 제목 줄이 접기 버튼이다 — 버튼 겉모습은 지우고 줄처럼 보이게 둔다 */
+.plan-settings > .plan-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 2px 0;
+  min-height: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+}
+.plan-settings > .plan-detail-title:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: transparent;
+}
+.plan-settings > .plan-detail-title .caret {
+  color: var(--dim);
+  font-size: 11px;
+}
+.plan-detail-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 편집 칸 안의 줄 간격도 좁힌다 — 사용자 요청 */
+.plan-detail-body .row,
+.plan-detail-body .detail-controls {
+  margin-top: 6px;
+  gap: 6px;
+}
+.plan-detail-body .field {
+  gap: 4px;
 }
 
 .plan-head {
@@ -1574,7 +1659,7 @@ button.link-inline {
   cursor: pointer;
 }
 
-.cue-row:hover { background: rgba(255, 255, 255, 0.05); }
+.cue-row:hover { background: var(--row-hover); }
 
 /* 선택(커서) — 보고 있을 뿐, 화면에는 안 나간다 */
 .cue-row.current {
@@ -1673,7 +1758,7 @@ button.link-inline {
   font-size: 0.8rem;
   color: var(--muted);
 }
-.cue-slide-row:hover { background: rgba(255, 255, 255, 0.05); }
+.cue-slide-row:hover { background: var(--row-hover); }
 .cue-slide-row.current {
   outline: 1px solid var(--accent, #4a9eff);
   color: var(--fg);
