@@ -116,31 +116,50 @@ export function templatesUsing(name: string): string[] {
     .map((template) => template.name);
 }
 
-export function listBackgrounds(): BackgroundFile[] {
-  if (!existsSync(paths.backgroundsDir)) return [];
+/** 폴더 하나를 훑어 배경으로 쓸 수 있는 파일만 고른다 */
+function scanFolder(dir: string, urlPrefix: string): BackgroundFile[] {
+  if (!existsSync(dir)) return [];
 
-  return readdirSync(paths.backgroundsDir)
+  return readdirSync(dir)
     .filter((name) => !name.startsWith('.'))
     .flatMap((name) => {
       const kind = backgroundKindOf(name);
       if (!kind) return [];
-      const full = path.join(paths.backgroundsDir, name);
+      const full = path.join(dir, name);
       // 폴더나 읽을 수 없는 항목은 조용히 건너뛴다 — 목록이 통째로 죽으면 안 된다
       try {
         const stat = statSync(full);
         if (!stat.isFile()) return [];
-        return [{ name, kind, bytes: stat.size, url: `/backgrounds/${encodeURIComponent(name)}` }];
+        return [{ name, kind, bytes: stat.size, url: `${urlPrefix}${encodeURIComponent(name)}` }];
       } catch {
         return [];
       }
     })
-    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
+}
+
+/** 앱이 관리하는 배경 (`data/backgrounds/`) — 올리기·삭제·총량 상한이 걸린다 */
+export function listBackgrounds(): BackgroundFile[] {
+  return scanFolder(paths.backgroundsDir, '/backgrounds/');
+}
+
+/**
+ * 사용자가 모아 둔 배경 (`~/Desktop/Data/Background`) — **읽기만 한다.**
+ *
+ * 여기 있는 파일은 지우거나 덮어쓰지 않고 총량 계산에도 넣지 않는다.
+ * 사용자 폴더이므로 앱이 손댈 물건이 아니다.
+ */
+export function listLibraryBackgrounds(): BackgroundFile[] {
+  return scanFolder(paths.backgroundSourceDir, '/background-library/');
 }
 
 export async function registerBackgroundRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/backgrounds', async () =>
     ok({
       files: listBackgrounds(),
+      // 사용자 폴더의 그림들 — 전례문·교독문 배경을 여기서 고른다
+      library: listLibraryBackgrounds(),
+      libraryDir: paths.backgroundSourceDir,
       maxUploadBytes: MAX_UPLOAD_BYTES,
       totalBytes: totalBackgroundBytes(),
       maxTotalBytes: MAX_TOTAL_BYTES,

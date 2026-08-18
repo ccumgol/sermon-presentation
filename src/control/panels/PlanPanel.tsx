@@ -24,7 +24,7 @@ import {
   AUTO_HOLD_MS_DEFAULT,
   AUTO_HOLD_MS_MAX,
   AUTO_HOLD_MS_MIN,
-  type ClientMsg, type CueItem, type Deck, type PlanDefaults, type PlanKind, type ServicePlan,
+  type ClientMsg, type CueItem, type Deck, type ItemBackground, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
@@ -93,6 +93,86 @@ const ORDER_PRESETS = [
   '광고',
   '축도',
 ] as const;
+
+/**
+ * 배경 그림 고르기 — 교독문·주기도문·사도신경이 쓴다.
+ *
+ * 두 폴더를 한 드롭다운에 묶는다. 사용자가 모아 둔 폴더(`~/Desktop/Data/Background`)가
+ * 먼저 오고, 앱에 올린 것이 뒤에 온다 — 전례문 배경은 대개 그 폴더에서 고른다.
+ *
+ * 목록에 없는 파일도 값으로 남긴다. 지우면 무엇을 쓰려 했는지 알 수 없어진다.
+ */
+function BackgroundSelect({
+  value,
+  library,
+  uploaded,
+  onChange,
+}: {
+  value: ItemBackground | undefined;
+  library: BackgroundFile[];
+  uploaded: BackgroundFile[];
+  onChange: (next: ItemBackground | undefined) => void;
+}): React.JSX.Element {
+  /** `source:name` 한 문자열로 다뤄야 select 의 값이 두 폴더를 구분할 수 있다 */
+  const key = value ? `${value.source}:${value.src}` : '';
+  const known =
+    value === undefined ||
+    (value.source === 'library' ? library : uploaded).some((f) => f.name === value.src);
+
+  return (
+    <>
+      <select
+        value={key}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === '') {
+            onChange(undefined);
+            return;
+          }
+          const cut = raw.indexOf(':');
+          const source = raw.slice(0, cut) === 'data' ? 'data' : 'library';
+          onChange({ src: raw.slice(cut + 1), source, ...(value?.fit ? { fit: value.fit } : {}) });
+        }}
+      >
+        <option value="">— 배경 없음 —</option>
+        {!known && value && <option value={key}>{value.src} (없음)</option>}
+        {library.filter((f) => f.kind === 'image').length > 0 && (
+          <optgroup label="내 배경 폴더">
+            {library
+              .filter((f) => f.kind === 'image')
+              .map((f) => (
+                <option key={`library:${f.name}`} value={`library:${f.name}`}>
+                  {f.name}
+                </option>
+              ))}
+          </optgroup>
+        )}
+        {uploaded.filter((f) => f.kind === 'image').length > 0 && (
+          <optgroup label="앱에 올린 배경">
+            {uploaded
+              .filter((f) => f.kind === 'image')
+              .map((f) => (
+                <option key={`data:${f.name}`} value={`data:${f.name}`}>
+                  {f.name}
+                </option>
+              ))}
+          </optgroup>
+        )}
+      </select>
+
+      {value && (
+        <select
+          value={value.fit ?? 'cover'}
+          onChange={(e) => onChange({ ...value, fit: e.target.value === 'contain' ? 'contain' : undefined })}
+          title="배경은 화면을 채우는 것이 기본입니다"
+        >
+          <option value="cover">채우기</option>
+          <option value="contain">전체 보이기</option>
+        </select>
+      )}
+    </>
+  );
+}
 
 const ITEM_ICONS: Record<CueItem['type'], string> = {
   bible: '📖',
@@ -254,6 +334,8 @@ export function PlanPanel({
 
   /** `data/backgrounds/` 파일 목록 — 그림·동영상 항목이 여기서 고른다 */
   const [bgFiles, setBgFiles] = useState<BackgroundFile[]>([]);
+  /** `~/Desktop/Data/Background` 의 그림들 — 전례문·교독문 배경을 여기서 고른다 */
+  const [bgLibrary, setBgLibrary] = useState<BackgroundFile[]>([]);
 
   const [addKind, setAddKind] = useState<AddKind>('bible');
   const [addInput, setAddInput] = useState('');
@@ -546,7 +628,11 @@ export function PlanPanel({
 
         const pages = liturgySlides(lines, item.perSlide ?? DEFAULT_LITURGY_PER_SLIDE);
         return {
-          slides: pages.map((page) => ({ kind: 'text' as const, lines: [...page] })),
+          slides: pages.map((page) => ({
+            kind: 'text' as const,
+            lines: [...page],
+            ...(item.background ? { background: item.background } : {}),
+          })),
           labels: pages.map((_, index) => `${index + 1}`),
         };
       }
@@ -563,6 +649,7 @@ export function PlanPanel({
               leader: slide.leader,
               ...(slide.people !== undefined ? { people: slide.people } : {}),
               reference: reading.title,
+              ...(item.background ? { background: item.background } : {}),
             })),
             labels: reading.slides.map((_, index) => `${index + 1}`),
           };
@@ -825,15 +912,25 @@ export function PlanPanel({
     try {
       const result = await api.backgrounds();
       setBgFiles(result.files);
+      setBgLibrary(result.library ?? []);
     } catch {
       // 목록을 못 읽어도 순서표 작업은 계속돼야 한다 — 고를 파일이 없을 뿐이다
       setBgFiles([]);
+      setBgLibrary([]);
     }
   }, []);
 
   useEffect(() => {
-    if (addKind === 'media' || items.some((i) => i.type === 'media')) void reloadBgFiles();
-  }, [addKind, items, reloadBgFiles]);
+    // 기본 설정 칸에도 배경 드롭다운이 있다. 이걸 빼먹으면 설정을 열었을 때
+    // 목록이 비어 '배경이 없다'고 오해한다.
+    const needsFiles =
+      defaultsOpen ||
+      addKind === 'media' ||
+      addKind === 'liturgy' ||
+      addKind === 'reading' ||
+      items.some((i) => i.type === 'media' || i.type === 'liturgy' || i.type === 'reading');
+    if (needsFiles) void reloadBgFiles();
+  }, [defaultsOpen, addKind, items, reloadBgFiles]);
 
   /** 순서표 전체를 하나의 덱으로 올린다 (순서대로 진행할 때) */
   async function loadForService(): Promise<void> {
@@ -1010,6 +1107,8 @@ export function PlanPanel({
       ...(plan?.defaults?.liturgy?.perSlide !== undefined
         ? { perSlide: plan.defaults.liturgy.perSlide }
         : {}),
+      // 기본 배경을 넣어 준다 — 항목마다 고르게 하면 잊어버린 한 장이 맨 화면으로 나간다
+      ...(plan?.defaults?.readingBackground ? { background: plan.defaults.readingBackground } : {}),
     });
   }
 
@@ -1020,6 +1119,7 @@ export function PlanPanel({
       type: 'reading',
       readingNumber: hit.number,
       readingTitle: hit.title,
+      ...(plan?.defaults?.readingBackground ? { background: plan.defaults.readingBackground } : {}),
     });
     setAddInput('');
   }
@@ -1347,6 +1447,21 @@ export function PlanPanel({
                     이 예배 전체의 기본값입니다. <b>항목에서 따로 지정한 것만</b> 예외가 됩니다.
                     템플릿은 이미 만든 항목에도 곧바로 적용되고, 역본·언어는 <b>앞으로 넣는</b> 항목에 채워집니다.
                   </p>
+
+                  {/*
+                    교독문·주기도문·사도신경 배경은 한 곳에서 정한다.
+                    사용자 요구: 이 셋은 '무조건' 배경을 깐다 (2026-08-18).
+                    여기서 고르면 앞으로 넣는 항목이 자동으로 이 배경을 받는다.
+                  */}
+                  <div className="row detail-controls">
+                    <label title="교독문·주기도문·사도신경에 함께 쓰입니다">교독문·전례문 배경</label>
+                    <BackgroundSelect
+                      value={plan.defaults?.readingBackground}
+                      library={bgLibrary}
+                      uploaded={bgFiles}
+                      onChange={(readingBackground) => patchDefaults((c) => ({ ...c, readingBackground }))}
+                    />
+                  </div>
 
                   {([
                     ['bible', '성경'],
@@ -1965,6 +2080,32 @@ export function PlanPanel({
             </div>
           )}
 
+          {current.type === 'reading' &&
+            (() => {
+              const reading = current;
+
+              function patchReading(patch: Partial<Extract<CueItem, { type: 'reading' }>>): void {
+                patchItems(
+                  items.map((i) =>
+                    i.id === reading.id && i.type === 'reading' ? { ...i, ...patch } : i,
+                  ),
+                );
+              }
+
+              return (
+                <div className="row detail-controls">
+                  <label>배경</label>
+                  <BackgroundSelect
+                    value={reading.background}
+                    library={bgLibrary}
+                    uploaded={bgFiles}
+                    onChange={(background) => patchReading({ background })}
+                  />
+                  <span className="muted">교독문 {reading.readingNumber}번</span>
+                </div>
+              );
+            })()}
+
           {current.type === 'media' &&
             (() => {
               const media = current;
@@ -2161,6 +2302,14 @@ export function PlanPanel({
                         </button>
                       ))}
                     </div>
+
+                    <label>배경</label>
+                    <BackgroundSelect
+                      value={liturgy.background}
+                      library={bgLibrary}
+                      uploaded={bgFiles}
+                      onChange={(background) => patchLiturgy({ background })}
+                    />
 
                     <label>화면 넘김</label>
                     <select

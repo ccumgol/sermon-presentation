@@ -345,6 +345,25 @@ export type CanvasBackground =
 /** 화면을 채울지(잘림), 다 보이게 넣을지(여백) */
 export type BackgroundFit = 'cover' | 'contain';
 
+/**
+ * **항목이 직접 지정하는 배경 그림** — 그 항목에서만 템플릿 배경을 덮는다.
+ *
+ * 템플릿 배경(`canvas.background`)과 다르다. 배경을 템플릿에 두면 배경을 바꿀 때마다
+ * 템플릿을 새로 만들어야 한다. 교독문·주기도문·사도신경처럼 **배경을 늘 깔지만 글은
+ * 같은 스타일로 나가는** 순서에는 항목 쪽에 두는 것이 맞다 (2026-08-18 사용자 요구).
+ *
+ * `src` 는 **파일 이름만** 담고, 어느 폴더인지는 `source` 가 말한다. 출력 페이지가
+ * 정해진 표로 주소를 만들므로 순서표에 담긴 값이 폴더 밖을 가리킬 수 없다.
+ */
+export interface ItemBackground {
+  /** 파일 이름만 (경로 구분자가 들어오면 서버가 거른다) */
+  src: string;
+  /** `library` = 사용자 폴더(읽기 전용) · `data` = 앱이 관리하는 배경 폴더 */
+  source: 'library' | 'data';
+  /** 기본 `cover` — 배경은 화면을 채워야 글자 뒤에 빈 자리가 생기지 않는다 */
+  fit?: BackgroundFit;
+}
+
 export interface TemplateCanvas {
   width: number;
   height: number;
@@ -515,6 +534,8 @@ export type CueItem =
        * 있으면 **이것이 이긴다.** 찬양의 '승인'과 같은 원칙이다.
        */
       overrideLines?: string[];
+      /** 이 항목에만 깔 배경 그림 (템플릿 배경을 덮는다) */
+      background?: ItemBackground;
       templateId?: number;
       note?: string;
     }
@@ -559,6 +580,8 @@ export type CueItem =
       readingNumber: number;
       /** 표시용 — DB 에 없어도 순서표에 무엇이었는지 남는다 */
       readingTitle?: string;
+      /** 이 항목에만 깔 배경 그림 (템플릿 배경을 덮는다) */
+      background?: ItemBackground;
       templateId?: number;
       note?: string;
     }
@@ -631,6 +654,14 @@ export interface PlanDefaults {
    * 리터럴로 적는다 (lib 가 이 파일을 import 한다).
    */
   liturgy?: { version?: 'new' | 'traditional'; perSlide?: 0 | 2 | 4 | 6 };
+  /**
+   * **교독문·주기도문·사도신경에 함께 쓸 배경 그림.**
+   *
+   * 이 셋은 회중이 함께 읽는 순서라 배경을 늘 깐다(2026-08-18 사용자 결정).
+   * 여기에 한 번 정해 두면 앞으로 넣는 항목이 자동으로 이 배경을 받는다 —
+   * 항목마다 고르게 하면 잊어버린 한 장이 맨 화면으로 나간다.
+   */
+  readingBackground?: ItemBackground;
 }
 
 export interface ServicePlan {
@@ -684,7 +715,8 @@ export type SlidePayload =
       lines: SongLine[][];
       credit?: string;
     }
-  | { kind: 'text'; lines: string[] }
+  /** `background` 는 전례문(주기도문·사도신경)이 항목 배경을 실어 보낼 때만 찬다 */
+  | { kind: 'text'; lines: string[]; background?: ItemBackground }
   /**
    * 순서 표시 — **왼쪽에 순서 이름, 오른쪽에 담당자**를 한 줄로 놓고 담당자 아래에 밑줄.
    *
@@ -715,6 +747,7 @@ export type SlidePayload =
       people?: string;
       /** '시편 1편' 처럼 작게 붙는 표기 */
       reference?: string;
+      background?: ItemBackground;
     }
   /** 그림·동영상 한 장 (예배 전 안내). 글자를 얹지 않는다. */
   | {

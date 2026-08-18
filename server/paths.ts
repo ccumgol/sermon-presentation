@@ -30,10 +30,22 @@ export const BIBLE_SOURCE_DIR = process.env.BIBLE_DB_DIR
   ? path.resolve(process.env.BIBLE_DB_DIR)
   : path.join(homedir(), 'Desktop', 'Data', 'BibleDB');
 
+/**
+ * 사용자가 모아 둔 배경 그림 폴더 — **읽기 전용으로만 접근한다.**
+ *
+ * 성경 DB 폴더와 같은 규칙이다. 여기에 쓰지 않고, 복사해 오지도 않는다 —
+ * 54MB(13장)를 `data/` 로 옮기면 두 벌이 되고 백업 용량 계산도 어긋난다.
+ * 폴더에 파일을 넣으면 목록에 바로 나타나는 것이 사용자가 기대하는 동작이다.
+ */
+export const BACKGROUND_SOURCE_DIR = process.env.SERMON_BACKGROUND_DIR
+  ? path.resolve(process.env.SERMON_BACKGROUND_DIR)
+  : path.join(homedir(), 'Desktop', 'Data', 'Background');
+
 export const paths = {
   appRoot: APP_ROOT,
   dataDir: DATA_DIR,
   bibleSourceDir: BIBLE_SOURCE_DIR,
+  backgroundSourceDir: BACKGROUND_SOURCE_DIR,
 
   /**
    * 성경 DB 는 읽기 전용·불변이라 사용자 데이터와 위치를 분리할 수 있다.

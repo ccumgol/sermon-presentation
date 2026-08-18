@@ -192,6 +192,9 @@ export const api = {
   backgrounds: () =>
     get<{
       files: BackgroundFile[];
+      /** `~/Desktop/Data/Background` 의 그림들 — 읽기 전용, 총량 계산에 들어가지 않는다 */
+      library: BackgroundFile[];
+      libraryDir: string;
       maxUploadBytes: number;
       /** 배경 폴더가 지금 쓰는 총 바이트 · 한도 (SECURITY-AUDIT S-1) */
       totalBytes: number;

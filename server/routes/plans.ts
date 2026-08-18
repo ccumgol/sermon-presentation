@@ -24,6 +24,7 @@ import {
   AUTO_HOLD_MS_MIN,
   type ApiResponse,
   type CueItem,
+  type ItemBackground,
   type PlanDefaults,
   type PlanKind,
   type ServicePlan,
@@ -36,6 +37,28 @@ function ok<T>(data: T): ApiResponse<T> {
 
 function fail(error: string): ApiResponse<null> {
   return { success: false, data: null, error };
+}
+
+/**
+ * 항목 배경을 검증한다.
+ *
+ * 이름 검증은 배경 업로드와 **같은 함수**를 쓴다(`safeBackgroundName`) — 경로를 떼고
+ * 허용 확장자만 통과시킨다. 폴더는 아는 두 값만 받는다. 모르는 값이면 배경을 담지
+ * 않는다 (항목은 살린다 — 배경이 없어도 본문은 나가야 한다).
+ */
+function readItemBackground(raw: unknown): ItemBackground | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const value = raw as Record<string, unknown>;
+
+  const src = safeBackgroundName(value.src);
+  if (!src) return undefined;
+
+  const source = value.source === 'data' ? 'data' : value.source === 'library' ? 'library' : undefined;
+  if (!source) return undefined;
+
+  // 기본은 cover — 배경이 화면을 못 채우면 글자 뒤에 빈 자리가 보인다
+  const fit = value.fit === 'contain' ? 'contain' : undefined;
+  return { src, source, ...(fit ? { fit } : {}) };
 }
 
 /**
@@ -162,6 +185,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         // 판본·장수는 모르는 값이면 기본으로 떨어뜨린다. 항목을 버릴 일은 아니다 —
         // 무엇을 띄울지(textId)만 맞으면 예배는 진행된다.
         const version = isLiturgyVersion(liturgy.version) ? liturgy.version : DEFAULT_LITURGY_VERSION;
+        const background = readItemBackground(fields.background);
         const perSlide = isLiturgyPerSlide(fields.perSlide) ? fields.perSlide : undefined;
         // 빈 배열은 '고치지 않음'으로 본다 — 실수로 다 지웠을 때 빈 화면이 나가면 안 된다
         const overrideLines = Array.isArray(fields.overrideLines)
@@ -178,6 +202,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           version,
           ...(perSlide !== undefined ? { perSlide } : {}),
           ...(overrideLines.length > 0 ? { overrideLines } : {}),
+          ...(background ? { background } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
@@ -198,6 +223,9 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           // 가져오기를 안 한 PC 로 순서표를 옮겼을 때 번호만 남으면 알 수 없다.
           ...(typeof reading.readingTitle === 'string' && reading.readingTitle.trim().length > 0
             ? { readingTitle: reading.readingTitle.trim() }
+            : {}),
+          ...(readItemBackground(fields.background)
+            ? { background: readItemBackground(fields.background)! }
             : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
@@ -309,6 +337,9 @@ function readDefaults(raw: unknown): PlanDefaults | undefined {
     if (isLiturgyPerSlide(liturgy.perSlide)) picked.perSlide = liturgy.perSlide;
     if (Object.keys(picked).length > 0) out.liturgy = picked;
   }
+
+  const readingBackground = readItemBackground(value.readingBackground);
+  if (readingBackground) out.readingBackground = readingBackground;
 
   return Object.keys(out).length > 0 ? out : undefined;
 }

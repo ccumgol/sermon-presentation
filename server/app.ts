@@ -134,6 +134,25 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
     },
   });
 
+  /**
+   * 사용자가 모아 둔 배경 그림 폴더 (`~/Desktop/Data/Background`).
+   *
+   * **읽기만 한다** — 올리기·삭제·총량 상한은 `data/backgrounds/` 쪽 얘기다.
+   * 폴더가 없을 수도 있으므로(다른 PC 에 설치했을 때) 있을 때만 붙인다.
+   * 없는데 붙이면 기동이 실패해 예배 준비 자체가 막힌다.
+   */
+  if (existsSync(paths.backgroundSourceDir)) {
+    await app.register(fastifyStatic, {
+      root: paths.backgroundSourceDir,
+      prefix: '/background-library/',
+      decorateReply: false,
+      index: false,
+      setHeaders(res) {
+        res.header('Cache-Control', 'no-cache, must-revalidate');
+      },
+    });
+  }
+
   const controlPanelBuilt = existsSync(path.join(paths.publicDir, 'app', 'index.html'));
 
   /**

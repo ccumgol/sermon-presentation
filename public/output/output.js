@@ -101,14 +101,24 @@
     });
   }
 
+  /**
+   * **템플릿이 원하는 배경.** 실제로 무엇을 깔지는 `syncBackdrop` 이 정한다.
+   *
+   * 항목 배경(교독문·주기도문·사도신경)이 있으면 그것이 이기므로, 템플릿 값을
+   * 곧바로 그리면 안 된다 — 그리는 순간 항목 배경이 지워진다.
+   */
+  var templateBackdrop = null;
+
   /** '{"mode":"image","src":"a.jpg"}' 또는 빈 문자열 */
   function applyBackdropFromString(value) {
     if (!value) {
-      applyBackdrop(null);
+      templateBackdrop = null;
+      syncBackdrop(lastSlide);
       return;
     }
     try {
-      applyBackdrop(JSON.parse(value));
+      templateBackdrop = JSON.parse(value);
+      syncBackdrop(lastSlide);
     } catch (err) {
       // 값이 깨져도 화면은 그대로 둔다
       diag.errors++;
@@ -154,10 +164,12 @@
   // 반복 동영상이 매번 처음으로 되감겨 화면이 튄다.
   var backdropKey = '';
 
-  function applyBackdrop(background) {
+  function applyBackdrop(background, urlPrefix) {
     var mode = background && background.mode;
     var src = background && background.src;
-    var key = mode === 'image' || mode === 'video' ? mode + ':' + src : '';
+    var prefix = urlPrefix || '/backgrounds/';
+    // 같은 파일 이름이 두 폴더에 있을 수 있으므로 앞머리도 열쇠에 넣는다
+    var key = mode === 'image' || mode === 'video' ? mode + ':' + prefix + ':' + src : '';
 
     // 같은 파일이면 아무것도 하지 않는다 — 맞춤·불투명도는 CSS 변수
     // (--backdrop-fit / --backdrop-opacity)로 따로 오므로 다시 만들 필요가 없다.
@@ -187,7 +199,7 @@
       renderDebug();
     });
 
-    node.src = '/backgrounds/' + encodeURIComponent(src);
+    node.src = prefix + encodeURIComponent(src);
     el.backdrop.appendChild(node);
 
     if (mode === 'video' && typeof node.play === 'function') tryPlay(node);
@@ -538,7 +550,55 @@
   function restoreTemplateBackdrop() {
     el.backdrop.style.removeProperty('--backdrop-fit');
     el.backdrop.style.removeProperty('--backdrop-opacity');
-    applyBackdrop(template && template.canvas && template.canvas.background);
+    // 템플릿 값은 CSS 패치로도 오므로(`applyStylePatch`) 기억해 둔 것을 쓴다.
+    // `template.canvas` 만 보면 편집 중 값과 어긋난다.
+    applyBackdrop(
+      templateBackdrop || (template && template.canvas && template.canvas.background),
+    );
+  }
+
+  /**
+   * **화면에 무엇을 깔지 정하는 유일한 곳.**
+   *
+   * 순서: 안내 슬라이드(자기가 관리) → 항목 배경 → 템플릿 배경.
+   *
+   * 전에는 세 곳이 각자 배경을 그렸다 — `render`, `applyTemplate`, 그리고 템플릿
+   * CSS 패치(`applyStylePatch` → `applyBackdropFromString`). 그래서 도착 순서에
+   * 따라 결과가 달라졌고, 출력 페이지를 새로 열면 항목 배경이 템플릿 값에 지워졌다
+   * (2026-08-18 실측). 결정은 한 곳에서만 한다.
+   */
+  function syncBackdrop(payload) {
+    if (payload && payload.kind === 'media') return;
+    if (applyItemBackground(payload && payload.background)) return;
+    restoreTemplateBackdrop();
+  }
+
+  /**
+   * 항목 배경을 낼 주소 앞머리.
+   *
+   * **정해진 표로만 만든다.** 순서표에 담긴 값이 주소를 통째로 정하게 하면, WS 로
+   * 아무 주소나 밀어넣어 바깥 그림을 불러오게 할 수 있다. 폴더 이름은 두 개뿐이다.
+   */
+  var BACKDROP_PREFIX = { data: '/backgrounds/', library: '/background-library/' };
+
+  /**
+   * 항목이 자기 배경을 지정했으면 그것을 깐다 (교독문·주기도문·사도신경).
+   *
+   * 템플릿 배경을 **그 항목에서만** 덮는다. 배경을 템플릿에 두면 배경을 바꿀 때마다
+   * 템플릿을 새로 만들어야 하는데, 이 순서들은 글 스타일은 그대로 두고 배경만 바꾼다.
+   *
+   * @returns 항목 배경을 깔았는지 (아니면 부르는 쪽이 템플릿 배경으로 되돌린다)
+   */
+  function applyItemBackground(background) {
+    if (!background || !background.src) return false;
+    var prefix = BACKDROP_PREFIX[background.source];
+    if (!prefix) return false;
+
+    // 배경은 화면을 채워야 글자 뒤에 빈 자리가 안 생긴다 — 기본 cover
+    el.backdrop.style.setProperty('--backdrop-fit', background.fit === 'contain' ? 'contain' : 'cover');
+    el.backdrop.style.setProperty('--backdrop-opacity', '1');
+    applyBackdrop({ mode: 'image', src: background.src }, prefix);
+    return true;
   }
 
   /**
@@ -560,8 +620,8 @@
    * @returns {boolean} 성공 여부
    */
   function render(payload) {
-    // 안내 슬라이드가 아니면 템플릿 배경으로 되돌린다 (안내 그림이 남지 않게)
-    if (!payload || payload.kind !== 'media') restoreTemplateBackdrop();
+    // 배경은 한 곳에서 정한다 (안내 → 항목 → 템플릿)
+    syncBackdrop(payload);
 
     if (!payload || payload.kind === 'blank') {
       // 내용을 **지운다**. 예전에는 blanked 클래스(투명도 0)만 켰는데,
@@ -883,9 +943,22 @@
   function applyTemplate(next) {
     if (!next) return;
     template = next;
-    applyBackdrop(next.canvas && next.canvas.background);
-    if (lastSlide) render(lastSlide);
-    else lastFit = applyAutoFit();
+
+    /*
+     * 배경은 **render 가 정한다** — 항목 배경 → 템플릿 배경 순.
+     *
+     * 전에는 여기서 `applyBackdrop` 를 직접 불렀다. 그래서 템플릿 메시지가 올 때마다
+     * 항목 배경(교독문·주기도문·사도신경)이 템플릿 배경으로 덮여 지워졌다.
+     * 출력 페이지를 새로 열면 배경이 빠지는 증상이 이것이었다 — 접속 직후 서버가
+     * 상태와 템플릿을 잇달아 보내는데, 템플릿이 뒤에 와서 배경을 지웠다.
+     * 결정하는 곳이 둘이면 순서에 따라 결과가 달라진다. 한 곳으로 모은다.
+     */
+    if (lastSlide) {
+      render(lastSlide);
+    } else {
+      syncBackdrop(null);
+      lastFit = applyAutoFit();
+    }
     renderDebug();
   }
 
