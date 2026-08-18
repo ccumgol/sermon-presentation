@@ -301,7 +301,7 @@ export interface SongSearchResult {
 // 템플릿 / 스타일
 // ─────────────────────────────────────────────────────────────
 
-export type TemplateKind = 'bible' | 'song' | 'lower_third' | 'blank' | 'order';
+export type TemplateKind = 'bible' | 'song' | 'lower_third' | 'blank' | 'order' | 'reading';
 
 export type Anchor =
   | 'top-left' | 'top-center' | 'top-right'

@@ -20,7 +20,7 @@ function fail(error: string): ApiResponse<null> {
   return { success: false, data: null, error };
 }
 
-const KINDS = new Set(['bible', 'song', 'lower_third', 'blank', 'order']);
+const KINDS = new Set(['bible', 'song', 'lower_third', 'blank', 'order', 'reading']);
 
 /**
  * 들어온 값을 기준 템플릿과 병합해 유효한 Template 을 만든다.

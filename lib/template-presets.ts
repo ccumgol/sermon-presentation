@@ -330,6 +330,126 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
     },
   }),
 
+  /**
+   * 교독문 — 인도자(위, 흰색) · 회중(아래, 노란색), **글자 크기는 같다.**
+   *
+   * 배경 그림 위에 얹히는 것을 전제로 만들었다(2026-08-18 사용자 지정):
+   *  - 어떤 그림이 와도 읽히도록 테두리를 두껍게 둔다. 밝은 하늘 사진 위에서
+   *    흰 글씨는 테두리 없이는 사라진다
+   *  - 위아래를 `gap` 으로 벌려 **누가 읽을 차례인지** 한눈에 보이게 한다
+   *
+   * 크기를 같게 둔 이유: 두 줄은 **번갈아 읽는 대등한 순서**다. 성경 다역본처럼
+   * 주/보조 관계가 아니므로 크기로 위아래를 나누면 회중 줄이 덜 중요해 보인다.
+   * 색으로만 구분한다.
+   *
+   * 글자 크기 64px 는 **1920×1080 에서 실제로 재서** 정했다 (2026-08-18):
+   *
+   * | 크기 | 회중 줄(33자) | 최악 짝(139자) 높이 / 가용 900 |
+   * |---|---|---|
+   * | 52px | 1줄 | 358 |
+   * | **64px** | **1줄** | **611** |
+   * | 68px | **2줄로 감김** | 647 |
+   *
+   * 68px 부터 회중 줄이 감겨 위/아래 구분이 흐려진다. 그 직전이 64px 다.
+   * 전체 76편의 최악 조합(3·1절, 인도자 62자 + 회중 77자)도 611/900 으로 넘치지 않는다.
+   */
+  preset({
+    id: -10,
+    name: '교독문 — 인도자/회중 (배경 위)',
+    kind: 'reading',
+    anchor: 'center',
+    safeArea: { top: 90, right: 120, bottom: 90, left: 120 },
+    // gap 이 인도자 줄과 회중 줄 사이를 벌린다 (.blocks 의 --block-gap)
+    layout: { align: 'center', verticalAlign: 'middle', gap: 64 },
+    text: {
+      primary: {
+        fontSize: 64,
+        fontWeight: 600,
+        color: '#ffffff',
+        stroke: { width: 7, color: '#000000' },
+        shadow: { x: 0, y: 3, blur: 14, color: 'rgba(0,0,0,0.65)' },
+      },
+      secondary: {
+        // ★ 인도자와 같은 크기 — 색으로만 구분한다
+        fontSize: 64,
+        fontWeight: 600,
+        color: '#ffe14d',
+        stroke: { width: 7, color: '#000000' },
+        shadow: { x: 0, y: 3, blur: 14, color: 'rgba(0,0,0,0.65)' },
+        // 긴 절이 어절 단위로 감겨야 읽기 좋다
+        wordBreak: 'keep-all',
+      },
+      reference: {
+        fontSize: 30,
+        fontWeight: 500,
+        color: '#ffffff',
+        opacity: 0.85,
+        stroke: { width: 4, color: '#000000' },
+      },
+    },
+    behavior: {
+      showVerseNumbers: false,
+      // '시편 1편' 을 아래에 작게 — 무엇을 읽는지 알려 준다
+      showReference: 'bottom',
+      showHeadings: false,
+      showCredit: false,
+      autoFit: true,
+      // 배경 위 글씨는 너무 작아지면 안 읽힌다. 여기서 멈추고 줄이 감기게 둔다.
+      autoFitMinScale: 0.7,
+    },
+  }),
+
+  /**
+   * 주기도문·사도신경 — **화면을 글자로 채운다.**
+   *
+   * 이 순서들은 배경 그림 위에 본문만 나간다(참조·머리글·절 번호가 없다).
+   * 그래서 남는 자리를 글자가 다 쓰도록 크게 잡았다(2026-08-18 사용자 지정).
+   *
+   * 글자 크기 84px 는 **1920×1080 에서 실제로 재서** 정했다 (2026-08-18).
+   * 본문 최장 줄은 21자('오늘날 우리에게 일용할 양식을 주옵시고').
+   *
+   * | 크기 | 4줄 채움 | 6줄 채움 | 감긴 줄 | 6줄에서 넘침 |
+   * |---|---|---|---|---|
+   * | 66px | 49% | 74% | 0 | 아니오 |
+   * | **84px** | **62%** | **95%** | **0** | **아니오** |
+   * | 90px | 67% | 102% | 0 | **예** |
+   *
+   * 84px 이 '화면을 채운다'와 '넘치지 않는다'가 만나는 자리다. 21자 줄이 1314px 로
+   * 안전 영역 1680px 안에 들어가 **어느 줄도 감기지 않는다** — 함께 읽는 본문이라
+   * 줄이 감기면 호흡이 어긋난다.
+   *
+   * 화면을 가장 꽉 채우려면 항목 설정에서 **'화면 넘김'을 6줄씩**으로 두면 된다
+   * (95%). 기본 4줄에서도 62% 라 충분히 크다.
+   *
+   * `gap` 은 줄 간격이다 — `renderText` 가 줄마다 블록을 만든다.
+   */
+  preset({
+    id: -11,
+    name: '주기도문·사도신경 — 전체화면',
+    kind: 'reading',
+    anchor: 'center',
+    safeArea: { top: 80, right: 120, bottom: 80, left: 120 },
+    layout: { align: 'center', verticalAlign: 'middle', gap: 34 },
+    text: {
+      primary: {
+        fontSize: 84,
+        fontWeight: 600,
+        color: '#ffffff',
+        stroke: { width: 8, color: '#000000' },
+        shadow: { x: 0, y: 4, blur: 16, color: 'rgba(0,0,0,0.7)' },
+      },
+    },
+    behavior: {
+      showVerseNumbers: false,
+      showReference: 'none',
+      showHeadings: false,
+      showCredit: false,
+      autoFit: true,
+      // 6줄씩으로 바꿔도 읽히도록 여유를 둔다
+      autoFitMinScale: 0.6,
+    },
+  }),
+
   preset({
     id: -7,
     name: '공백 (블랭크)',

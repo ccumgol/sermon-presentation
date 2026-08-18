@@ -211,8 +211,8 @@ describe('diffCssVars', () => {
 });
 
 describe('내장 프리셋', () => {
-  it('9종이 있고 id 가 겹치지 않는다', () => {
-    expect(BUILTIN_TEMPLATES).toHaveLength(9);
+  it('11종이 있고 id 가 겹치지 않는다', () => {
+    expect(BUILTIN_TEMPLATES).toHaveLength(11);
     const ids = BUILTIN_TEMPLATES.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
