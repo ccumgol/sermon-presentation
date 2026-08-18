@@ -208,6 +208,36 @@ export function buildPlanRows(
   return rows;
 }
 
+/**
+ * 새 항목을 넣을 자리 — **고른 줄이 속한 항목 바로 다음.**
+ *
+ * `cursor` 는 **화면 줄** 번호다. 항목 번호가 아니다. 펼친 항목의 슬라이드가 줄로
+ * 끼어들기 때문에 둘은 어긋난다:
+ *
+ * ```
+ * 줄0  📖 요 3:16      ← 항목0 (펼침)
+ * 줄1    슬라이드 1
+ * 줄2    슬라이드 2
+ * 줄3  🎵 찬송가       ← 항목1
+ * ```
+ *
+ * 줄3(찬송가)에서 새 항목을 넣을 때 `cursor + 1 = 4` 를 항목 번호로 쓰면 항목이 2개뿐이라
+ * **맨 끝**에 붙는다. 슬라이드 줄(줄1·줄2)에 커서가 있을 때도 마찬가지다.
+ * 그래서 줄이 가리키는 `itemIndex` 를 봐야 한다 (2026-08-18 사용자 신고).
+ *
+ * 항목이 없으면 0. 커서가 어디를 가리키는지 알 수 없으면 맨 끝에 붙인다.
+ */
+export function insertIndexFor(
+  rows: readonly PlanRow[],
+  cursor: number,
+  itemCount: number,
+): number {
+  if (itemCount === 0) return 0;
+  const row = rows[Math.min(Math.max(cursor, 0), rows.length - 1)];
+  if (!row) return itemCount;
+  return Math.min(row.itemIndex + 1, itemCount);
+}
+
 /** 항목 배열에서 한 항목을 옮긴다 (불변 — 새 배열을 만든다) */
 export function moveItem(items: readonly CueItem[], from: number, to: number): CueItem[] {
   if (from === to || from < 0 || from >= items.length) return [...items];

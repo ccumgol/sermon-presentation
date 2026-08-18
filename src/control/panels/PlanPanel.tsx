@@ -15,7 +15,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
-  buildPlanDeck, buildPlanRows, describeItem, holdMsFor, isExpandable, itemsInGroup, moveItem, newItemId,
+  buildPlanDeck, buildPlanRows, describeItem, holdMsFor, insertIndexFor, isExpandable, itemsInGroup,
+  moveItem, newItemId,
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
@@ -1016,10 +1017,22 @@ export function PlanPanel({
   }, [addKind, addInput]);
 
   /** 새 항목을 커서 **다음**에 넣는다 — 순서를 짜는 자연스러운 방향 */
+  /**
+   * 새 항목을 **고른 항목 바로 다음**에 넣는다.
+   *
+   * 자리 계산은 `insertIndexFor` 가 한다 — `cursor` 는 화면 줄 번호라 그대로 쓰면
+   * 펼친 항목의 슬라이드 줄 때문에 어긋나 맨 끝에 붙는다.
+   */
   function insertItem(item: CueItem): void {
-    const at = items.length === 0 ? 0 : cursor + 1;
-    patchItems([...items.slice(0, at), item, ...items.slice(at)]);
-    setCursor(at);
+    const at = insertIndexFor(rows, cursor, items.length);
+    const next = [...items.slice(0, at), item, ...items.slice(at)];
+    patchItems(next);
+
+    // 커서도 **줄** 번호로 옮긴다. 항목 번호를 그대로 넣으면 같은 이유로 어긋난다.
+    const nextRows = buildPlanRows(next, expandedId, preview?.slides.length ?? 0);
+    const rowIndex = nextRows.findIndex((row) => row.kind !== 'slide' && row.itemId === item.id);
+    setCursor(rowIndex >= 0 ? rowIndex : Math.max(nextRows.length - 1, 0));
+
     setAddInput('');
     setSongHits([]);
     setParseOk(null);

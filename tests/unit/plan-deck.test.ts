@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  buildPlanDeck, buildPlanRows, describeItem, holdMsFor, isExpandable, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
+  buildPlanDeck, buildPlanRows, describeItem, holdMsFor, insertIndexFor, isExpandable, itemsInGroup, splitOrderText, moveItem, removeItem, type ItemResolver } from '../../lib/plan-deck.ts';
 import type { CueItem, SlidePayload } from '../../shared/types.ts';
 
 function bible(id: string, ref: string): CueItem {
@@ -313,5 +313,55 @@ describe('holdMsFor — 자동 진행에서 머무는 시간', () => {
     // text 에 holdMs 를 억지로 붙여도 무시된다 — 규칙이 한 종류에만 있다
     const sneaky = { kind: 'text', lines: ['광고'], holdMs: 40_000 } as unknown as SlidePayload;
     expect(holdMsFor(sneaky, 8000)).toBe(8000);
+  });
+});
+
+describe('insertIndexFor — 새 항목이 들어갈 자리', () => {
+  /** 요 3:16(펼침, 슬라이드 2장) · 찬송가 · 광고 */
+  const three: CueItem[] = [
+    bible('a', '요 3:16'),
+    { id: 'b', type: 'song', songId: 1, songTitle: '찬송가', langs: ['ko'] },
+    { id: 'c', type: 'text', content: '광고' },
+  ];
+  const expanded = buildPlanRows(three, 'a', 2); // 줄: a, 슬1, 슬2, b, c
+
+  it('펼친 항목이 있어도 고른 항목 바로 다음에 넣는다', () => {
+    expect(expanded.map((r) => r.kind)).toEqual(['item', 'slide', 'slide', 'item', 'item']);
+    // 줄3 = 찬송가(항목1) → 항목2 자리
+    expect(insertIndexFor(expanded, 3, three.length)).toBe(2);
+    // 줄4 = 광고(항목2) → 맨 끝
+    expect(insertIndexFor(expanded, 4, three.length)).toBe(3);
+  });
+
+  /** 이게 실제 신고였다 — 슬라이드 줄에 커서가 있으면 맨 끝에 붙었다 */
+  it('슬라이드 줄에 커서가 있으면 그 항목 다음에 넣는다', () => {
+    expect(insertIndexFor(expanded, 1, three.length)).toBe(1);
+    expect(insertIndexFor(expanded, 2, three.length)).toBe(1);
+  });
+
+  it('접힌 목록에서는 줄 번호와 항목 번호가 같다', () => {
+    const flat = buildPlanRows(three, null, 0);
+    expect(insertIndexFor(flat, 0, three.length)).toBe(1);
+    expect(insertIndexFor(flat, 1, three.length)).toBe(2);
+    expect(insertIndexFor(flat, 2, three.length)).toBe(3);
+  });
+
+  it('구분 줄에서도 그 다음에 넣는다', () => {
+    const withDivider: CueItem[] = [
+      { id: 'd', type: 'divider', label: '예배 부름' },
+      bible('a', '요 3:16'),
+    ];
+    const rows = buildPlanRows(withDivider, null, 0);
+    expect(insertIndexFor(rows, 0, withDivider.length)).toBe(1);
+  });
+
+  it('항목이 없으면 0', () => {
+    expect(insertIndexFor([], 0, 0)).toBe(0);
+    expect(insertIndexFor([], 5, 0)).toBe(0);
+  });
+
+  it('커서가 범위를 벗어나도 항목 수를 넘지 않는다', () => {
+    expect(insertIndexFor(expanded, 99, three.length)).toBe(3);
+    expect(insertIndexFor(expanded, -3, three.length)).toBe(1);
   });
 });
