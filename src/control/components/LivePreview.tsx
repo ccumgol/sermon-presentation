@@ -38,7 +38,7 @@ export function LivePreview({ state, deck }: Props): React.JSX.Element {
 
   return (
     <>
-      <div className="card">
+      <div className="card preview-card">
         <h2>라이브 미리보기</h2>
         <div className="preview-frame" ref={boxRef}>
           <iframe

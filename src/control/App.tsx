@@ -4,6 +4,7 @@ import type { Translation } from '../../shared/types.ts';
 import { api, type ServerInfo } from './api.ts';
 import { ControlBar } from './components/ControlBar.tsx';
 import { LivePreview } from './components/LivePreview.tsx';
+import { NextUp } from './components/NextUp.tsx';
 import { useLiveState } from './hooks/useLiveState.ts';
 import { BiblePanel } from './panels/BiblePanel.tsx';
 import { PlanPanel } from './panels/PlanPanel.tsx';
@@ -11,6 +12,7 @@ import { ReviewPanel } from './panels/ReviewPanel.tsx';
 import { SongPanel } from './panels/SongPanel.tsx';
 import { TemplatePanel } from './panels/TemplatePanel.tsx';
 import { SettingsPanel } from './panels/SettingsPanel.tsx';
+import { useTheme } from './hooks/useTheme.ts';
 
 /** 탭 순서 = 화면에 나오는 순서. 예배 순서가 첫 번째다 — 실제로 가장 많이 쓴다. */
 type Tab = 'plan' | 'bible' | 'song' | 'review' | 'template' | 'settings';
@@ -130,6 +132,7 @@ export function App(): React.JSX.Element {
 
   const outputCount = connections.output;
   const live = Boolean(state?.slide) && !(state?.blank ?? false);
+  const theme = useTheme();
 
   return (
     <div className="app">
@@ -168,6 +171,24 @@ export function App(): React.JSX.Element {
         </nav>
 
         <span className="spacer" />
+
+        {/*
+          테마 토글. 기본은 OS 설정을 따르고(`system`), 어긋날 때만 고정한다.
+          제목 대신 아이콘 하나로 둔 이유는 상단 바가 예배 중에는 볼 일이 없는 자리라서다.
+        */}
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={theme.toggle}
+          title={
+            theme.choice === 'system'
+              ? `화면 밝기 — 지금은 OS 설정(${theme.resolved === 'dark' ? '어둡게' : '밝게'})을 따릅니다`
+              : `화면 밝기 — ${theme.choice === 'dark' ? '어둡게' : '밝게'} 고정`
+          }
+        >
+          {theme.resolved === 'dark' ? '🌙' : '☀️'}
+          {theme.choice !== 'system' && <span className="pin" aria-hidden="true">•</span>}
+        </button>
 
         <div className="status">
           <span>
@@ -268,21 +289,30 @@ export function App(): React.JSX.Element {
           {tab === 'settings' && <SettingsPanel info={info} />}
         </main>
 
+        {/*
+          오른쪽 열 = 미리보기(위) + 송출 제어(아래).
+          전에는 제어 버튼이 화면 전체 폭 아래에 있었고 이 열 아래는 비어 있었다.
+          제어를 여기로 내리면 왼쪽 순서 목록이 그 높이를 되찾는다.
+        */}
         <aside className="side">
           <LivePreview state={state} deck={deck} />
+
+          <div className="side-gap">
+            <NextUp deck={deck} />
+          </div>
+
+          <ControlBar
+            state={state}
+            deck={deck}
+            connected={connected}
+            onPrev={onPrev}
+            onNext={onNext}
+            onBlank={onBlank}
+            onRestore={onRestore}
+            onClear={onClear}
+          />
         </aside>
       </div>
-
-      <ControlBar
-        state={state}
-        deck={deck}
-        connected={connected}
-        onPrev={onPrev}
-        onNext={onNext}
-        onBlank={onBlank}
-        onRestore={onRestore}
-        onClear={onClear}
-      />
     </div>
   );
 }

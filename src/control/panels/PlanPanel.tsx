@@ -1397,19 +1397,12 @@ export function PlanPanel({
 
           {plan && (
             <>
-              <div className="plan-head">
-                <button
-                  type="button"
-                  className="primary grow"
-                  onClick={() => void loadForService()}
-                  disabled={!connected || busy || items.length === 0}
-                  title="순서표 전체를 하나로 올립니다. 이후 화살표로 끝까지 진행합니다."
-                >
-                  예배용으로 올리기
-                </button>
-              </div>
-
-              <div className="plan-head">
+              {/*
+                한 줄로 합쳤다 (2026-08-18). 전에는 '예배용으로 올리기' 가 한 줄을 통째로
+                쓰고 보조 버튼이 또 한 줄을 써서, 순서 목록이 그만큼(53px) 좁아졌다.
+                랩탑(높이 900px)에서 목록이 285px 밖에 안 됐다.
+              */}
+              <div className="plan-head plan-actions">
                 <button
                   type="button"
                   className="grow"
@@ -1649,10 +1642,9 @@ export function PlanPanel({
             </div>
           )}
 
-          {plan && (
-            <p className="hintline muted">
-              {plan.kind === 'template' ? '유형' : '저장된 순서'} · {plan.name}
-              {dirty && <b> · 저장 안 됨</b>}
+          {plan && dirty && (
+            <p className="hintline muted plan-dirty">
+              <b>저장 안 됨</b>
             </p>
           )}
 
@@ -2611,9 +2603,12 @@ export function PlanPanel({
         </div>
       )}
 
+      {/*
+        이 목록에서만 쓰는 키만 적는다. 송출 키(←→·Space·B·Esc)는 오른쪽 송출 제어에
+        같은 내용이 있어, 두 곳에 적으면 자리를 두 번 쓰고 어느 것이 최신인지 흐려진다.
+      */}
       <p className="hintline muted plan-keys">
-        <b>↑↓</b> 줄 이동 · <b>Tab</b> 펼치기 · <b>Shift+Tab</b> 접기 · <b>Enter</b> 송출 ·
-        <b> ←→</b> 송출 중 이동 · <b>Space</b> 다음 · <b>B</b> 블랙 · <b>Esc</b> 복구
+        <b>↑↓</b> 줄 이동 · <b>Tab</b> 펼치기 · <b>Shift+Tab</b> 접기 · <b>Enter</b> 송출
       </p>
     </div>
   );

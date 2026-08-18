@@ -1,31 +1,101 @@
 /*
  * 컨트롤 패널 스타일.
  *
- * 방송실은 대개 어둡다 → 다크 UI 고정 (계획서 §6.1).
- * 예배 중 쓰는 버튼은 항상 같은 자리, 크게, 하단 고정.
- * 터치 타깃은 44px 이상 (태블릿 조작 지원).
+ * 예배 중 쓰는 버튼은 항상 같은 자리, 크게 둔다. 터치 타깃은 44px 이상.
+ *
+ * ## 라이트/다크 두 벌 (2026-08-18)
+ *
+ * 방송실이 어두우면 다크가 맞지만, 랩탑으로 밝은 곳에서 준비할 때는 다크가 오히려
+ * 안 읽힌다. 그래서 두 벌을 두고 **기본은 OS 설정을 따른다**.
+ *
+ * | 상태 | 어떻게 |
+ * |---|---|
+ * | 고르지 않음 | OS 설정(`prefers-color-scheme`)을 따른다 |
+ * | `data-theme="dark"` | 다크 고정 |
+ * | `data-theme="light"` | 라이트 고정 |
+ *
+ * 색은 **`:root` 에 라이트를 먼저 두고** 다크에서 덮는다. 어느 변수든 라이트 값이
+ * 반드시 있으므로, 다크 블록에서 빠뜨린 변수가 '값 없음'이 되는 일이 없다.
  */
 
 :root {
+  color-scheme: light;
+
+  /* 라이트 — 밝은 방에서 랩탑으로 준비할 때 */
+  --bg: #f2f4f7;
+  --panel: #ffffff;
+  --panel-2: #eaeef3;
+  --line: #d5dbe4;
+  --line-strong: #b3bcca;
+  --fg: #131720;
+  --muted: #515b6b;
+  --dim: #737d8c;
+
+  --accent: #1f6feb;
+  --accent-ink: #ffffff;
+  --live: #d42a1f;
+  --ok: #067647;
+  --warn: #a15c07;
+
+  /* 입력칸 바닥. 카드(--panel) 위에 놓이므로 그보다 살짝 눌러 준다 */
+  --field: #ffffff;
+
+  --radius: 10px;
+  /* 좁은 화면에서만 쓰는 하단 바 높이 (넓은 화면은 오른쪽 열에 둔다) */
+  --bar-height: 72px;
+}
+
+/*
+ * 다크 값 한 벌을 두 곳에서 쓴다 — OS 가 다크일 때(라이트로 고정하지 않았다면)와
+ * 사용자가 다크로 고정했을 때. 값을 한 곳에만 적으면 토글이 한쪽 방향만 듣는다.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    /*
+     * 전보다 대비를 올렸다 (사용자: "다크모드에서 화면이 눈에 잘 들어오지 않아").
+     * 배경과 카드가 거의 같은 밝기(#14161a / #1d2026)라 카드 경계가 안 보였고,
+     * 선(#2c3038)과 흐린 글씨(#6b7280)가 배경에 묻혔다.
+     */
+    --bg: #0e1116;
+    --panel: #1a1f27;
+    --panel-2: #242b35;
+    --line: #333b47;
+    --line-strong: #4a5462;
+    --fg: #eef1f6;
+    --muted: #aab3c0;
+    --dim: #808b99;
+
+    --accent: #58a6ff;
+    --accent-ink: #06101c;
+    --live: #ff5c5c;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+
+    --field: #0d1117;
+  }
+}
+
+:root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #14161a;
-  --panel: #1d2026;
-  --panel-2: #232730;
-  --line: #2c3038;
-  --line-strong: #3a3f4a;
-  --fg: #e8eaee;
-  --muted: #9aa2ae;
-  --dim: #6b7280;
+  --bg: #0e1116;
+  --panel: #1a1f27;
+  --panel-2: #242b35;
+  --line: #333b47;
+  --line-strong: #4a5462;
+  --fg: #eef1f6;
+  --muted: #aab3c0;
+  --dim: #808b99;
 
-  --accent: #5aa9ff;
-  --accent-ink: #08121e;
-  --live: #ff4d4f;
+  --accent: #58a6ff;
+  --accent-ink: #06101c;
+  --live: #ff5c5c;
   --ok: #4ade80;
   --warn: #fbbf24;
 
-  --radius: 10px;
-  --bar-height: 84px;
+  --field: #0d1117;
 }
 
 * {
@@ -85,7 +155,7 @@ input,
 select {
   font: inherit;
   color: inherit;
-  background: #0f1115;
+  background: var(--field);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: 10px 12px;
@@ -101,8 +171,10 @@ select:focus {
 
 .app {
   display: grid;
-  grid-template-rows: 52px 1fr var(--bar-height);
+  /* 하단 전체 폭 바를 없애고 오른쪽 열로 내렸다 — 왼쪽 목록이 그 높이를 되찾는다 */
+  grid-template-rows: 48px 1fr;
   height: 100%;
+  min-height: 0;
 }
 
 .topbar {
@@ -186,12 +258,160 @@ select:focus {
   padding: 16px;
 }
 
+/* 테마 토글 — 고정했을 때는 점을 하나 붙여 'OS 따라감' 과 구별한다 */
+.theme-toggle {
+  position: relative;
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.theme-toggle .pin {
+  position: absolute;
+  right: 4px;
+  bottom: 1px;
+  font-size: 10px;
+  color: var(--accent);
+}
+
 .side {
+  display: grid;
+  /*
+   * 열을 명시해야 한다. `auto` 로 두면 미리보기 iframe 의 원본 폭(1920px)이
+   * max-content 로 잡혀 열이 그만큼 벌어지고, `width: 100%` 인 미리보기 틀이
+   * 1081px 높이로 커져 송출 제어를 화면 밖으로 밀어낸다 (실측).
+   */
+  grid-template-columns: minmax(0, 1fr);
+  /* 미리보기 · 여유 공간 · 송출 제어 — 제어가 늘 아래에 붙는다 */
+  grid-template-rows: auto 1fr auto;
   border-left: 1px solid var(--line);
   background: var(--panel);
-  padding: 16px;
-  overflow-y: auto;
+  padding: 12px;
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/*
+ * 미리보기와 제어 사이. '다음 화면' 목록이 들어간다.
+ * 2번째 출력 화면(강사 모니터)이 생기면 그것이 이 자리를 쓴다.
+ */
+.side-gap {
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.nextup-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.nextup-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nextup-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  /* 라벨이 길어도 목록이 넓어지지 않게 한 줄로 자른다 */
+  min-width: 0;
+}
+
+/* 바로 다음 것은 눈에 띄어야 한다 — 손을 준비하는 기준이다 */
+.nextup-list li.soon {
+  background: var(--panel-2);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.nextup-no {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.nextup-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nextup-group {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+/* ── 송출 제어 (오른쪽 열 아래 / 좁은 화면에서는 아래 띠) ──── */
+
+.transport {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transport-row {
+  display: flex;
+  gap: 8px;
+}
+
+.transport-row > button {
+  flex: 1;
+  min-height: 48px;
+  font-weight: 600;
+}
+
+.transport-nav > button {
+  min-height: 56px;
+  font-size: 17px;
+}
+
+.transport-meta {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 20px;
+}
+
+.transport-meta .counter {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.transport-meta .blank-tag {
+  color: var(--live);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.transport-keys {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--dim);
 }
 
 /* ── 하단 컨트롤 바 ─────────────────────────────────────────── */
@@ -418,7 +638,7 @@ select:focus {
 code {
   flex: 1;
   min-width: 0;
-  background: #0f1115;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 11px 12px;
@@ -457,11 +677,38 @@ dl.meta dd {
 
 /* ── 태블릿 ─────────────────────────────────────────────────── */
 
+/*
+ * 좁은 화면 — 오른쪽 열을 **아래 띠**로 바꾼다.
+ *
+ * 전에는 `display: none` 이었는데, 송출 제어가 이 열로 내려왔으므로 그렇게 하면
+ * 예배 중 손을 쓸 수 없게 된다. 미리보기만 감추고 제어는 남긴다.
+ */
 @media (max-width: 900px) {
   .body {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
   .side {
+    grid-template-rows: auto;
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding: 8px 12px;
+    gap: 0;
+  }
+  .side > .card,
+  .side > .side-gap {
+    display: none;
+  }
+  /* 가로로 눕혀 높이를 아낀다 */
+  .transport {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .transport-row {
+    flex: 1;
+  }
+  .transport-keys {
     display: none;
   }
 }
@@ -666,7 +913,7 @@ label.check input[type='checkbox'] {
   width: 100%;
   min-height: 320px;
   padding: 12px;
-  background: #0f1115;
+  background: var(--field);
   color: var(--fg);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -1264,6 +1511,28 @@ button.link-inline {
 }
 
 .plan-head .grow { flex: 1; }
+
+/*
+ * '예배용으로 올리기' + 보조 버튼 한 줄.
+ * 주 동작이 눈에 먼저 들어와야 하므로 폭을 두 배로 준다.
+ */
+.plan-actions > button.primary {
+  flex: 2 1 0;
+}
+.plan-actions > button {
+  flex: 1 1 0;
+  min-height: 40px;
+  font-size: 13px;
+  /* 버튼 이름이 길어 줄바꿈되면 줄 높이가 튄다 — 한 줄로 자른다 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-dirty {
+  margin: 0 0 4px;
+  color: var(--warn);
+}
 
 .cue-list {
   flex: 1 1 auto;
