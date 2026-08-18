@@ -1,0 +1,928 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for lib/song-slides.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">lib</a> song-slides.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">91.15% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>103/113</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">85.33% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>64/75</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">85.71% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>30/35</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">94.04% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>79/84</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">383x</span>
+<span class="cline-any cline-yes">82x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">82x</span>
+<span class="cline-any cline-yes">2219x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">428x</span>
+<span class="cline-any cline-yes">304x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">304x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">66x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">158x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">71x</span>
+<span class="cline-any cline-yes">79x</span>
+<span class="cline-any cline-yes">174x</span>
+<span class="cline-any cline-yes">158x</span>
+<span class="cline-any cline-yes">79x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">83x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">83x</span>
+<span class="cline-any cline-yes">49x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">49x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">47x</span>
+<span class="cline-any cline-yes">47x</span>
+<span class="cline-any cline-yes">71x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">23x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">83x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-yes">344x</span>
+<span class="cline-any cline-yes">344x</span>
+<span class="cline-any cline-yes">344x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">93x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">79x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">74x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-yes">75x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">157x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-yes">38x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">50x</span>
+<span class="cline-any cline-yes">50x</span>
+<span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-yes">30x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * 찬양 섹션 → 슬라이드.
+ *
+ * 2언어 표시의 핵심은 `lineIndex` 페어링이다. 같은 lineIndex 를 가진 줄들이
+ * 한 묶음이 되어 화면에서 위아래(또는 좌우)로 짝지어 나온다.
+ * 통짜 텍스트로 저장했다면 이 대응을 만들 방법이 없다 (계획서 §3.2).
+ */
+&nbsp;
+import type { LangCode, SlidePayload, Song, SongLine, SongSection } from '../shared/types.ts';
+&nbsp;
+/** 한 화면에 담을 줄 수 */
+export type LinesPerSlide = 1 | 2 | 4 | 'section';
+&nbsp;
+export interface SongSlideOptions {
+  /** 표시할 언어 — 순서가 표시 순서다. 첫 번째가 주 언어. */
+  langs: LangCode[];
+  linesPerSlide?: LinesPerSlide;
+  /** 저작권 표기를 붙일지 */
+  includeCredit?: boolean;
+  /** 표시 한 행의 최대 글자 수 — 이 폭에 맞춰 운율 행을 짝으로 묶는다 */
+  maxCharsPerLine?: number;
+}
+&nbsp;
+/** 템플릿이 지정하지 않았을 때의 표시 행 폭 */
+export const DEFAULT_MAX_CHARS_PER_LINE = 24;
+&nbsp;
+/**
+ * 섹션의 줄을 lineIndex 별 묶음으로 만든다.
+ *
+ * 선택한 언어 중 그 줄에 없는 언어는 조용히 빠진다 — 한국어만 있는 찬송가에
+ * 영어를 함께 켜도 빈 자리가 생기지 않는다.
+ */
+export function pairLines(section: SongSection, langs: readonly LangCode[]): SongLine[][] {
+  const maxIndex = section.lines.reduce((max, line) =&gt; Math.max(max, line.lineIndex), -1);
+  const groups: SongLine[][] = [];
+&nbsp;
+  for (let index = 0; index &lt;= maxIndex; index++) {
+    const atIndex = section.lines.filter((line) =&gt; line.lineIndex === index);
+    // 요청한 언어 순서대로 담는다 (표시 순서 = 요청 순서)
+    const group = langs.flatMap((lang) =&gt; atIndex.filter((line) =&gt; line.lang === lang));
+    if (group.length &gt; 0) groups.push(group);
+  }
+&nbsp;
+  return groups;
+}
+&nbsp;
+/** 한 묶음에서 가장 긴 언어의 글자 수 (공백 제외) */
+function groupWidth(group: readonly SongLine[]): number {
+  return group.reduce((max, line) =&gt; Math.max(max, line.text.replace(/\s/g, '').length), 0);
+}
+&nbsp;
+/** 인접한 두 묶음을 합친다 — 언어별로 이어 붙여 줄 짝을 유지한다 */
+function mergePair(first: readonly SongLine[], second: readonly SongLine[]): SongLine[] {
+  const langs = [...new Set([...first, ...second].map((line) =&gt; line.lang))];
+&nbsp;
+  return langs.map((lang) =&gt; {
+    const texts = [first, second]
+      .map((group) =&gt; group.find((line) =&gt; line.lang === lang)?.text)
+      .filter((text): text is string =&gt; text !== undefined);
+    return { lineIndex: first[0]!.lineIndex, lang, text: texts.join(' ') };
+  });
+}
+&nbsp;
+/**
+ * 저장된 운율 행을 표시 폭에 맞춰 묶는다.
+ *
+ * 가사는 악보의 운율 행 단위로 저장한다 (새256 = 9.9.9.9). 화면 구성에 따라
+ * 필요한 행 길이가 다르므로, 표시할 때 인접 행을 **짝으로** 묶어 폭을 맞춘다.
+ *
+ *   9.9.9.9  --24자--&gt;  19.19   (하단 두 줄 템플릿)
+ *   9.9.9.9  --12자--&gt;  9.9.9.9 (전체화면 큰 글씨)
+ *
+ * **반드시 짝으로 묶는다.** 3개를 2+1 로 묶으면 행 길이가 들쭉날쭉해지고 홀수
+ * 행이 되어 2줄씩 표시에서 마지막 한 줄이 혼자 남는다. 그래서 절반으로 나누어
+ * 떨어질 때만, 그리고 결과가 짝수(또는 1행)일 때만 묶는다.
+ *
+ * 모든 짝이 폭 안에 들어와야 묶는다 — 일부만 묶으면 운율이 깨진다.
+ */
+export function fitLinesToWidth(groups: readonly SongLine[][], maxChars: number): SongLine[][] {
+  let current = [...groups];
+&nbsp;
+  while (current.length &gt;= 2 &amp;&amp; current.length % 2 === 0) {
+    const halved = current.length / 2;
+    // 결과가 홀수면 2줄씩 표시에서 고아 줄이 생긴다 (1행은 예외 — 나눌 것이 없다)
+    if (halved !== 1 &amp;&amp; halved % 2 !== 0) break;
+&nbsp;
+    const merged: SongLine[][] = [];
+    for (let index = 0; index &lt; current.length; index += 2) {
+      merged.push(mergePair(current[index]!, current[index + 1]!));
+    }
+    if (merged.some((group) =&gt; groupWidth(group) &gt; maxChars)) break;
+&nbsp;
+    current = merged;
+  }
+&nbsp;
+  return current;
+}
+&nbsp;
+/** items 를 pages 장에 균등하게 나눈다 (앞장이 한 줄 더 많다) */
+function distribute&lt;T&gt;(items: T[], pages: number): T[][] {
+  const base = Math.floor(items.length / pages);
+  const extra = items.length % pages;
+&nbsp;
+  const out: T[][] = [];
+  let cursor = 0;
+  for (let page = 0; page &lt; pages; page++) {
+    const size = base + (page &lt; extra ? 1 : 0);
+    out.push(items.slice(cursor, cursor + size));
+    cursor += size;
+  }
+  return out;
+}
+&nbsp;
+/**
+ * 줄을 화면 단위로 나눈다 — **고아 줄을 만들지 않는다.**
+ *
+ * 앞에서부터 기계적으로 잘라 담으면 3줄짜리 절이 '2줄 + 1줄'이 되어 마지막
+ * 한 줄이 혼자 다음 화면으로 넘어간다. 찬송가 섹션의 30%(1,484/4,877)가
+ * 홀수 줄이라 2줄씩 설정에서 실제로 자주 일어난다. 가사는 구가 이어지는데
+ * 화면이 끊기면 회중이 따라 부르지 못한다.
+ *
+ * 그래서 두 가지를 한다:
+ *  1. 필요한 장수를 먼저 정하고 **균등 분배** (6줄·4줄씩 → 4+2 가 아니라 3+3)
+ *  2. 그래도 마지막 장이 한 줄뿐이면 장수를 하나 줄인다
+ *     (한 장에 `size + 1` 줄까지만 허용 — 넘치면 출력 페이지가 배율로 줄인다)
+ */
+export function chunkWithoutOrphans&lt;T&gt;(items: T[], size: number): T[][] {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!Number.isFinite(size) || size &lt;= 0) <span class="cstat-no" title="statement not covered" >return items.length &gt; 0 ? [items] : [];</span>
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (items.length === 0) <span class="cstat-no" title="statement not covered" >return [];</span>
+&nbsp;
+  const pages = Math.ceil(items.length / size);
+  const even = distribute(items, pages);
+&nbsp;
+  // 마지막 장이 한 줄뿐이면 한 장 줄여 붙인다.
+  // '1줄씩'은 모든 화면이 한 줄인 것이 의도이므로 고아로 보지 않는다.
+  if (size &gt; 1 &amp;&amp; pages &gt; 1 &amp;&amp; even[even.length - 1]!.length === 1) {
+    const merged = distribute(items, pages - 1);
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (merged[0]!.length &lt;= size + 1) return merged;
+  }
+&nbsp;
+  return even;
+}
+&nbsp;
+/**
+ * 저작권·출처 표기.
+ *
+ * 수록 곡집이 여러 개면 첫 번째(정렬 순서상 가장 앞선 곡집)만 쓴다 —
+ * 화면 아래 한 줄에 여러 곡집 번호를 늘어놓으면 읽히지 않는다.
+ * '기타'처럼 번호가 없는 곡집은 표기에서 뺀다.
+ */
+function creditOf(song: Song): string | undefined {
+  const parts: string[] = [];
+&nbsp;
+  const numbered = song.entries.find((entry) =&gt; entry.number !== undefined);
+  if (numbered) parts.push(`${numbered.songbookName} ${numbered.number}장`);
+&nbsp;
+  if (song.copyright) parts.push(song.copyright);
+  if (song.ccliNumber) parts.push(`CCLI ${song.ccliNumber}`);
+  return parts.length &gt; 0 ? parts.join(' · ') : undefined;
+}
+&nbsp;
+/** 섹션 하나를 슬라이드 배열로 */
+export function buildSectionSlides(
+  song: Song,
+  section: SongSection,
+  options: SongSlideOptions,
+): SlidePayload[] {
+  const paired = pairLines(section, options.langs);
+  if (paired.length === 0) return [];
+&nbsp;
+  // 저장된 운율 행을 표시 폭에 맞춰 묶는다 (9.9.9.9 → 19.19)
+  const groups = fitLinesToWidth(paired, options.maxCharsPerLine ?? DEFAULT_MAX_CHARS_PER_LINE);
+&nbsp;
+  const perSlide = options.linesPerSlide ?? 2;
+  const pages = perSlide === 'section' ? [groups] : chunkWithoutOrphans(groups, perSlide);
+  const credit = options.includeCredit ? creditOf(song) : undefined;
+&nbsp;
+  return pages.map((lines, index) =&gt; ({
+    kind: 'song',
+    title: song.title,
+    sectionLabel: section.label,
+    // 절 번호는 첫 장에만 — 출력 페이지는 슬라이드 하나만 받아 앞뒤를 볼 수 없다
+    ...(index === 0 ? { sectionStart: true } : {}),
+    lines,
+    ...(credit ? { credit } : {}),
+  }));
+}
+&nbsp;
+/**
+ * 곡 전체(또는 지정한 섹션 순서)를 슬라이드로.
+ *
+ * `sequence` 로 진행 순서를 줄 수 있다 — 1절, 후렴, 2절, 후렴 처럼
+ * 같은 섹션이 여러 번 나오는 것이 찬양의 기본 형태다.
+ */
+export function <span class="fstat-no" title="function not covered" >buildSongSlides(</span>
+  song: Song,
+  options: SongSlideOptions &amp; { sequence?: number[] },
+): SlidePayload[] {
+  const order = <span class="cstat-no" title="statement not covered" >options.sequence</span>
+    ? options.sequence.<span class="fstat-no" title="function not covered" >flatMap((i</span>d) =&gt; {
+        const section = <span class="cstat-no" title="statement not covered" >song.sections.<span class="fstat-no" title="function not covered" >find((s</span>) =&gt; <span class="cstat-no" title="statement not covered" >s.id === id)</span>;</span>
+<span class="cstat-no" title="statement not covered" >        return section ? [section] : [];</span>
+      })
+    : [...song.sections].<span class="fstat-no" title="function not covered" >sort((a</span>, b) =&gt; <span class="cstat-no" title="statement not covered" >a.position - b.position)</span>;
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return order.<span class="fstat-no" title="function not covered" >flatMap((s</span>ection) =&gt; <span class="cstat-no" title="statement not covered" >buildSectionSlides(song, section, options))</span>;</span>
+}
+&nbsp;
+/** 슬라이드 라벨 — 컨트롤 패널 목록용 */
+/**
+ * 섹션 라벨에서 **절 번호 접두사**를 만든다 — `'1절'` → `'1. '`.
+ *
+ * 찬송가는 절이 여럿이라, 목록에서 가사만 보면 몇 절인지 바로 안 보인다.
+ * 사용자가 실제로 쓰는 표기가 `'1. 주 믿는 사람 일어나…'` 라 그 형식을 따른다.
+ *
+ * 후렴·브리지처럼 **번호가 없는 섹션은 접두사를 붙이지 않는다** — 목록의 라벨 칸에
+ * 이미 '후렴' 이 보이므로, 없는 번호를 지어내는 것보다 비워 두는 편이 정확하다.
+ */
+/**
+ * 이 슬라이드가 **그 절의 첫 장**인가.
+ *
+ * 절이 길면 여러 장으로 나뉘는데(`1절 1/2`, `1절 2/2`), 번호는 첫 장에만 붙인다.
+ * 이어지는 장에도 붙으면 같은 번호가 연달아 보여 절이 바뀐 것처럼 읽힌다.
+ *
+ * 라벨 문자열('1절 1/2')을 파싱하지 않고 **앞 슬라이드와 섹션을 비교**한다 —
+ * 라벨 형식이 바뀌어도 판정이 깨지지 않는다.
+ */
+export function isSectionStart(slide: SlidePayload, previous: SlidePayload | undefined): boolean {
+  if (slide.kind !== 'song') return false;
+  if (!previous || previous.kind !== 'song') return true;
+  return previous.sectionLabel !== slide.sectionLabel;
+}
+&nbsp;
+export function verseNumberPrefix(sectionLabel: string | undefined): string {
+  const matched = /(\d+)/.exec(sectionLabel ?? '');
+  return matched ? `${matched[1]}. ` : '';
+}
+&nbsp;
+export function describeSongSlide(slide: SlidePayload, indexInSection: number, totalInSection: number): string {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (slide.kind !== 'song') <span class="cstat-no" title="statement not covered" >return '';</span>
+  return totalInSection &gt; 1 ? `${slide.sectionLabel} ${indexInSection + 1}/${totalInSection}` : slide.sectionLabel;
+}
+&nbsp;
+/**
+ * 곡 전체 슬라이드에 라벨을 붙인다.
+ * 섹션 안에서 몇 번째인지 표시해야 오퍼레이터가 위치를 알 수 있다.
+ */
+export function buildSongDeck(
+  song: Song,
+  options: SongSlideOptions &amp; { sequence?: number[] },
+): { slides: SlidePayload[]; labels: string[] } {
+  const order = options.sequence
+    ? options.sequence.flatMap((id) =&gt; {
+        const section = song.sections.find((s) =&gt; s.id === id);
+        return section ? [section] : [];
+      })
+    : [...song.sections].sort((a, b) =&gt; a.position - b.position);
+&nbsp;
+  const slides: SlidePayload[] = [];
+  const labels: string[] = [];
+&nbsp;
+  for (const section of order) {
+    const sectionSlides = buildSectionSlides(song, section, options);
+    for (const [index, slide] of sectionSlides.entries()) {
+      slides.push(slide);
+      labels.push(describeSongSlide(slide, index, sectionSlides.length));
+    }
+  }
+&nbsp;
+  return { slides, labels };
+}
+&nbsp;
+/** 곡이 실제로 가진 언어 목록에서 표시 가능한 조합을 추린다 */
+export function availableLangs(song: Song): LangCode[] {
+  const order = ['ko', 'en', 'zh', 'ja'];
+  return [...song.langs].sort((a, b) =&gt; {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    return (ai === -1 ? <span class="branch-0 cbranch-no" title="branch not covered" >99 : a</span>i) - (bi === -1 ? 99 : bi);
+  });
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-08-18T13:24:48.895Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

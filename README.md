@@ -16,6 +16,7 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 | [PLAN.md](PLAN.md) | 전체 설계와 판단 근거 |
 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) | 원본 데이터의 알려진 문제 |
 | [docs/collaboration-report.md](docs/collaboration-report.md) | 여러 Agent 협업 규칙·작업 보드 |
+| [docs/REVIEW-2026-08-18.md](docs/REVIEW-2026-08-18.md) | **검수 리포트** — 방향성 결정(OBS/standalone·탭 구조·덜어낼 것)과 불안요소 |
 
 저장소: https://github.com/ccumgol/sermon-presentation
 
