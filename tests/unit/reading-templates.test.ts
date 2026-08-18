@@ -104,3 +104,67 @@ describe('프리셋 전체', () => {
     expect(ids).toEqual([-11, -10]);
   });
 });
+
+describe('절대 행간 — 글자를 키워도 줄 사이가 벌어지지 않는다', () => {
+  /**
+   * 사용자 요청: "행간을 글자크기의 상대 비율이 아니라 절대 고정으로".
+   *
+   * 배수(1.4)면 84 → 118px 로 키울 때 여백이 34 → 47px 로 함께 벌어진다.
+   * `line-height` 를 px 로 고정하면 반대로 글자가 커질 때 겹친다.
+   * `calc(1em + Npx)` 는 글자 상자만 따라가고 **여백은 고정**이라 둘 다 피한다.
+   */
+  it('두 템플릿이 절대 행간을 쓴다', () => {
+    for (const tpl of [READING, LITURGY]) {
+      expect(tpl.text.primary.lineGapPx, tpl.name).toBeGreaterThan(0);
+    }
+    // 교독문은 회중 줄도 감기므로 함께 지정해야 한다
+    expect(READING.text.secondary.lineGapPx).toBe(READING.text.primary.lineGapPx);
+  });
+
+  it('CSS 로 calc(1em + Npx) 가 나간다', async () => {
+    const { templateToCssVars } = await import('../../lib/template-css.ts');
+    for (const tpl of [READING, LITURGY]) {
+      const vars = templateToCssVars(tpl);
+      expect(vars['--primary-line-height'], tpl.name).toBe(`calc(1em + ${tpl.text.primary.lineGapPx}px)`);
+    }
+  });
+
+  it('절대 행간을 안 쓰는 템플릿은 배수 그대로다', async () => {
+    const { templateToCssVars } = await import('../../lib/template-css.ts');
+    const { getBuiltinTemplate } = await import('../../lib/template-presets.ts');
+    const bible = getBuiltinTemplate(-1)!;
+    expect(bible.text.primary.lineGapPx).toBeUndefined();
+    expect(templateToCssVars(bible)['--primary-line-height']).toBe(String(bible.text.primary.lineHeight));
+  });
+});
+
+describe('출력 페이지가 항목 설정을 따른다', () => {
+  it('글자 크기는 곱하고 행간은 곱하지 않는다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync(new URL('../../public/output/output.css', import.meta.url), 'utf8');
+    // 크기에는 배수를 곱한다
+    expect(css).toContain('calc(var(--primary-size) * var(--item-scale, 1))');
+    expect(css).toContain('calc(var(--secondary-size) * var(--item-scale, 1))');
+    // 행간에는 곱하지 않는다 — 곱하면 절대 행간이 무의미해진다
+    expect(css).not.toMatch(/line-height:\s*calc\(var\(--primary-line-height\)\s*\*/);
+  });
+
+  it('폰트는 정해진 두 갈래만 받는다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const js = readFileSync(new URL('../../public/output/output.js', import.meta.url), 'utf8');
+    // 순서표 값이 font-family 를 통째로 정하게 하면 아무 글꼴이나 밀어넣을 수 있다
+    expect(js).toContain('var ITEM_FONTS = {');
+    expect(js).toMatch(/ITEM_FONTS\[style\.font\]/);
+  });
+
+  it('지정이 없으면 값을 지운다 — 앞 순서의 크기를 물려받으면 안 된다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const js = readFileSync(new URL('../../public/output/output.js', import.meta.url), 'utf8');
+    // 함수 시작부터 다음 함수 선언까지 — 파일 안 순서에 기대지 않는다
+    const start = js.indexOf('function applyItemStyle');
+    expect(start).toBeGreaterThan(-1);
+    const fn = js.slice(start, js.indexOf('\n  function ', start + 10));
+    expect(fn).toContain("removeProperty('--item-font')");
+    expect(fn).toContain("removeProperty('--item-scale')");
+  });
+});

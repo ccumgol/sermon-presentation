@@ -368,6 +368,8 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
         color: '#ffffff',
         stroke: { width: 7, color: '#000000' },
         shadow: { x: 0, y: 3, blur: 14, color: 'rgba(0,0,0,0.65)' },
+        // 절대 행간 — 글자를 키워도 감긴 줄 사이가 벌어지지 않는다
+        lineGapPx: 16,
       },
       secondary: {
         // ★ 인도자와 같은 크기 — 색으로만 구분한다
@@ -376,6 +378,7 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
         color: '#ffe14d',
         stroke: { width: 7, color: '#000000' },
         shadow: { x: 0, y: 3, blur: 14, color: 'rgba(0,0,0,0.65)' },
+        lineGapPx: 16,
         // 긴 절이 어절 단위로 감겨야 읽기 좋다
         wordBreak: 'keep-all',
       },
@@ -437,6 +440,12 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
         color: '#ffffff',
         stroke: { width: 8, color: '#000000' },
         shadow: { x: 0, y: 4, blur: 16, color: 'rgba(0,0,0,0.7)' },
+        /*
+         * 절대 행간 10px. 여기서는 줄마다 블록이 하나라 줄 사이 여백은
+         * `layout.gap`(34px) 이 맡고, 이 값은 글자 상자의 위아래 숨통이다.
+         * 배수(1.4)로 두면 글자를 키울 때 34 + 0.4×크기 로 함께 벌어졌다.
+         */
+        lineGapPx: 10,
       },
     },
     behavior: {

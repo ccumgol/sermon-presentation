@@ -25,6 +25,7 @@ import {
   type ApiResponse,
   type CueItem,
   type ItemBackground,
+  type ReadingStyle,
   type PlanDefaults,
   type PlanKind,
   type ServicePlan,
@@ -59,6 +60,32 @@ function readItemBackground(raw: unknown): ItemBackground | undefined {
   // 기본은 cover — 배경이 화면을 못 채우면 글자 뒤에 빈 자리가 보인다
   const fit = value.fit === 'contain' ? 'contain' : undefined;
   return { src, source, ...(fit ? { fit } : {}) };
+}
+
+/**
+ * 교독문·전례문의 표시 설정(폰트·글자 크기)을 검증한다.
+ *
+ * 폰트는 **아는 두 값만** 받는다 — 모르는 값이면 담지 않고 템플릿 폰트를 쓴다.
+ * 배수는 범위를 잘라 둔다. 0 이나 음수가 들어가면 글자가 사라지고, 너무 크면
+ * 화면을 넘겨 `autoFit` 이 다시 줄인다(그러면 지정한 뜻이 없어진다).
+ */
+const READING_SCALE_MIN = 0.6;
+const READING_SCALE_MAX = 2;
+
+function readReadingStyle(raw: unknown): ReadingStyle | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const value = raw as Record<string, unknown>;
+
+  const font = value.font === 'serif' ? 'serif' : value.font === 'sans' ? 'sans' : undefined;
+  const scale =
+    typeof value.scale === 'number' && Number.isFinite(value.scale)
+      ? Math.min(Math.max(Math.round(value.scale * 100) / 100, READING_SCALE_MIN), READING_SCALE_MAX)
+      : undefined;
+
+  // 기본값(1)은 저장하지 않는다 — 박아 두면 나중에 기본을 바꿀 수 없다
+  const keepScale = scale !== undefined && scale !== 1 ? scale : undefined;
+  if (!font && keepScale === undefined) return undefined;
+  return { ...(font ? { font } : {}), ...(keepScale !== undefined ? { scale: keepScale } : {}) };
 }
 
 /**
@@ -203,6 +230,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           ...(perSlide !== undefined ? { perSlide } : {}),
           ...(overrideLines.length > 0 ? { overrideLines } : {}),
           ...(background ? { background } : {}),
+          ...(readReadingStyle(fields.style) ? { style: readReadingStyle(fields.style)! } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
@@ -227,6 +255,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           ...(readItemBackground(fields.background)
             ? { background: readItemBackground(fields.background)! }
             : {}),
+          ...(readReadingStyle(fields.style) ? { style: readReadingStyle(fields.style)! } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });

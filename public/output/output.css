@@ -278,8 +278,16 @@ body.blanked .slide {
 }
 
 .line-primary {
-  font-family: var(--primary-font);
-  font-size: var(--primary-size);
+  /* 항목이 폰트를 지정하면(고딕/명조) 그것이 이긴다 */
+  font-family: var(--item-font, var(--primary-font));
+  /*
+   * `--item-scale` 은 순서 항목이 지정한 글자 크기 배수다 (교독문·전례문).
+   * 없으면 1 — 템플릿 크기 그대로.
+   *
+   * 행간(`--primary-line-height`)은 `calc(1em + Npx)` 형태라 **여기서 곱하지 않는다**.
+   * 글자 상자는 1em 으로 따라가고 여백만 고정이므로, 크기를 바꿔도 줄 사이가 그대로다.
+   */
+  font-size: calc(var(--primary-size) * var(--item-scale, 1));
   font-weight: var(--primary-weight);
   line-height: var(--primary-line-height);
   letter-spacing: var(--primary-spacing);
@@ -298,8 +306,8 @@ body.blanked .slide {
 }
 
 .line-secondary {
-  font-family: var(--secondary-font);
-  font-size: var(--secondary-size);
+  font-family: var(--item-font, var(--secondary-font));
+  font-size: calc(var(--secondary-size) * var(--item-scale, 1));
   font-weight: var(--secondary-weight);
   line-height: var(--secondary-line-height);
   letter-spacing: var(--secondary-spacing);

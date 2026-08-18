@@ -25,7 +25,7 @@ import {
   AUTO_HOLD_MS_DEFAULT,
   AUTO_HOLD_MS_MAX,
   AUTO_HOLD_MS_MIN,
-  type ClientMsg, type CueItem, type Deck, type ItemBackground, type PlanDefaults, type PlanKind, type ServicePlan,
+  type ClientMsg, type CueItem, type Deck, type ItemBackground, type ReadingStyle, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
@@ -93,6 +93,111 @@ const ORDER_PRESETS = [
   '광고',
   '축도',
 ] as const;
+
+/**
+ * 교독문·전례문의 **폰트와 글자 크기**.
+ *
+ * 이 순서들은 화면을 글자로 채우고 회중이 멀리서 따라 읽는다. 예배당 크기·좌석 거리가
+ * 교회마다 달라 그 자리에서 조절할 수 있어야 한다 (2026-08-18 사용자 요청).
+ *
+ * **행간은 따라 커지지 않는다** — 템플릿이 절대 행간(`lineGapPx`)을 쓰므로 글자만 커진다.
+ * 배수로 두면 글자를 키울 때 줄 사이가 함께 벌어져 화면이 헐거워졌다.
+ */
+/**
+ * 이 크기에서 줄이 감길지 어림한다.
+ *
+ * **어림값이다.** 정확한 값은 실제로 그려 봐야 알지만(출력 페이지 측정 장치),
+ * 크기를 끌 때마다 측정하면 느리고 전례문은 자동 분할 경로에 없다.
+ * 계수는 1920×1080 에서 실측해서 정했다 — 고딕 84px 에서 21자가 1314px(자당 0.745em),
+ * 명조는 더 넓다.
+ *
+ * 감기는 것 자체가 오류는 아니지만, **함께 읽는 본문은 줄이 감기면 호흡이 어긋난다.**
+ * 그래서 막지 않고 알린다.
+ */
+const SAFE_WIDTH_PX = 1680;
+const CHAR_WIDTH_EM = { sans: 0.75, serif: 0.82 } as const;
+
+function wrapsAtScale(
+  longestLineChars: number,
+  baseFontSize: number,
+  style: ReadingStyle | undefined,
+): boolean {
+  if (longestLineChars <= 0) return false;
+  const em = CHAR_WIDTH_EM[style?.font ?? 'sans'];
+  const width = longestLineChars * baseFontSize * (style?.scale ?? 1) * em;
+  return width > SAFE_WIDTH_PX;
+}
+
+function ReadingStyleControls({
+  value,
+  onChange,
+  longestLineChars,
+  baseFontSize,
+}: {
+  value: ReadingStyle | undefined;
+  onChange: (next: ReadingStyle | undefined) => void;
+  /** 이 항목 본문의 가장 긴 줄 글자 수 — 줄 감김 어림에 쓴다 */
+  longestLineChars?: number;
+  /** 템플릿의 기본 글자 크기 */
+  baseFontSize?: number;
+}): React.JSX.Element {
+  const font = value?.font ?? 'sans';
+  const scale = value?.scale ?? 1;
+
+  /** 빈 설정은 아예 지운다 — 기본값이 박히면 나중에 기본을 바꿀 수 없다 */
+  function patch(next: ReadingStyle): void {
+    const cleaned: ReadingStyle = {
+      ...(next.font && next.font !== 'sans' ? { font: next.font } : {}),
+      ...(next.scale !== undefined && next.scale !== 1 ? { scale: next.scale } : {}),
+    };
+    onChange(Object.keys(cleaned).length > 0 ? cleaned : undefined);
+  }
+
+  return (
+    <>
+      <label>폰트</label>
+      <div className="toggle-row">
+        {([
+          ['sans', '고딕'],
+          ['serif', '명조'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`toggle${font === key ? ' active' : ''}`}
+            onClick={() => patch({ ...value, font: key })}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <label title="템플릿 크기에 곱합니다. 행간은 그대로 유지됩니다.">글자 크기</label>
+      <input
+        type="range"
+        min={0.6}
+        max={2}
+        step={0.05}
+        value={scale}
+        onChange={(e) => patch({ ...value, scale: Number(e.target.value) })}
+      />
+      <span className="muted">{Math.round(scale * 100)}%</span>
+      {scale !== 1 && (
+        <button type="button" className="reset" onClick={() => patch({ ...value, scale: 1 })} title="기본 크기로">
+          ↺
+        </button>
+      )}
+
+      {longestLineChars !== undefined &&
+        baseFontSize !== undefined &&
+        wrapsAtScale(longestLineChars, baseFontSize, value) && (
+          <span className="wrap-warn" title={`가장 긴 줄이 ${longestLineChars}자입니다`}>
+            ⚠ 이 크기에서는 긴 줄이 두 줄로 감깁니다
+          </span>
+        )}
+    </>
+  );
+}
 
 /**
  * 배경 그림 고르기 — 교독문·주기도문·사도신경이 쓴다.
@@ -633,6 +738,7 @@ export function PlanPanel({
             kind: 'text' as const,
             lines: [...page],
             ...(item.background ? { background: item.background } : {}),
+            ...(item.style ? { style: item.style } : {}),
           })),
           labels: pages.map((_, index) => `${index + 1}`),
         };
@@ -651,6 +757,7 @@ export function PlanPanel({
               ...(slide.people !== undefined ? { people: slide.people } : {}),
               reference: reading.title,
               ...(item.background ? { background: item.background } : {}),
+              ...(item.style ? { style: item.style } : {}),
             })),
             labels: reading.slides.map((_, index) => `${index + 1}`),
           };
@@ -1266,6 +1373,21 @@ export function PlanPanel({
     const id = templateIdFor(item);
     if (typeof id === 'number') return styleTemplates.find((t) => t.id === id) ?? template;
     return template;
+  }
+
+  /**
+   * 이 항목이 실제로 쓸 템플릿의 기본 글자 크기.
+   *
+   * 지금 활성 템플릿을 쓰면 안 된다 — 항목이 다른 템플릿을 지정했으면 크기가 달라
+   * 줄 감김 어림이 틀린다 (실측에서 140% 인데도 경고가 안 떴다).
+   */
+  function baseFontSizeFor(item: CueItem, fallback: number): number {
+    const id = templateIdFor(item);
+    if (typeof id === 'number') {
+      const found = styleTemplates.find((t) => t.id === id);
+      if (found) return found.text.primary.fontSize;
+    }
+    return template?.text.primary.fontSize ?? fallback;
   }
 
   /** 기본 설정을 고친다 — 순서표에 저장되므로 dirty 로 표시된다 */
@@ -2069,7 +2191,11 @@ export function PlanPanel({
                     uploaded={bgFiles}
                     onChange={(background) => patchReading({ background })}
                   />
-                  <span className="muted">교독문 {reading.readingNumber}번</span>
+                  <ReadingStyleControls
+                    value={reading.style}
+                    onChange={(style) => patchReading({ style })}
+                    baseFontSize={baseFontSizeFor(reading, 64)}
+                  />
                 </div>
               );
             })()}
@@ -2189,6 +2315,13 @@ export function PlanPanel({
                       library={bgLibrary}
                       uploaded={bgFiles}
                       onChange={(background) => patchLiturgy({ background })}
+                    />
+
+                    <ReadingStyleControls
+                      value={liturgy.style}
+                      onChange={(style) => patchLiturgy({ style })}
+                      longestLineChars={shown.reduce((max, l) => Math.max(max, l.length), 0)}
+                      baseFontSize={baseFontSizeFor(liturgy, 84)}
                     />
 
                     <label>화면 넘김</label>

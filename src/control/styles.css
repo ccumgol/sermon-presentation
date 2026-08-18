@@ -2035,6 +2035,18 @@ button.link-inline {
 .file-row { align-items: center; gap: 6px; }
 .file-row > select { min-width: 0; }
 
+.detail-controls .wrap-warn {
+  flex: 1 0 100%;
+  color: var(--warn);
+  font-size: 0.78rem;
+}
+
+.detail-controls .reset {
+  min-width: 28px;
+  padding: 0 6px;
+  color: var(--dim);
+}
+
 .detail-block { margin-top: 10px; }
 .detail-block > summary { cursor: pointer; font-size: 0.8rem; opacity: 0.75; }
 .detail-block > summary .tag {

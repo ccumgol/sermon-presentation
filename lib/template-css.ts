@@ -79,7 +79,14 @@ function textStyleVars(prefix: string, style: TextStyle): CssVars {
     [`--${prefix}-font`]: style.fontFamily,
     [`--${prefix}-size`]: px(style.fontSize),
     [`--${prefix}-weight`]: String(style.fontWeight),
-    [`--${prefix}-line-height`]: String(style.lineHeight),
+    /*
+     * 행간. `lineGapPx` 가 있으면 **절대 여백**으로 나간다 — 글자 상자는 글자를
+     * 따라가고(1em) 여백만 고정이라, 글자를 키워도 줄 사이가 벌어지지 않고 겹치지도 않는다.
+     */
+    [`--${prefix}-line-height`]:
+      style.lineGapPx === undefined
+        ? String(style.lineHeight)
+        : `calc(1em + ${style.lineGapPx}px)`,
     [`--${prefix}-spacing`]: px(style.letterSpacing),
     [`--${prefix}-color`]: style.color,
     [`--${prefix}-opacity`]: String(style.opacity),

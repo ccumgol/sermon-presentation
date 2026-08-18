@@ -20,6 +20,16 @@
         <span id="group">—</span>
         <span id="progress">—</span>
         <span id="clock">--:--</span>
+        <!--
+          글자 크기. 이 화면은 예배당 **뒷벽**에 붙어 강사·찬양팀이 멀리서 본다
+          (2026-08-18 사용자). 모니터 크기와 거리가 교회마다 달라 고정할 수 없다.
+          키보드 + / - / 0 으로도 조절된다.
+        -->
+        <span id="zoom">
+          <button type="button" id="zoom-out" title="글자 작게 (-)">−</button>
+          <span id="zoom-value">100%</span>
+          <button type="button" id="zoom-in" title="글자 크게 (+)">+</button>
+        </span>
       </header>
 
       <section id="now-wrap">
@@ -37,6 +47,7 @@
         <span id="blank" class="pill live" hidden>■ 블랙 — 회중 화면에 아무것도 나오지 않습니다</span>
         <span class="spacer"></span>
         <span id="upcoming"></span>
+        <span class="pill">+ / − 글자 크기 · 0 기본</span>
       </footer>
     </main>
 

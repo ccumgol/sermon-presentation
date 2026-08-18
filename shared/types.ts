@@ -313,6 +313,18 @@ export interface TextStyle {
   fontSize: number; // px @1080p
   fontWeight: number; // 100..900
   lineHeight: number; // 배수
+  /**
+   * **절대 행간(leading)** — 글자 크기와 무관하게 고정되는 여백(px).
+   *
+   * 지정하면 `lineHeight`(배수) 대신 `calc(1em + Npx)` 로 나간다. 그래서 글자를 키워도
+   * **줄 사이 여백이 그대로**다 (2026-08-18 사용자 요청: "행간을 글자크기의 상대 비율이
+   * 아니라 절대 고정으로").
+   *
+   * 배수(1.4)로 두면 글자를 84 → 110px 로 키울 때 여백도 34 → 44px 로 벌어져
+   * 화면이 헐거워진다. 반대로 `line-height` 를 px 로 고정하면 글자가 커질 때 겹친다.
+   * `1em + Npx` 는 글자 상자는 글자를 따라가고 **여백만** 고정이라 겹치지 않는다.
+   */
+  lineGapPx?: number;
   letterSpacing: number; // px
   color: string;
   opacity: number;
@@ -354,6 +366,26 @@ export type BackgroundFit = 'cover' | 'contain';
  * `src` 는 **파일 이름만** 담고, 어느 폴더인지는 `source` 가 말한다. 출력 페이지가
  * 정해진 표로 주소를 만들므로 순서표에 담긴 값이 폴더 밖을 가리킬 수 없다.
  */
+/**
+ * 회중이 함께 읽는 순서(교독문·주기도문·사도신경)의 **표시 설정**.
+ *
+ * 이 순서들은 화면을 글자로 채우고 회중이 멀리서 따라 읽는다. 예배당 크기·좌석 거리가
+ * 교회마다 다르므로 **그 자리에서 조절**할 수 있어야 한다 (2026-08-18 사용자 요청).
+ *
+ * 템플릿에 두지 않고 항목에 둔 이유: 같은 예배 안에서도 교독문은 크게, 사도신경은
+ * 작게 두고 싶을 수 있다. 템플릿이면 그때마다 템플릿을 새로 만들어야 한다.
+ * 지정하지 않으면 템플릿 값을 그대로 쓴다.
+ */
+export interface ReadingStyle {
+  /** `sans` 고딕 · `serif` 명조. 없으면 템플릿 폰트 */
+  font?: 'sans' | 'serif';
+  /**
+   * 글자 크기 배수. 템플릿 크기에 곱한다.
+   * 행간은 **따라 커지지 않는다** (`TextStyle.lineGapPx` 참고).
+   */
+  scale?: number;
+}
+
 export interface ItemBackground {
   /** 파일 이름만 (경로 구분자가 들어오면 서버가 거른다) */
   src: string;
@@ -535,6 +567,8 @@ export type CueItem =
       overrideLines?: string[];
       /** 이 항목에만 깔 배경 그림 (템플릿 배경을 덮는다) */
       background?: ItemBackground;
+      /** 폰트·글자 크기 (없으면 템플릿 값) */
+      style?: ReadingStyle;
       templateId?: number;
       note?: string;
     }
@@ -554,6 +588,8 @@ export type CueItem =
       readingTitle?: string;
       /** 이 항목에만 깔 배경 그림 (템플릿 배경을 덮는다) */
       background?: ItemBackground;
+      /** 폰트·글자 크기 (없으면 템플릿 값) */
+      style?: ReadingStyle;
       templateId?: number;
       note?: string;
     }
@@ -687,8 +723,8 @@ export type SlidePayload =
       lines: SongLine[][];
       credit?: string;
     }
-  /** `background` 는 전례문(주기도문·사도신경)이 항목 배경을 실어 보낼 때만 찬다 */
-  | { kind: 'text'; lines: string[]; background?: ItemBackground }
+  /** `background`·`style` 은 전례문(주기도문·사도신경)이 실어 보낼 때만 찬다 */
+  | { kind: 'text'; lines: string[]; background?: ItemBackground; style?: ReadingStyle }
   /**
    * 순서 표시 — **왼쪽에 순서 이름, 오른쪽에 담당자**를 한 줄로 놓고 담당자 아래에 밑줄.
    *
@@ -720,6 +756,7 @@ export type SlidePayload =
       /** '시편 1편' 처럼 작게 붙는 표기 */
       reference?: string;
       background?: ItemBackground;
+      style?: ReadingStyle;
     }
   | { kind: 'blank' };
 

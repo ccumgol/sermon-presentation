@@ -20,6 +20,7 @@
   var LAYER = 'stage';
 
   var el = {
+    zoomValue: document.getElementById('zoom-value'),
     group: document.getElementById('group'),
     progress: document.getElementById('progress'),
     clock: document.getElementById('clock'),
@@ -34,6 +35,66 @@
   var deck = null;
   var live = null;
   var knownRevision = -1;
+
+  // ── 글자 크기 ───────────────────────────────────────────
+  //
+  // 이 화면은 예배당 **뒷벽**에 붙어 강사·찬양팀이 멀리서 본다. 모니터 크기와 거리가
+  // 교회마다 달라 고정할 수 없다 (2026-08-18 사용자 요청).
+  //
+  // **이 PC 에 저장한다** — 강단 모니터의 크기·거리는 그 자리의 성질이고,
+  // 다른 PC 에서 열었을 때 따라오면 오히려 틀린다.
+
+  var ZOOM_KEY = 'sermon.stage.zoom';
+  var ZOOM_MIN = 0.6;
+  var ZOOM_MAX = 2.6;
+  var ZOOM_STEP = 0.1;
+  var zoom = 1;
+
+  function clampZoom(value) {
+    if (!isFinite(value)) return 1;
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(value * 100) / 100));
+  }
+
+  function applyZoom(next, remember) {
+    zoom = clampZoom(next);
+    document.documentElement.style.setProperty('--zoom', String(zoom));
+    if (el.zoomValue) el.zoomValue.textContent = Math.round(zoom * 100) + '%';
+    if (remember) {
+      try {
+        localStorage.setItem(ZOOM_KEY, String(zoom));
+      } catch (err) {
+        // 저장에 실패해도 이번 세션에는 적용된다
+      }
+    }
+  }
+
+  (function restoreZoom() {
+    var saved = 1;
+    try {
+      var raw = localStorage.getItem(ZOOM_KEY);
+      if (raw) saved = parseFloat(raw);
+    } catch (err) {
+      // 못 읽으면 기본값
+    }
+    applyZoom(saved, false);
+  })();
+
+  document.getElementById('zoom-in').addEventListener('click', function () {
+    applyZoom(zoom + ZOOM_STEP, true);
+  });
+  document.getElementById('zoom-out').addEventListener('click', function () {
+    applyZoom(zoom - ZOOM_STEP, true);
+  });
+
+  // 키보드로도 — 모니터가 손에서 멀면 마우스를 쓰기 어렵다
+  window.addEventListener('keydown', function (event) {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === '+' || event.key === '=') applyZoom(zoom + ZOOM_STEP, true);
+    else if (event.key === '-' || event.key === '_') applyZoom(zoom - ZOOM_STEP, true);
+    else if (event.key === '0') applyZoom(1, true);
+    else return;
+    event.preventDefault();
+  });
 
   // ── 시계 ────────────────────────────────────────────────
   //

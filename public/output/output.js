@@ -521,6 +521,34 @@
   var BACKDROP_PREFIX = { data: '/backgrounds/', library: '/background-library/' };
 
   /**
+   * 항목이 지정한 폰트 — 고딕/명조 두 갈래만.
+   *
+   * **정해진 표로만 만든다.** 순서표에 담긴 값이 font-family 를 통째로 정하게 하면
+   * WS 로 아무 글꼴 이름이나 밀어넣을 수 있다. 배경 주소와 같은 규칙이다.
+   */
+  var ITEM_FONTS = {
+    sans: '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif',
+    serif: '"Nanum Myeongjo", "Apple SD Gothic Neo", "Batang", "Noto Serif KR", serif',
+  };
+
+  /**
+   * 교독문·전례문이 지정한 표시 설정(폰트·글자 크기)을 적용한다.
+   *
+   * 슬라이드마다 다시 정한다 — 지정이 없으면 **반드시 지운다**. 남겨 두면 다음 순서가
+   * 앞 순서의 크기를 물려받아 예배 중에 글자가 갑자기 커진다.
+   */
+  function applyItemStyle(style) {
+    var slide = el.slide;
+    var font = style && ITEM_FONTS[style.font];
+    if (font) slide.style.setProperty('--item-font', font);
+    else slide.style.removeProperty('--item-font');
+
+    var scale = style && typeof style.scale === 'number' && style.scale > 0 ? style.scale : null;
+    if (scale) slide.style.setProperty('--item-scale', String(scale));
+    else slide.style.removeProperty('--item-scale');
+  }
+
+  /**
    * 항목이 자기 배경을 지정했으면 그것을 깐다 (교독문·주기도문·사도신경).
    *
    * 템플릿 배경을 **그 항목에서만** 덮는다. 배경을 템플릿에 두면 배경을 바꿀 때마다
@@ -561,6 +589,8 @@
   function render(payload) {
     // 배경은 한 곳에서 정한다 (항목 → 템플릿)
     syncBackdrop(payload);
+    // 폰트·글자 크기도 슬라이드마다 다시 정한다 (지정이 없으면 지운다)
+    applyItemStyle(payload && payload.style);
 
     if (!payload || payload.kind === 'blank') {
       // 내용을 **지운다**. 예전에는 blanked 클래스(투명도 0)만 켰는데,
