@@ -59,6 +59,9 @@ export function createWsHub(server: Server, log: Logger): WsHub {
   });
   const clients = new Map<WebSocket, Client>();
 
+  /** 강사 모니터(`/stage`)가 쓰는 layer 이름 */
+  const STAGE_LAYER = 'stage';
+
   function send(socket: WebSocket, msg: ServerMsg): void {
     if (socket.readyState !== WebSocket.OPEN) return;
     try {
@@ -75,16 +78,38 @@ export function createWsHub(server: Server, log: Logger): WsHub {
     }
   }
 
-  function counts(): { control: number; output: number } {
+  /**
+   * 덱을 받아야 하는 클라이언트인가.
+   *
+   * 컨트롤 패널과 **강사 모니터**다. 강사 모니터는 '다음에 무엇이 오는지' 를 보여 주는
+   * 것이 존재 이유이므로 지금 슬라이드만으로는 부족하다 (2026-08-18, (다) 강사 모니터).
+   *
+   * OBS 로 나가는 출력 페이지에는 보내지 않는다 — 쓰지 않는 데이터를 예배 중에
+   * 계속 밀어 넣을 이유가 없다 (덱이 커지면 슬라이드 수백 장이다).
+   */
+  function wantsDeck(client: Client): boolean {
+    return client.role === 'control' || client.layer === STAGE_LAYER;
+  }
+
+  function broadcastDeck(deck: Deck | null): void {
+    for (const client of clients.values()) {
+      if (wantsDeck(client)) send(client.socket, { t: 'deck', payload: deck });
+    }
+  }
+
+  function counts(): { control: number; output: number; stage: number } {
     let control = 0;
     let output = 0;
+    let stage = 0;
     for (const client of clients.values()) {
       if (client.role === 'control') control++;
-      // 컨트롤 패널 안의 미리보기 iframe 은 실제 송출 화면이 아니므로 세지 않는다.
-      // 그래야 '출력 연결됨' 표시가 OBS 연결 여부를 정확히 뜻한다.
+      // 강사 모니터는 OBS 로 나가는 화면이 아니다. 따로 센다 —
+      // 여기에 섞으면 'OBS 연결됨' 표시가 거짓이 된다.
+      else if (client.layer === STAGE_LAYER) stage++;
+      // 컨트롤 패널 안의 미리보기 iframe 도 실제 송출 화면이 아니다
       else if (client.layer !== 'preview') output++;
     }
-    return { control, output };
+    return { control, output, stage };
   }
 
   /**
@@ -125,7 +150,7 @@ export function createWsHub(server: Server, log: Logger): WsHub {
       broadcastTemplate(getTemplateOrDefault(live.templateId));
     }
     broadcast({ t: 'state', payload: live });
-    broadcast({ t: 'deck', payload: deck }, ['control']);
+    broadcastDeck(deck);
   });
 
   function handle(client: Client, msg: ClientMsg): void {
@@ -137,14 +162,19 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         send(client.socket, { t: 'state', payload: state.getState() });
         // 접속 즉시 템플릿까지 보내야 새로고침 후 스타일이 그대로 복구된다
         sendTemplate(client.socket, getTemplateOrDefault(state.getState().templateId));
-        if (client.role === 'control') send(client.socket, { t: 'deck', payload: state.getDeck() });
+        if (wantsDeck(client)) send(client.socket, { t: 'deck', payload: state.getDeck() });
         log.info(`WS 연결: ${client.role}${client.role === 'output' ? ` (layer=${client.layer})` : ''}`);
         // 역할이 정해진 뒤에 알려야 집계가 맞는다
         broadcastCounts();
 
         // 옛 판이 붙어 있으면 컨트롤 패널에 알린다.
         // 미리보기 iframe 은 컨트롤 패널과 함께 새로 뜨므로 대상이 아니다.
-        if (client.role === 'output' && client.layer !== 'preview' && isOutputStale(msg.loadedAt, outputBuildMs())) {
+        if (
+          client.role === 'output' &&
+          client.layer !== 'preview' &&
+          client.layer !== STAGE_LAYER &&
+          isOutputStale(msg.loadedAt, outputBuildMs())
+        ) {
           log.warn(`출력 페이지가 옛 판입니다 (layer=${client.layer}) — OBS 브라우저 소스를 새로고침하세요`);
           broadcast({ t: 'output:stale', payload: { layer: client.layer ?? 'main' } }, ['control']);
         }

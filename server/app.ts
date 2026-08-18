@@ -166,6 +166,13 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   // index:false 로 두었으므로 디렉터리 경로의 index.html 은 직접 연결한다.
   // OBS 가 요청하는 '/output/' 이 여기 걸린다.
   app.get('/output/', async (_request, reply) => reply.sendFile('output/index.html'));
+
+  /**
+   * 강사 모니터. OBS 를 거치지 않고 **우리가 직접 띄우는 창**이다 —
+   * 설교자 앞 모니터에 전체화면으로 둔다 (2026-08-18, (다)).
+   */
+  app.get('/stage/', async (_request, reply) => reply.sendFile('stage/index.html'));
+  app.get('/stage', async (_request, reply) => reply.redirect('/stage/'));
   app.get('/app/', async (_request, reply) => reply.sendFile('app/index.html'));
 
   // 파비콘 요청으로 로그가 지저분해지지 않게 조용히 넘긴다

@@ -286,6 +286,16 @@ select:focus {
   padding: 16px;
 }
 
+/* 강사 모니터 열기 — 접속돼 있으면 점이 붙는다 */
+.stage-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
 /* 테마 토글 — 고정했을 때는 점을 하나 붙여 'OS 따라감' 과 구별한다 */
 .theme-toggle {
   position: relative;

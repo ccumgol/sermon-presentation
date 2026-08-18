@@ -24,7 +24,10 @@ export interface OutputError {
 
 export interface Connections {
   control: number;
+  /** OBS 로 나가는 출력 페이지 수 (미리보기·강사 모니터는 빼고 센다) */
   output: number;
+  /** 강사 모니터(`/stage`) 수 — OBS 출력과 섞으면 'OBS 연결됨' 표시가 거짓이 된다 */
+  stage: number;
 }
 
 export interface LiveConnection {
@@ -57,7 +60,7 @@ export function useLiveState(): LiveConnection {
   const [deck, setDeck] = useState<Deck | null>(null);
   const [outputErrors, setOutputErrors] = useState<OutputError[]>([]);
   const [staleOutput, setStaleOutput] = useState<string | null>(null);
-  const [connections, setConnections] = useState<Connections>({ control: 0, output: 0 });
+  const [connections, setConnections] = useState<Connections>({ control: 0, output: 0, stage: 0 });
   const [template, setTemplate] = useState<Template | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -118,7 +121,7 @@ export function useLiveState(): LiveConnection {
         setStatus('closed');
         // 끊긴 동안의 접속 수는 알 수 없다. 오래된 값을 그대로 보여주면
         // OBS 가 붙어 있다고 오해할 수 있으므로 0 으로 되돌린다.
-        setConnections({ control: 0, output: 0 });
+        setConnections({ control: 0, output: 0, stage: 0 });
         scheduleReconnect();
       };
 

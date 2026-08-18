@@ -1,0 +1,176 @@
+/*
+ * 강사 모니터.
+ *
+ * 회중 화면이 아니므로 투명 배경이 필요 없다. 목표는 하나 — **멀리서 읽힌다.**
+ * 강단 모니터는 대개 설교자에게서 1~2m 떨어져 있고, 조명이 얼굴 쪽으로 향해 있어
+ * 화면이 밝으면 눈이 부신다. 그래서 어두운 바탕에 큰 글씨로 고정한다.
+ */
+
+:root {
+  --bg: #0b0d11;
+  --fg: #f2f5f9;
+  --dim: #8b95a3;
+  --line: #242b35;
+  --accent: #58a6ff;
+  --live: #ff5c5c;
+  --next: #ffd76a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  /* 한국어는 어절 단위로 끊어야 읽기 좋다 */
+  word-break: keep-all;
+}
+
+#stage {
+  display: grid;
+  /* 상태줄 · 지금(넉넉히) · 다음 · 하단 */
+  grid-template-rows: auto minmax(0, 3fr) minmax(0, 2fr) auto;
+  height: 100%;
+  padding: 2vh 2.5vw;
+  gap: 1.6vh;
+}
+
+/* ── 상태줄 ─────────────────────────────────────────────── */
+
+#bar {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5vw;
+  padding-bottom: 1vh;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(14px, 1.6vw, 26px);
+  color: var(--dim);
+}
+
+#group {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+#progress {
+  font-variant-numeric: tabular-nums;
+}
+
+#clock {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(18px, 2.2vw, 38px);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* ── 지금 / 다음 ────────────────────────────────────────── */
+
+.label {
+  margin: 0 0 0.6vh;
+  font-size: clamp(11px, 1.1vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+
+#now-wrap,
+#next-wrap {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+/*
+ * 글자 크기를 vh 로 잡는다. 강단 모니터 크기가 제각각이라 px 로 고정하면
+ * 어떤 화면에서는 잘리고 어떤 화면에서는 너무 작다.
+ */
+#now,
+#next {
+  min-height: 0;
+  overflow: hidden;
+  line-height: 1.34;
+}
+
+#now {
+  font-size: clamp(22px, 4.4vh, 74px);
+  font-weight: 700;
+}
+
+#next {
+  font-size: clamp(16px, 3vh, 48px);
+  font-weight: 500;
+  color: var(--next);
+}
+
+/* 교독문은 인도자/회중 두 줄이 한 화면이다 — 색으로 구분한다 */
+.people {
+  color: var(--next);
+}
+#next .people {
+  color: var(--dim);
+}
+
+.ref {
+  display: block;
+  margin-top: 0.8vh;
+  font-size: 0.5em;
+  color: var(--dim);
+}
+
+.empty {
+  color: var(--dim);
+  font-weight: 400;
+  font-size: clamp(16px, 2.4vh, 34px);
+}
+
+/* ── 하단 ───────────────────────────────────────────────── */
+
+#foot {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+  padding-top: 1vh;
+  border-top: 1px solid var(--line);
+  font-size: clamp(12px, 1.3vw, 22px);
+  color: var(--dim);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.pill {
+  padding: 0.4vh 1vw;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.pill.live {
+  border-color: var(--live);
+  color: var(--live);
+  font-weight: 600;
+}
+
+.pill.ok {
+  border-color: #2f6f4a;
+  color: #4ade80;
+}
+
+.pill.off {
+  border-color: var(--live);
+  color: var(--live);
+}
+
+#upcoming {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

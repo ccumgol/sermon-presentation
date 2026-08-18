@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>강사 모니터 — Sermon Presentation</title>
+    <link rel="stylesheet" href="/stage/stage.css" />
+  </head>
+  <body>
+    <!--
+      강사(설교자) 모니터.
+
+      OBS 를 거치지 않는다 — 이 화면은 회중에게 나가지 않고 강단 모니터에만 띄운다.
+      그래서 투명 배경도, 알파 합성도 필요 없다. 대신 **읽기 편한 것**이 전부다.
+
+      출력 페이지와 같은 원칙: 의존성 0. 예배 중 이 화면이 죽으면 대안이 없다.
+    -->
+    <main id="stage">
+      <header id="bar">
+        <span id="group">—</span>
+        <span id="progress">—</span>
+        <span id="clock">--:--</span>
+      </header>
+
+      <section id="now-wrap">
+        <h2 class="label">지금 화면</h2>
+        <div id="now"></div>
+      </section>
+
+      <section id="next-wrap">
+        <h2 class="label">다음 <span id="next-label"></span></h2>
+        <div id="next"></div>
+      </section>
+
+      <footer id="foot">
+        <span id="conn" class="pill">연결 중…</span>
+        <span id="blank" class="pill live" hidden>■ 블랙 — 회중 화면에 아무것도 나오지 않습니다</span>
+        <span class="spacer"></span>
+        <span id="upcoming"></span>
+      </footer>
+    </main>
+
+    <script src="/stage/stage.js"></script>
+  </body>
+</html>

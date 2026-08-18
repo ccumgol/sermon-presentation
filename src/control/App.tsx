@@ -173,6 +173,20 @@ export function App(): React.JSX.Element {
         <span className="spacer" />
 
         {/*
+          강사 모니터 — 새 창으로 연다. 설교자 앞 모니터에 전체화면(F11)으로 둔다.
+          OBS 를 거치지 않는다 — 회중에게 나가는 화면이 아니라 조작자용 정보다.
+        */}
+        <button
+          type="button"
+          className="stage-open"
+          onClick={() => window.open('/stage/', 'sermon-stage', 'width=1280,height=720')}
+          title="강사(설교자) 모니터를 새 창으로 엽니다. 그 창을 강단 모니터로 옮겨 전체화면으로 두세요."
+        >
+          강사 모니터
+          {connections.stage > 0 && <span className="dot ok" />}
+        </button>
+
+        {/*
           테마 토글. 기본은 OS 설정을 따르고(`system`), 어긋날 때만 고정한다.
           제목 대신 아이콘 하나로 둔 이유는 상단 바가 예배 중에는 볼 일이 없는 자리라서다.
         */}
