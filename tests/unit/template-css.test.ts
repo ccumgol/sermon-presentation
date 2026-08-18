@@ -93,7 +93,6 @@ describe('templateToCssVars', () => {
     // 페이지 배경에 색을 깔면 배경 실패가 곧 '검은 화면'이 된다.
     for (const background of [
       { mode: 'image' as const, src: 'sunrise.jpg', fit: 'cover' as const, opacity: 1 },
-      { mode: 'video' as const, src: 'loop.mp4' },
     ]) {
       const template: Template = { ...base(), canvas: { ...base().canvas, background } };
       expect(templateToCssVars(template)['--canvas-bg']).toBe('transparent');
@@ -105,12 +104,12 @@ describe('templateToCssVars', () => {
       ...base(),
       canvas: {
         ...base().canvas,
-        background: { mode: 'video', src: 'loop.mp4', fit: 'contain', opacity: 0.6 },
+        background: { mode: 'image', src: 'sanctuary.png', fit: 'contain', opacity: 0.6 },
       },
     };
     const vars = templateToCssVars(template);
     // 편집 중 style:set 만으로도 미리보기에 반영되려면 이 키가 함께 나가야 한다
-    expect(vars['backdrop']).toBe('{"mode":"video","src":"loop.mp4"}');
+    expect(vars['backdrop']).toBe('{"mode":"image","src":"sanctuary.png"}');
     expect(vars['--backdrop-fit']).toBe('contain');
     expect(vars['--backdrop-opacity']).toBe('0.6');
   });

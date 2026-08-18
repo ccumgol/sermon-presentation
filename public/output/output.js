@@ -169,7 +169,7 @@
     var src = background && background.src;
     var prefix = urlPrefix || '/backgrounds/';
     // 같은 파일 이름이 두 폴더에 있을 수 있으므로 앞머리도 열쇠에 넣는다
-    var key = mode === 'image' || mode === 'video' ? mode + ':' + prefix + ':' + src : '';
+    var key = mode === 'image' ? 'image:' + prefix + ':' + src : '';
 
     // 같은 파일이면 아무것도 하지 않는다 — 맞춤·불투명도는 CSS 변수
     // (--backdrop-fit / --backdrop-opacity)로 따로 오므로 다시 만들 필요가 없다.
@@ -178,16 +178,9 @@
     clearChildren(el.backdrop);
     if (!key || !src) return;
 
-    var node;
-    if (mode === 'video') {
-      node = document.createElement('video');
-      node.muted = true; // 자동 재생은 음소거일 때만 허용된다
-      node.loop = true;
-      node.autoplay = true;
-      node.playsInline = true;
-    } else {
-      node = document.createElement('img');
-    }
+    // 그림만 그린다. **반복 동영상 배경은 OBS 미디어 소스가 한다** (2026-08-18, D-B).
+    // 브라우저에서 하면 자동 재생 차단·코덱 문제를 우리가 떠안는다.
+    var node = document.createElement('img');
 
     // 파일이 없거나 코덱을 못 읽어도 **화면을 비우지 않는다** — 배경만 빠진다.
     // 대신 컨트롤 패널이 알 수 있게 오류로 올린다.
@@ -202,43 +195,7 @@
     node.src = prefix + encodeURIComponent(src);
     el.backdrop.appendChild(node);
 
-    if (mode === 'video' && typeof node.play === 'function') tryPlay(node);
   }
-
-  /**
-   * 배경 동영상 재생 시도.
-   *
-   * **송출을 멈추지 않는다** — 자동 재생이 막혀도 배경만 첫 프레임에서 멈춘다.
-   * 그런데 그냥 삼키면 '동영상이 왜 안 움직이나' 를 알 길이 없다. 브라우저는
-   * 화면에 그려지지 않는 동안(OBS 소스가 감춰졌거나 장면이 바뀐 동안) 재생을
-   * 미루므로, **다시 보이게 될 때 한 번 더 시도한다.** 그래야 장면을 되돌렸을 때
-   * 얼어붙은 그림이 남지 않는다.
-   */
-  function tryPlay(node) {
-    var started = node.play();
-    if (!started || typeof started.catch !== 'function') return;
-
-    started.catch(function () {
-      if (document.visibilityState === 'visible') {
-        // 보이는데도 막혔다 — 조작자가 알아야 한다 (진단 배지·컨트롤 패널)
-        diag.errors++;
-        pendingErrors.push({
-          message: '배경 동영상 자동 재생이 막혀 첫 화면에서 멈췄습니다',
-          url: location.href,
-        });
-        renderDebug();
-        return;
-      }
-      // 아직 안 보이는 것뿐이다 — 보이게 되면 다시 시도한다
-      document.addEventListener('visibilitychange', function retry() {
-        if (document.visibilityState !== 'visible') return;
-        document.removeEventListener('visibilitychange', retry);
-        // 그 사이 배경이 바뀌었으면 이 노드는 이미 떨어져 나갔다
-        if (node.isConnected) tryPlay(node);
-      });
-    });
-  }
-
 
   /** 성경 본문 블록 렌더 */
   function renderBible(payload) {
@@ -519,26 +476,9 @@
     setOptional(el.credit, null);
   }
 
-  /**
-   * 그림·동영상 한 장 (예배 전 안내).
-   *
-   * 배경 장치(`applyBackdrop`)를 그대로 쓴다 — 파일을 못 읽어도 화면을 비우지 않고,
-   * 같은 파일이면 노드를 다시 만들지 않아 동영상이 되감기지 않으며, 자동 재생이
-   * 막히면 보일 때 다시 시도한다. 그 성질이 전부 필요하다.
-   *
-   * 글자는 얹지 않는다. 맞춤은 기본 `contain` — 안내는 글자가 잘리면 안 된다.
-   * 불투명도는 템플릿 값을 쓰지 않고 1 로 고정한다(내용이므로 흐려지면 안 된다).
-   */
-  function renderMedia(payload) {
-    clearSlide();
-    el.backdrop.style.setProperty('--backdrop-fit', payload.fit === 'cover' ? 'cover' : 'contain');
-    el.backdrop.style.setProperty('--backdrop-opacity', '1');
-    applyBackdrop({ mode: payload.mediaKind === 'video' ? 'video' : 'image', src: payload.src });
-  }
-
   var RENDERERS = {
     bible: renderBible, song: renderSong, text: renderText, order: renderOrder,
-    reading: renderReading, media: renderMedia,
+    reading: renderReading,
   };
 
   /**
@@ -560,7 +500,7 @@
   /**
    * **화면에 무엇을 깔지 정하는 유일한 곳.**
    *
-   * 순서: 안내 슬라이드(자기가 관리) → 항목 배경 → 템플릿 배경.
+   * 순서: 항목 배경(교독문·전례문) → 템플릿 배경.
    *
    * 전에는 세 곳이 각자 배경을 그렸다 — `render`, `applyTemplate`, 그리고 템플릿
    * CSS 패치(`applyStylePatch` → `applyBackdropFromString`). 그래서 도착 순서에
@@ -568,7 +508,6 @@
    * (2026-08-18 실측). 결정은 한 곳에서만 한다.
    */
   function syncBackdrop(payload) {
-    if (payload && payload.kind === 'media') return;
     if (applyItemBackground(payload && payload.background)) return;
     restoreTemplateBackdrop();
   }
@@ -620,7 +559,7 @@
    * @returns {boolean} 성공 여부
    */
   function render(payload) {
-    // 배경은 한 곳에서 정한다 (안내 → 항목 → 템플릿)
+    // 배경은 한 곳에서 정한다 (항목 → 템플릿)
     syncBackdrop(payload);
 
     if (!payload || payload.kind === 'blank') {

@@ -130,12 +130,9 @@ describe('배경 목록 API', () => {
       files: unknown[];
       library: unknown[];
       libraryDir: string;
-      totalBytes: number;
     }>;
     expect(Array.isArray(body.data!.library)).toBe(true);
     expect(body.data!.libraryDir.length).toBeGreaterThan(0);
-    // 사용자 폴더는 총량 계산에 들어가지 않는다 (앱이 손댈 물건이 아니다)
-    expect(typeof body.data!.totalBytes).toBe('number');
   });
 });
 
@@ -147,13 +144,17 @@ describe('배경 목록 API', () => {
  * 새로 열면 항목 배경이 템플릿 값에 지워졌다.
  */
 describe('출력 페이지 — 배경을 정하는 곳은 하나뿐이다', () => {
-  it('applyBackdrop 을 직접 부르는 곳은 세 갈래(안내·템플릿·항목)뿐이다', async () => {
+  it('applyBackdrop 을 직접 부르는 곳은 두 갈래(템플릿·항목)뿐이다', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(new URL('../../public/output/output.js', import.meta.url), 'utf8');
 
-    // 정의 한 줄 + 세 갈래. 늘어나면 결정 지점이 또 흩어졌다는 뜻이다.
+    /*
+     * 정의 한 줄 + 두 갈래(템플릿 배경 · 항목 배경).
+     * 안내(media) 갈래는 D-B 결정으로 덜어냈다 — 반복 동영상·안내 화면은 OBS 가 맡는다.
+     * 늘어나면 결정 지점이 또 흩어졌다는 뜻이다.
+     */
     const calls = source.match(/applyBackdrop\(/g) ?? [];
-    expect(calls.length, 'applyBackdrop 호출이 늘었습니다 — syncBackdrop 을 거치게 하세요').toBe(4);
+    expect(calls.length, 'applyBackdrop 호출이 늘었습니다 — syncBackdrop 을 거치게 하세요').toBe(3);
 
     // 세 갈래를 고르는 곳이 syncBackdrop 이어야 한다
     expect(source).toContain('function syncBackdrop(payload)');

@@ -40,8 +40,6 @@ export function describeItem(item: CueItem): string {
       return item.content.split(/\r?\n/)[0]?.slice(0, 24) ?? '텍스트';
     case 'liturgy':
       return findLiturgy(item.textId)?.title ?? '본문';
-    case 'media':
-      return item.src;
     case 'reading':
       return item.readingTitle
         ? `교독문 ${item.readingNumber}. ${item.readingTitle}`
@@ -251,22 +249,6 @@ export function moveItem(items: readonly CueItem[], from: number, to: number): C
 
 export function removeItem(items: readonly CueItem[], id: string): CueItem[] {
   return items.filter((item) => item.id !== id);
-}
-
-/**
- * 자동 진행(예배 전 안내)에서 이 슬라이드가 머무는 시간.
- *
- * 기본은 구분에 설정한 시간이지만, **그림·동영상 한 장은 따로 정할 수 있다** —
- * 40초짜리 안내 동영상이 8초에 잘리면 안 되기 때문이다.
- *
- * `0` 이나 음수는 '정하지 않음' 으로 본다. 그대로 쓰면 타이머가 즉시 터져
- * 화면이 미친 듯이 넘어간다.
- */
-export function holdMsFor(slide: SlidePayload | undefined, dividerHoldMs: number): number {
-  if (slide?.kind === 'media' && typeof slide.holdMs === 'number' && slide.holdMs > 0) {
-    return slide.holdMs;
-  }
-  return dividerHoldMs;
 }
 
 /** 브라우저·서버 어디서든 쓸 수 있는 항목 id 발급 */

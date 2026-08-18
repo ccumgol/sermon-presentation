@@ -56,11 +56,6 @@ function backgroundValue(background: CanvasBackground): string {
       // rgba 로 직접 지정하는 것이 텍스트 opacity 와 섞이지 않아 안전하다.
       return background.opacity >= 1 ? background.color : withAlpha(background.color, background.opacity);
     case 'image':
-    case 'video':
-      // 그림·동영상은 CSS 배경이 아니라 출력 페이지의 #backdrop 요소가 그린다
-      // (동영상은 CSS 로 재생할 수 없고, 맞춤·불투명도를 따로 다뤄야 한다).
-      // 페이지 배경 자체는 투명이라 파일이 없으면 그대로 투명 송출이 된다.
-      return 'transparent';
     default:
       return 'transparent';
   }
@@ -127,9 +122,9 @@ function simpleStyleVars(prefix: string, style: TextStyle): CssVars {
  * 키 순서를 고정해야 diffCssVars 가 "안 바뀌었다"를 제대로 판단한다.
  */
 export function backdropValue(background: CanvasBackground): string {
-  if (background.mode !== 'image' && background.mode !== 'video') return '';
-  if (!background.src) return '';
-  return JSON.stringify({ mode: background.mode, src: background.src });
+  // 그림 배경만 요소를 만든다 — 색·투명·크로마는 CSS 변수로 충분하다
+  if (background.mode !== 'image' || !background.src) return '';
+  return JSON.stringify({ mode: 'image', src: background.src });
 }
 
 function backdropFit(background: CanvasBackground): string {

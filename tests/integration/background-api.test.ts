@@ -1,30 +1,21 @@
 /**
- * 배경 파일 라우트 통합 테스트.
+ * 배경 목록 API — **목록만 있다** (2026-08-18, D-B 결정).
  *
- * 이 라우트는 **파일을 쓰는 유일한 API** 라 방어가 핵심이다.
- * 경로를 담은 이름(`../../`), 허용하지 않는 확장자, 빈 내용이 통과하면
- * 데이터 폴더 밖에 파일이 생길 수 있다.
+ * 업로드·삭제·총량 상한을 덜어냈다. 기획서 §1.3 이 배경 재생을 범위에서 제외했고
+ * ("OBS가 이미 잘 함") 검수에서 그 판단으로 되돌렸다. 덜어내면서 보안 위험 S-1
+ * (무인증 업로드로 디스크 고갈 → 가사 손실)도 함께 사라졌다.
+ *
+ * 여기서 지키는 것은 **쓰기 경로가 없다**는 것과 **그림만 나열한다**는 것이다.
  */
-
-import { existsSync, rmSync } from 'node:fs';
-import path from 'node:path';
 
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../../server/app.ts';
-import { paths } from '../../server/paths.ts';
-import { safeBackgroundName, type BackgroundFile } from '../../server/routes/backgrounds.ts';
+import { isBackgroundImage, safeBackgroundName } from '../../server/routes/backgrounds.ts';
 import type { ApiResponse } from '../../shared/types.ts';
 
 let app: FastifyInstance;
-
-/** 이 테스트가 만든 파일만 지운다 */
-const createdFiles: string[] = [];
-
-// 1×1 투명 PNG
-const TINY_PNG =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 beforeAll(async () => {
   const built = await buildApp({ getPort: () => 7777 });
@@ -33,93 +24,76 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  for (const name of createdFiles) {
-    const full = path.join(paths.backgroundsDir, name);
-    if (existsSync(full)) rmSync(full);
-  }
   await app.close();
 });
 
-async function post<T>(payload: Record<string, unknown>): Promise<{ status: number; body: ApiResponse<T> }> {
-  const response = await app.inject({ method: 'POST', url: '/api/backgrounds', payload });
-  return { status: response.statusCode, body: response.json() as ApiResponse<T> };
+interface ListBody {
+  files: Array<{ name: string; bytes: number; url: string }>;
+  library: Array<{ name: string; bytes: number; url: string }>;
+  libraryDir: string;
+  dataDir: string;
 }
 
-describe('safeBackgroundName — 이름 검증', () => {
-  it('그림·동영상 확장자만 통과한다', () => {
-    expect(safeBackgroundName('sunrise.jpg')).toBe('sunrise.jpg');
-    expect(safeBackgroundName('loop.MP4')).toBe('loop.MP4');
-    expect(safeBackgroundName('script.sh')).toBeUndefined();
-    expect(safeBackgroundName('notes.txt')).toBeUndefined();
+describe('목록', () => {
+  it('두 폴더를 따로 알려 준다', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/backgrounds' });
+    const body = res.json() as ApiResponse<ListBody>;
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.data!.files)).toBe(true);
+    expect(Array.isArray(body.data!.library)).toBe(true);
+    // 어느 폴더를 보는지 화면에 알려 줄 수 있어야 한다
+    expect(body.data!.libraryDir.length).toBeGreaterThan(0);
+    expect(body.data!.dataDir.length).toBeGreaterThan(0);
   });
 
-  it('경로를 담은 이름은 파일 이름만 남긴다', () => {
-    // 상위 폴더로 나가는 이름이 그대로 쓰이면 데이터 폴더 밖에 파일이 생긴다
-    expect(safeBackgroundName('../../evil.png')).toBe('evil.png');
-    expect(safeBackgroundName('/etc/passwd.png')).toBe('passwd.png');
-  });
-
-  it('빈 이름·숨김 파일·문자열이 아닌 값은 거부한다', () => {
-    expect(safeBackgroundName('')).toBeUndefined();
-    expect(safeBackgroundName('   ')).toBeUndefined();
-    expect(safeBackgroundName('.hidden.png')).toBeUndefined();
-    expect(safeBackgroundName(42)).toBeUndefined();
-    expect(safeBackgroundName(null)).toBeUndefined();
+  it('용량과 주소를 함께 준다', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/backgrounds' });
+    const body = res.json() as ApiResponse<ListBody>;
+    for (const file of [...body.data!.files, ...body.data!.library]) {
+      expect(typeof file.bytes).toBe('number');
+      expect(file.url).toMatch(/^\/(backgrounds|background-library)\//);
+    }
   });
 });
 
-describe('배경 API', () => {
-  it('목록과 올리기 한도를 준다', async () => {
-    const response = await app.inject({ method: 'GET', url: '/api/backgrounds' });
-    const body = response.json() as ApiResponse<{ files: BackgroundFile[]; maxUploadBytes: number }>;
-    expect(response.statusCode).toBe(200);
-    expect(Array.isArray(body.data!.files)).toBe(true);
-    expect(body.data!.maxUploadBytes).toBeGreaterThan(0);
-  });
-
-  it('그림을 올리면 목록과 폴더에 나타난다', async () => {
-    createdFiles.push('agent-j-test.png');
-    const { status, body } = await post<{ file: BackgroundFile | null }>({
-      name: 'agent-j-test.png',
-      base64: TINY_PNG,
+describe('쓰기 경로가 없다', () => {
+  /** 업로드가 없으면 디스크 고갈 위험(S-1)도 없다 */
+  it('업로드(POST)를 받지 않는다', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/backgrounds',
+      payload: { name: 'x.png', base64: 'AAAA' },
     });
-
-    expect(status).toBe(200);
-    expect(body.data!.file).toMatchObject({ name: 'agent-j-test.png', kind: 'image' });
-    expect(existsSync(path.join(paths.backgroundsDir, 'agent-j-test.png'))).toBe(true);
-
-    const list = (
-      (await app.inject({ method: 'GET', url: '/api/backgrounds' })).json() as ApiResponse<{
-        files: BackgroundFile[];
-      }>
-    ).data!.files;
-    expect(list.some((f) => f.name === 'agent-j-test.png')).toBe(true);
+    expect(res.statusCode).toBe(404);
   });
 
-  it('올린 파일을 /backgrounds/ 로 내려준다', async () => {
-    const response = await app.inject({ method: 'GET', url: '/backgrounds/agent-j-test.png' });
-    expect(response.statusCode).toBe(200);
+  it('삭제(DELETE)를 받지 않는다', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/api/backgrounds/x.png' });
+    expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('그림만 배경이 된다', () => {
+  it('동영상은 배경 목록에 들어가지 않는다 — OBS 미디어 소스가 맡는다', () => {
+    for (const name of ['a.mp4', 'a.webm', 'a.mov', 'a.m4v']) {
+      expect(isBackgroundImage(name), name).toBe(false);
+      expect(safeBackgroundName(name), name).toBeUndefined();
+    }
   });
 
-  it('허용하지 않는 확장자는 400 — 파일이 생기지 않는다', async () => {
-    const { status } = await post({ name: 'evil.sh', base64: TINY_PNG });
-    expect(status).toBe(400);
-    expect(existsSync(path.join(paths.backgroundsDir, 'evil.sh'))).toBe(false);
+  it('그림 확장자는 통과한다', () => {
+    for (const name of ['a.png', 'a.JPG', 'a.jpeg', 'a.webp', 'a.gif', 'a.avif']) {
+      expect(isBackgroundImage(name), name).toBe(true);
+    }
   });
 
-  it('경로를 담은 이름은 데이터 폴더 안에만 쓴다', async () => {
-    createdFiles.push('escape.png');
-    const { status } = await post({ name: '../../escape.png', base64: TINY_PNG });
-
-    expect(status).toBe(200);
-    expect(existsSync(path.join(paths.backgroundsDir, 'escape.png'))).toBe(true);
-    // 상위 폴더로 새어 나가지 않았다
-    expect(existsSync(path.join(paths.backgroundsDir, '..', '..', 'escape.png'))).toBe(false);
-  });
-
-  it('내용이 비면 400', async () => {
-    const { status } = await post({ name: 'empty.png', base64: '' });
-    expect(status).toBe(400);
-    expect(existsSync(path.join(paths.backgroundsDir, 'empty.png'))).toBe(false);
+  /** 순서표에 담긴 배경 이름도 이 함수로 검증한다 — 두 곳에서 따로 막으면 어긋난다 */
+  it('경로를 떼고 숨김·엉뚱한 확장자를 막는다', () => {
+    expect(safeBackgroundName('sub/dir/bg.png')).toBe('bg.png');
+    expect(safeBackgroundName('../../etc/passwd')).toBeUndefined();
+    expect(safeBackgroundName('.env')).toBeUndefined();
+    expect(safeBackgroundName('notes.txt')).toBeUndefined();
+    expect(safeBackgroundName('')).toBeUndefined();
+    expect(safeBackgroundName(42)).toBeUndefined();
   });
 });

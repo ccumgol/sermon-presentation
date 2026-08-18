@@ -29,10 +29,9 @@ export interface ReadingSummary {
   slideCount: number;
 }
 
-/** `data/backgrounds/` 안의 배경 파일 하나 */
+/** 배경으로 쓸 수 있는 그림 하나 (동영상은 OBS 가 맡는다) */
 export interface BackgroundFile {
   name: string;
-  kind: 'image' | 'video';
   bytes: number;
   url: string;
 }
@@ -192,29 +191,11 @@ export const api = {
   backgrounds: () =>
     get<{
       files: BackgroundFile[];
-      /** `~/Desktop/Data/Background` 의 그림들 — 읽기 전용, 총량 계산에 들어가지 않는다 */
+      /** `~/Desktop/Data/Background` 의 그림들 — 읽기 전용 */
       library: BackgroundFile[];
       libraryDir: string;
-      maxUploadBytes: number;
-      /** 배경 폴더가 지금 쓰는 총 바이트 · 한도 (SECURITY-AUDIT S-1) */
-      totalBytes: number;
-      maxTotalBytes: number;
+      dataDir: string;
     }>('/api/backgrounds'),
-  uploadBackground: (name: string, base64: string) =>
-    send<{ file: BackgroundFile | null; replaced?: boolean; totalBytes: number; maxTotalBytes: number }>(
-      'POST',
-      '/api/backgrounds',
-      { name, base64 },
-    ),
-  /**
-   * 배경 삭제. 쓰고 있는 템플릿이 있으면 서버가 **409 로 막고 그 이름들을 알려 준다** —
-   * `force` 로만 밀어붙인다 (배경은 이름으로만 참조되므로 그냥 지우면 템플릿이 조용히 깨진다).
-   */
-  deleteBackground: (name: string, force = false) =>
-    send<{ name: string; wasInUse: string[]; totalBytes: number }>(
-      'DELETE',
-      `/api/backgrounds/${encodeURIComponent(name)}${force ? '?force=true' : ''}`,
-    ),
 
   templates: () => get<Template[]>('/api/templates'),
   currentTemplate: () => get<Template>('/api/template/current'),
