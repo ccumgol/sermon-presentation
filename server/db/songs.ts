@@ -229,6 +229,28 @@ function toSongMeta(row: SongRow): Omit<Song, 'sections' | 'langs' | 'entries'> 
   };
 }
 
+/**
+ * 곡집·번호로 곡을 찾는다 — **번역 반입의 기준.**
+ *
+ * 제목으로 찾을 수 없다. 번역판의 제목은 원곡과 다르고(`Amazing Grace` ↔
+ * `나 같은 죄인 살리신`) 곡집마다 표기도 다르다. `(곡집, 번호)` 는 사람이 정한
+ * 고정 좌표라 번역을 넣을 때 가장 믿을 수 있는 기준이다.
+ *
+ * **여러 곡이 나올 수 있다.** `song_entries` 의 PK 는 `(song_id, songbook_id)` 라
+ * 같은 번호를 두 곡이 가질 수 있고, 실제로 35건이 그렇다(많은물소리 301~ 등 실측).
+ * 그래서 하나를 고르지 않고 **전부 돌려준다** — 조용히 첫 곡을 고르면 엉뚱한 곡에
+ * 번역이 들어가고, 그것은 예배 화면에서야 드러난다. 부르는 쪽이 판단해야 한다.
+ */
+export function findByEntry(songbookId: string, number: number): Song[] {
+  const rows = conn()
+    .prepare('SELECT song_id FROM song_entries WHERE songbook_id = ? AND number = ? ORDER BY song_id')
+    .all(songbookId, number) as unknown as Array<{ song_id: number }>;
+  return rows.flatMap((row) => {
+    const song = getSong(row.song_id);
+    return song ? [song] : [];
+  });
+}
+
 export function getSong(id: number): Song | undefined {
   const row = conn().prepare('SELECT * FROM songs WHERE id = ?').get(id) as SongRow | undefined;
   if (!row) return undefined;

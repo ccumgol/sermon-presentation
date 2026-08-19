@@ -22,6 +22,7 @@
     "lyrics:realign": "node scripts/realign-lyrics.ts",
     "chorus:merge": "node scripts/merge-chorus.ts",
     "measure:meter": "node scripts/measure-meter-ranking.ts",
+    "lyrics:lang": "node scripts/import-lyrics-lang.ts",
     "praise:check": "node scripts/check-praise-folder.ts"
   },
   "dependencies": {
