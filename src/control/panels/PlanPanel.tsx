@@ -20,6 +20,7 @@ import {
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
+import { itemTitle } from '../../../lib/item-title.ts';
 import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
@@ -28,6 +29,7 @@ import {
   AUTO_HOLD_MS_MAX,
   AUTO_HOLD_MS_MIN,
   type ClientMsg, type CueItem, type Deck, type ItemBackground, type LangCode, type ItemTextStyle, type PlanDefaults, type PlanKind, type ServicePlan,
+  type SongEntry,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
@@ -59,6 +61,17 @@ interface Props {
 
 /** 성경 탭과 같은 한도 — 세 역본을 넘기면 한 화면에 들어가지 않는다 */
 const MAX_SECONDARY = 2;
+
+/**
+ * 곡집·번호 표기 — `새찬송가 1장`. 제목 슬라이드에 쓴다.
+ *
+ * 번호가 있는 **첫** 수록만 쓴다. 한 곡이 새찬송가·통일찬송가에 함께 실린 경우가 있는데
+ * 둘을 다 적으면 화면 한 줄이 길어진다. 번호 없는 곡집('기타')은 건너뛴다.
+ */
+function songLabelOf(entries: readonly SongEntry[]): string | undefined {
+  const numbered = entries.find((entry) => entry.number !== undefined);
+  return numbered ? `${numbered.songbookName} ${numbered.number}장` : undefined;
+}
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
 type AddKind =
@@ -467,7 +480,9 @@ export function PlanPanel({
 
   const [addKind, setAddKind] = useState<AddKind>('bible');
   const [addInput, setAddInput] = useState('');
-  const [songHits, setSongHits] = useState<Array<{ id: number; title: string; label?: string }>>([]);
+  const [songHits, setSongHits] = useState<
+    Array<{ id: number; title: string; label?: string; songLabel?: string }>
+  >([]);
   const [parseOk, setParseOk] = useState<{ ok: boolean; text: string } | null>(null);
   /** 성경 항목을 추가할 때 쓸 역본 — 마지막에 고른 값을 다음 추가에도 이어 쓴다 */
   const [addPrimary, setAddPrimary] = useState(defaultTranslation);
@@ -1000,6 +1015,38 @@ export function PlanPanel({
     };
   }, [currentSongId, songLangs?.id]);
 
+  /**
+   * 항목 제목 한 줄을 띄운다 — 회중이 다음을 준비하도록.
+   *
+   * **그 항목이 쓸 템플릿을 함께 올린다.** 그러면 제목이 곧이어 나올 본문과 **같은
+   * 자리·같은 모양**으로 뜬다. 활성 템플릿을 그대로 쓰면 앞 순서(순서 표시 등)의
+   * 큰 명조가 남아 성경 참조가 엉뚱하게 커진다.
+   *
+   * 슬라이드 한 장짜리 덱으로 보낸다 — `show` 로 보내면 진행 위치(덱)를 잃는다.
+   */
+  const sendTitle = useCallback(
+    (item: CueItem) => {
+      if (!connected) return;
+      const title = itemTitle(item);
+      if (!title) return;
+
+      const useTemplate = templateIdFor(item);
+      if (typeof useTemplate === 'number') send({ t: 'template:set', id: useTemplate });
+
+      send({
+        t: 'deck:load',
+        payload: {
+          reference: `${describeItem(item)} (제목)`,
+          slides: [{ kind: 'text', lines: [title] }],
+          labels: ['제목'],
+          index: 0,
+        },
+      });
+      setLiveItemId(null);
+    },
+    [connected, send, items, plan?.defaults?.templates],
+  );
+
   /** 인용구를 띄우기 직전 화면으로 되돌린다 */
   const restoreBefore = useCallback(() => {
     if (!before || !connected) return;
@@ -1194,6 +1241,8 @@ export function PlanPanel({
               label: hit.entries
                 .filter((e) => e.number !== undefined)
                 .map((e) => `${e.songbookShortLabel}${e.number}`)[0],
+              // 제목 슬라이드용 — 짧은 라벨('새305')과 달리 회중이 읽는 형태다
+              songLabel: songLabelOf(hit.entries),
             })),
           ),
         )
@@ -1270,7 +1319,7 @@ export function PlanPanel({
       return;
     }
     // 찬양은 검색 결과에서 고른다
-    if (addKind === 'song' && songHits[0]) addSong(songHits[0].id, songHits[0].title);
+    if (addKind === 'song' && songHits[0]) addSong(songHits[0].id, songHits[0].title, songHits[0].songLabel);
   }
 
   /**
@@ -1338,13 +1387,14 @@ export function PlanPanel({
     setAddInput('');
   }
 
-  function addSong(songId: number, songTitle: string): void {
+  function addSong(songId: number, songTitle: string, songLabel?: string): void {
     // 찬양의 언어·줄 수도 예배 기본 설정을 따른다 — 매번 같은 값을 다시 고르지 않게
     insertItem({
       id: newItemId(),
       type: 'song',
       songId,
       songTitle,
+      ...(songLabel ? { songLabel } : {}),
       langs: plan?.defaults?.song?.langs ?? ['ko'],
       lines: plan?.defaults?.song?.lines ?? '2',
     });
@@ -1374,12 +1424,25 @@ export function PlanPanel({
         return;
       }
       if (isExpandable(item)) {
-        setExpandedId((prev) => (prev === item.id ? null : item.id));
+        const nowOpen = expandedId !== item.id;
+        setExpandedId(nowOpen ? item.id : null);
+
+        /*
+         * 펼치면서 **제목을 띄운다** (사용자 요청, 2026-08-19).
+         *
+         * 여러 장짜리 항목은 누른 뒤 그 안의 장을 골라야 화면에 나가므로, 누르는 그
+         * 순간이 '다음은 이것' 이라고 알릴 자리다. 접을 때는 띄우지 않는다 —
+         * 접는 것은 '이제 안 볼래' 이지 '이걸 알려라' 가 아니다.
+         *
+         * 예배 기본 설정에서 끌 수 있다. 클릭이 송출을 일으키는 것은 큰 변화라,
+         * 항목을 살펴보려고 눌렀을 때 화면이 바뀌는 것이 부담스러울 수 있다.
+         */
+        if (nowOpen && plan?.defaults?.titleOnSelect !== false) void sendTitle(item);
         return;
       }
       void sendItem(item, 0);
     },
-    [items, sendItem],
+    [items, sendItem, sendTitle, expandedId, plan?.defaults?.titleOnSelect],
   );
 
   // ── 키보드 ──────────────────────────────────────────────────
@@ -1839,6 +1902,36 @@ export function PlanPanel({
                     </select>
                   </div>
 
+                  {/*
+                    클릭이 송출을 일으키는 것은 큰 변화라 끌 수 있게 둔다. 없으면 켠
+                    것으로 보므로(요청받은 기능이 기본으로 동작해야 한다) false 만 저장된다.
+                  */}
+                  <div className="row detail-controls">
+                    <label title="성경·찬양·교독문·주기도문·사도신경에 해당합니다">
+                      항목을 누르면 제목 띄우기
+                    </label>
+                    <span className="candidates">
+                      {(
+                        [
+                          [true, '켬'],
+                          [false, '끔'],
+                        ] as const
+                      ).map(([on, label]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          className={(plan.defaults?.titleOnSelect !== false) === on ? 'primary' : undefined}
+                          onClick={() => patchDefaults((c) => ({ ...c, titleOnSelect: on }))}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </span>
+                    <span className="muted output-style-hint">
+                      여러 장짜리 항목을 펼칠 때 '창 1:1-6' 처럼 제목 한 줄이 나갑니다
+                    </span>
+                  </div>
+
                   <p className="hintline muted">
                     바꾼 뒤 <b>템플릿 업데이트</b>(유형) 또는 <b>순서 저장하기</b> 를 눌러야 남습니다.
                   </p>
@@ -2215,7 +2308,7 @@ export function PlanPanel({
               {addKind === 'song' && songHits.length > 0 && (
                 <div className="candidates">
                   {songHits.map((hit) => (
-                    <button key={hit.id} type="button" onClick={() => addSong(hit.id, hit.title)}>
+                    <button key={hit.id} type="button" onClick={() => addSong(hit.id, hit.title, hit.songLabel)}>
                       {hit.label ? `${hit.label} ` : ''}{hit.title}
                     </button>
                   ))}

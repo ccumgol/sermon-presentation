@@ -189,6 +189,10 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           type: 'song',
           songId: song.songId,
           songTitle: typeof song.songTitle === 'string' ? song.songTitle : '(제목 없음)',
+          // 제목 슬라이드용 곡집 표기. 길이를 자른다 — 화면 한 줄에 들어가야 한다
+          ...(typeof song.songLabel === 'string' && song.songLabel.trim().length > 0
+            ? { songLabel: song.songLabel.trim().slice(0, 40) }
+            : {}),
           langs: Array.isArray(song.langs) ? song.langs.filter((l) => typeof l === 'string').slice(0, MAX_LANGS) : ['ko'],
           ...(typeof song.lines === 'string' ? { lines: song.lines } : {}),
           ...(() => {
@@ -364,6 +368,9 @@ function readDefaults(raw: unknown): PlanDefaults | undefined {
     if (typeof song.lines === 'string') picked.lines = song.lines;
     if (Object.keys(picked).length > 0) out.song = picked;
   }
+
+  // 참/거짓만 받는다. 없으면 담지 않는다 — 없으면 '켬' 으로 보므로 false 만 저장된다
+  if (typeof value.titleOnSelect === 'boolean') out.titleOnSelect = value.titleOnSelect;
 
   const liturgy = value.liturgy as Record<string, unknown> | undefined;
   if (liturgy && typeof liturgy === 'object') {
