@@ -525,10 +525,17 @@
    *
    * **정해진 표로만 만든다.** 순서표에 담긴 값이 font-family 를 통째로 정하게 하면
    * WS 로 아무 글꼴 이름이나 밀어넣을 수 있다. 배경 주소와 같은 규칙이다.
+   *
+   * 값의 원본은 `lib/korean-fonts.ts` 다. 이 파일은 **의존성 0** 이 원칙이라(OBS
+   * 브라우저 소스가 죽지 않게) import 할 수 없어 같은 문자열을 여기에도 적어 둔다.
+   * 두 벌이 어긋나면 `tests/unit/korean-fonts.test.ts` 가 깨진다 —
+   * 전에 명조 2순위가 `Apple SD Gothic Neo`(고딕)여서 나눔명조가 없는 PC 에서
+   * '명조' 를 골라도 고딕이 나왔다. 그 종류의 어긋남을 막는 장치다.
    */
   var ITEM_FONTS = {
-    sans: '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif',
-    serif: '"Nanum Myeongjo", "Apple SD Gothic Neo", "Batang", "Noto Serif KR", serif',
+    sans: '"Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif',
+    serif: '"Noto Serif KR", "Noto Serif CJK KR", "BareunBatangOTFPro", "NanumMyeongjoExtraBold", ' +
+      '"Nanum Myeongjo", "AppleMyungjo", "Batang", serif',
   };
 
   /**

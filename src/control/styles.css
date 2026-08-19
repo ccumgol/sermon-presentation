@@ -553,6 +553,45 @@ select:focus {
   margin-bottom: 0;
 }
 
+/* 대표 폰트 설치 안내 목록 — 이름·용도·상태를 한 줄에 */
+.font-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+.font-list > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.font-list > li:last-child {
+  border-bottom: none;
+}
+.font-name {
+  font-size: 15px;
+}
+.font-why {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+/* 있음/없음을 색으로 — 글자를 읽기 전에 눈에 들어와야 한다 */
+.font-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.font-dot.ok {
+  background: var(--ok, #4ade80);
+}
+.font-dot.missing {
+  background: var(--warn, #fbbf24);
+}
+
 /* 표시 언어의 위/아래를 밝히는 짧은 꼬리표 — 버튼 옆에 붙는다 */
 .lang-order {
   font-size: 12px;

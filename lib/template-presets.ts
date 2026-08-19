@@ -10,21 +10,12 @@
  * 대체해 자간이 들쭉날쭉해진다. 그래서 총칭 앞에 실제로 존재하는 폰트를 둔다.
  */
 
+import { FONT_KO_SANS, FONT_KO_SERIF } from './korean-fonts.ts';
 import type { Anchor, Template, TemplateKind, TextStyle } from '../shared/types.ts';
 
-const FONT_KO = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif';
+const FONT_KO = FONT_KO_SANS;
 const FONT_EN = '"Inter", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
-/**
- * 한국어 **명조(바탕)** 계열 — 순서 표시처럼 굵고 큰 제목에 쓴다.
- *
- * 앞쪽은 굵은 바탕(설치돼 있으면), 그다음 맥·윈도우 기본 명조, 마지막에 총칭.
- * 총칭(serif)만 남기면 한글을 못 덮는 폰트로 대체돼 자간이 들쭉날쭉해진다
- * (헬라어에서 겪은 문제와 같은 원리 — PLAN 3.4 참고).
- */
-const FONT_KO_SERIF =
-  '"Noto Serif KR", "Noto Serif CJK KR", "BareunBatangOTFPro", "NanumMyeongjoExtraBold", ' +
-  '"Nanum Myeongjo", "AppleMyungjo", "Batang", serif';
 /**
  * 다음절 그리스어(Ἐ ῇ ἦ — U+1F00 대역)는 총칭 `serif` 로 두면 글자마다 대체가
  * 일어나 심하게 벌어진다. 실측: 같은 구절이 `serif` 819.6px vs Times 526.6px.

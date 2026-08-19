@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, ApiError, type ServerInfo } from '../api.ts';
+import { FontSetupCard } from '../components/FontSetupCard.tsx';
 
 interface Props {
   info: ServerInfo | null;
@@ -159,6 +160,13 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
         <h2>OBS 브라우저 소스 URL</h2>
         <CopyRow value={info.outputUrl} />
       </div>
+
+      {/*
+        폰트 안내를 OBS 설정 **바로 다음**에 둔다. 처음 설치하는 사람이 위에서
+        아래로 읽어 내려가는 순서에서, 소스를 만든 직후가 폰트를 챙길 자리다.
+        더 아래로 밀면 스크롤 밖이라 아무도 안 본다.
+      */}
+      <FontSetupCard />
 
       <div className="card">
         <h2>OBS 설정</h2>
