@@ -464,6 +464,17 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
  */
 export const DEFAULT_TEMPLATE_ID = -1;
 
+/**
+ * 성경·찬양 탭에서 고를 수 있는 프리셋 — **본문·가사에 쓰는 셋만.**
+ *
+ * 순서 표시·교독문·전례문·로우서드·공백은 그 항목 전용이라 성경 본문이나 가사에
+ * 쓰면 글자 크기·배치가 맞지 않는다. 목록에 넣으면 고를 수는 있는데 결과가
+ * 이상해져, 고를 수 있다는 것이 곧 안내가 되어야 한다.
+ *
+ * 순서는 목록에 보이는 순서다 — 가장 많이 쓰는 하단을 앞에.
+ */
+export const SHARED_PRESET_IDS: readonly number[] = [-1, -8, -3];
+
 export function getBuiltinTemplate(id: number): Template | undefined {
   return BUILTIN_TEMPLATES.find((t) => t.id === id);
 }

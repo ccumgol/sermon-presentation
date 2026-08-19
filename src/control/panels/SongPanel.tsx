@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   LANG_LABELS, MAX_LANGS, orderLangs, SELECTABLE_LANGS, toggleLang as nextLangs,
 } from '../../../lib/lang-select.ts';
+import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { LyricsGrid } from '../components/LyricsGrid.tsx';
 import { mergeSecondaryLyrics } from '../../../lib/lyrics-merge.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
@@ -69,6 +70,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    * 표시 언어(`langs`)와 따로 두는 이유: 표시 언어는 **송출할 것**이고 이것은
    * **편집할 것**이다. 中文 을 넣는 동안 화면에는 한/영만 내보내고 싶을 수 있다.
    */
+  /** 이 탭에서 띄울 때 쓸 프리셋·폰트 — 고르지 않으면 지금 템플릿 그대로 */
+  const [outputStyle, setOutputStyle] = useState<OutputStyle>({});
   const [gridLangs, setGridLangs] = useState<LangCode[] | null>(null);
   /** 붙여 넣을 대상 언어 — 어느 언어를 채우는지 골라야 다른 언어를 지우지 않는다 */
   const [pasteLang, setPasteLang] = useState<LangCode>('en');
@@ -143,6 +146,34 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     }
   }, []);
 
+  /**
+   * 이 탭의 프리셋·폰트를 얹어 보낸다.
+   *
+   * 템플릿을 **슬라이드보다 먼저** 올린다 — 순서가 반대면 옛 템플릿으로 한 번
+   * 그려졌다가 바뀌어 화면이 튄다 (예배 순서 탭의 sendItem 과 같은 규칙).
+   *
+   * 송출 경로가 둘(고른 곡 송출·번호 즉시 송출)이라 한 곳에 모은다. 두 곳에 적으면
+   * 한쪽만 고쳐 '검색해서 띄우면 되는데 번호로 띄우면 안 된다' 가 된다.
+   */
+  const sendWithStyle = useCallback(
+    (deck: Deck): void => {
+      if (outputStyle.templateId !== undefined) {
+        send({ t: 'template:set', id: outputStyle.templateId });
+      }
+      const payload =
+        outputStyle.style === undefined
+          ? deck
+          : {
+              ...deck,
+              slides: deck.slides.map((slide) =>
+                slide.kind === 'song' ? { ...slide, style: outputStyle.style } : slide,
+              ),
+            };
+      send({ t: 'deck:load', payload });
+    },
+    [outputStyle, send],
+  );
+
   const sendDeck = useCallback(
     async (sectionId?: number) => {
       if (!song) return;
@@ -158,7 +189,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           const names = deckResult.missingLangs.map((l) => LANG_LABELS[l] ?? l).join(', ');
           setNotice(`이 곡에는 ${names} 가사가 없어 표시되지 않습니다. 편집에서 추가할 수 있습니다.`);
         }
-        send({ t: 'deck:load', payload: deckResult.deck });
+        sendWithStyle(deckResult.deck);
         void loadQuickPicks();
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '송출하지 못했습니다');
@@ -166,7 +197,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         setBusy(false);
       }
     },
-    [song, langs, lines, send, loadQuickPicks],
+    [song, langs, lines, sendWithStyle, loadQuickPicks],
   );
 
   /**
@@ -195,7 +226,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           setError(`'${loaded.title}' 에 표시할 가사가 없습니다`);
           return;
         }
-        send({ t: 'deck:load', payload: deckResult.deck });
+        sendWithStyle(deckResult.deck);
         void loadQuickPicks();
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '송출하지 못했습니다');
@@ -203,7 +234,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         setBusy(false);
       }
     },
-    [langs, lines, send, loadQuickPicks],
+    [langs, lines, sendWithStyle, loadQuickPicks],
   );
 
   /** 즐겨찾기에 넣거나 뺀다 — 목록은 곧바로 다시 읽는다 */
@@ -424,6 +455,12 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 {' '}(가사가 다릅니다)
               </p>
             )}
+
+            {/*
+              이 탭은 순서를 벗어나 급히 띄우는 자리다 — 예배 중 곡이 갑자기 바뀔 때 쓴다.
+              그때 화면 모양을 정할 길이 없었다(지금 활성 템플릿이 무엇이든 그대로 나갔다).
+            */}
+            <OutputStyleBar value={outputStyle} onChange={setOutputStyle} />
 
             <div className="row">
               <div className="field">

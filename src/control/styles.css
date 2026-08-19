@@ -575,6 +575,16 @@ select:focus {
   display: none;
 }
 
+/* 성경·찬양 탭의 화면 설정 줄 — 프리셋 · 폰트 · 안내가 한 줄에 */
+.output-style {
+  align-items: center;
+}
+.output-style-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+}
+
 /* 항목 표시 옵션 — 라벨 · 세 갈래 버튼 · 실효값을 한 줄에 */
 .display-row {
   display: flex;

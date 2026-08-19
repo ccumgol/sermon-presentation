@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BUILTIN_TEMPLATES, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
+import { BUILTIN_TEMPLATES, SHARED_PRESET_IDS, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
 import {
   anchorToAlignment, clampRhythm, diffCssVars, MAX_TITLE_RHYTHM, overrideVarsFor, templateToCssVars, withAlpha,
 } from '../../lib/template-css.ts';
@@ -340,5 +340,28 @@ describe('순서 표시 리듬', () => {
     // 총칭 serif 앞에 실제 폰트가 있어야 글자별 대체가 일어나지 않는다 (PLAN 3.4)
     expect(preset.text.primary.fontFamily).toMatch(/Batang|Myeongjo|Myungjo/);
     expect(preset.text.primary.fontFamily.endsWith('serif')).toBe(true);
+  });
+});
+
+describe('성경·찬양 탭에서 고를 수 있는 프리셋', () => {
+  it('셋뿐이다 — 하단·전체·좌우', () => {
+    expect(SHARED_PRESET_IDS).toEqual([-1, -8, -3]);
+  });
+
+  it('모두 실제로 있는 프리셋이다', () => {
+    for (const id of SHARED_PRESET_IDS) {
+      expect(BUILTIN_TEMPLATES.some((t) => t.id === id), `프리셋 ${id}`).toBe(true);
+    }
+  });
+
+  it('셋 다 이름에 겸용임을 밝힌다 — 고를 때 그것이 안내가 된다', () => {
+    for (const id of SHARED_PRESET_IDS) {
+      expect(BUILTIN_TEMPLATES.find((t) => t.id === id)!.name).toContain('겸용');
+    }
+  });
+
+  it('항목 전용 프리셋은 들어 있지 않다', () => {
+    // 순서 표시(-9)·교독문(-10)·전례문(-11)·로우서드(-6)·공백(-7)
+    for (const id of [-9, -10, -11, -6, -7]) expect(SHARED_PRESET_IDS).not.toContain(id);
   });
 });

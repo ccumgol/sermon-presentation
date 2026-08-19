@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import type { ClientMsg, Deck, ParseResult, Template, Translation } from '../../../shared/types.ts';
 import { api, ApiError, type PassageResponse } from '../api.ts';
@@ -68,6 +69,8 @@ export function BiblePanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** 이 탭에서 띄울 때 쓸 프리셋·폰트 — 고르지 않으면 지금 템플릿 그대로 */
+  const [outputStyle, setOutputStyle] = useState<OutputStyle>({});
 
   const inputRef = useRef<HTMLInputElement>(null);
   const measurer = useMeasure();
@@ -150,14 +153,32 @@ export function BiblePanel({
           setNotice(`${names} 에는 이 본문이 없어 표시되지 않습니다`);
         }
 
-        send({ t: 'deck:load', payload: deckToSend });
+        /*
+         * 템플릿을 **슬라이드보다 먼저** 올린다 — 순서가 반대면 옛 템플릿으로 한 번
+         * 그려졌다가 바뀌어 화면이 튄다 (예배 순서 탭의 sendItem 과 같은 규칙).
+         */
+        if (outputStyle.templateId !== undefined) {
+          send({ t: 'template:set', id: outputStyle.templateId });
+        }
+
+        const styled =
+          outputStyle.style === undefined
+            ? deckToSend
+            : {
+                ...deckToSend,
+                slides: deckToSend.slides.map((slide) =>
+                  slide.kind === 'bible' ? { ...slide, style: outputStyle.style } : slide,
+                ),
+              };
+
+        send({ t: 'deck:load', payload: styled });
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '본문을 불러오지 못했습니다');
       } finally {
         setLoading(false);
       }
     },
-    [paging, send, translations, template, measurer, translationIds.join(',')],
+    [paging, send, translations, template, measurer, outputStyle, translationIds.join(',')],
   );
 
   const hint = parseHint(parse, parsePending);
@@ -270,6 +291,12 @@ export function BiblePanel({
             </select>
           </div>
         </div>
+
+        {/*
+          이 탭은 순서를 벗어나 급히 띄우는 자리다 — 설교 중 다른 본문을 찾을 때 쓴다.
+          그때 화면 모양을 정할 길이 없었다(지금 활성 템플릿이 무엇이든 그대로 나갔다).
+        */}
+        <OutputStyleBar value={outputStyle} onChange={setOutputStyle} />
 
         <div className="field" style={{ marginTop: 12 }}>
           <label>보조 역본 (최대 {MAX_SECONDARY}개)</label>
