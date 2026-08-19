@@ -27,7 +27,7 @@ import {
   type CueItem,
   type ItemBackground,
   type ItemDisplay,
-  type ReadingStyle,
+  type ItemTextStyle,
   type PlanDefaults,
   type PlanKind,
   type ServicePlan,
@@ -93,7 +93,7 @@ function readItemDisplay(raw: unknown): ItemDisplay | undefined {
 const READING_SCALE_MIN = 0.6;
 const READING_SCALE_MAX = 2;
 
-function readReadingStyle(raw: unknown): ReadingStyle | undefined {
+function readItemTextStyle(raw: unknown): ItemTextStyle | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const value = raw as Record<string, unknown>;
 
@@ -168,6 +168,10 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
             const display = readItemDisplay(fields.display);
             return display ? { display } : {};
           })(),
+          ...(() => {
+            const style = readItemTextStyle(fields.style);
+            return style ? { style } : {};
+          })(),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
@@ -190,6 +194,10 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           ...(() => {
             const display = readItemDisplay(fields.display);
             return display ? { display } : {};
+          })(),
+          ...(() => {
+            const style = readItemTextStyle(fields.style);
+            return style ? { style } : {};
           })(),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
@@ -259,7 +267,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           ...(perSlide !== undefined ? { perSlide } : {}),
           ...(overrideLines.length > 0 ? { overrideLines } : {}),
           ...(background ? { background } : {}),
-          ...(readReadingStyle(fields.style) ? { style: readReadingStyle(fields.style)! } : {}),
+          ...(readItemTextStyle(fields.style) ? { style: readItemTextStyle(fields.style)! } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
@@ -284,7 +292,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           ...(readItemBackground(fields.background)
             ? { background: readItemBackground(fields.background)! }
             : {}),
-          ...(readReadingStyle(fields.style) ? { style: readReadingStyle(fields.style)! } : {}),
+          ...(readItemTextStyle(fields.style) ? { style: readItemTextStyle(fields.style)! } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });

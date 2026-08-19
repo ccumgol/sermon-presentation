@@ -27,7 +27,7 @@ import {
   AUTO_HOLD_MS_DEFAULT,
   AUTO_HOLD_MS_MAX,
   AUTO_HOLD_MS_MIN,
-  type ClientMsg, type CueItem, type Deck, type ItemBackground, type LangCode, type ReadingStyle, type PlanDefaults, type PlanKind, type ServicePlan,
+  type ClientMsg, type CueItem, type Deck, type ItemBackground, type LangCode, type ItemTextStyle, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
@@ -122,7 +122,7 @@ const CHAR_WIDTH_EM = { sans: 0.75, serif: 0.82 } as const;
 function wrapsAtScale(
   longestLineChars: number,
   baseFontSize: number,
-  style: ReadingStyle | undefined,
+  style: ItemTextStyle | undefined,
 ): boolean {
   if (longestLineChars <= 0) return false;
   const em = CHAR_WIDTH_EM[style?.font ?? 'sans'];
@@ -130,25 +130,34 @@ function wrapsAtScale(
   return width > SAFE_WIDTH_PX;
 }
 
-function ReadingStyleControls({
+function ItemTextStyleControls({
   value,
   onChange,
   longestLineChars,
   baseFontSize,
+  showScale = true,
 }: {
-  value: ReadingStyle | undefined;
-  onChange: (next: ReadingStyle | undefined) => void;
+  value: ItemTextStyle | undefined;
+  onChange: (next: ItemTextStyle | undefined) => void;
   /** 이 항목 본문의 가장 긴 줄 글자 수 — 줄 감김 어림에 쓴다 */
   longestLineChars?: number;
   /** 템플릿의 기본 글자 크기 */
   baseFontSize?: number;
+  /**
+   * 글자 크기 조절을 보일지.
+   *
+   * 성경·찬양에서는 **감춘다.** 본문 길이가 매번 달라 자동 축소가 개입하므로,
+   * 크기를 항목마다 주면 요청한 값과 화면이 달라져 무엇이 이겼는지 알기 어렵다.
+   * 교독문·전례문은 본문이 정해져 있어 크기를 예측할 수 있다.
+   */
+  showScale?: boolean;
 }): React.JSX.Element {
   const font = value?.font ?? 'sans';
   const scale = value?.scale ?? 1;
 
   /** 빈 설정은 아예 지운다 — 기본값이 박히면 나중에 기본을 바꿀 수 없다 */
-  function patch(next: ReadingStyle): void {
-    const cleaned: ReadingStyle = {
+  function patch(next: ItemTextStyle): void {
+    const cleaned: ItemTextStyle = {
       ...(next.font && next.font !== 'sans' ? { font: next.font } : {}),
       ...(next.scale !== undefined && next.scale !== 1 ? { scale: next.scale } : {}),
     };
@@ -174,29 +183,33 @@ function ReadingStyleControls({
         ))}
       </div>
 
-      <label title="템플릿 크기에 곱합니다. 행간은 그대로 유지됩니다.">글자 크기</label>
-      <input
-        type="range"
-        min={0.6}
-        max={2}
-        step={0.05}
-        value={scale}
-        onChange={(e) => patch({ ...value, scale: Number(e.target.value) })}
-      />
-      <span className="muted">{Math.round(scale * 100)}%</span>
-      {scale !== 1 && (
-        <button type="button" className="reset" onClick={() => patch({ ...value, scale: 1 })} title="기본 크기로">
-          ↺
-        </button>
-      )}
+      {showScale && (
+        <>
+          <label title="템플릿 크기에 곱합니다. 행간은 그대로 유지됩니다.">글자 크기</label>
+          <input
+            type="range"
+            min={0.6}
+            max={2}
+            step={0.05}
+            value={scale}
+            onChange={(e) => patch({ ...value, scale: Number(e.target.value) })}
+          />
+          <span className="muted">{Math.round(scale * 100)}%</span>
+          {scale !== 1 && (
+            <button type="button" className="reset" onClick={() => patch({ ...value, scale: 1 })} title="기본 크기로">
+              ↺
+            </button>
+          )}
 
-      {longestLineChars !== undefined &&
-        baseFontSize !== undefined &&
-        wrapsAtScale(longestLineChars, baseFontSize, value) && (
-          <span className="wrap-warn" title={`가장 긴 줄이 ${longestLineChars}자입니다`}>
-            ⚠ 이 크기에서는 긴 줄이 두 줄로 감깁니다
-          </span>
-        )}
+          {longestLineChars !== undefined &&
+            baseFontSize !== undefined &&
+            wrapsAtScale(longestLineChars, baseFontSize, value) && (
+              <span className="wrap-warn" title={`가장 긴 줄이 ${longestLineChars}자입니다`}>
+                ⚠ 이 크기에서는 긴 줄이 두 줄로 감깁니다
+              </span>
+            )}
+        </>
+      )}
     </>
   );
 }
@@ -707,10 +720,16 @@ export function PlanPanel({
          * 그 값이 따라오지 않는다. 여기서는 항목의 뜻을 전달만 한다.
          */
         const withDisplay = (slides: SlidePayload[]): SlidePayload[] =>
-          item.display === undefined
+          item.display === undefined && item.style === undefined
             ? slides
             : slides.map((slide) =>
-                slide.kind === 'bible' ? { ...slide, display: item.display } : slide,
+                slide.kind === 'bible'
+                  ? {
+                      ...slide,
+                      ...(item.display ? { display: item.display } : {}),
+                      ...(item.style ? { style: item.style } : {}),
+                    }
+                  : slide,
               );
 
         if ((item.paging ?? 'verse') === 'auto') {
@@ -730,10 +749,16 @@ export function PlanPanel({
       if (item.type === 'song') {
         const songDeck = await api.songDeck(item.songId, item.langs, item.lines ?? '2', undefined, maxChars);
         const slides =
-          item.display === undefined
+          item.display === undefined && item.style === undefined
             ? songDeck.deck.slides
             : songDeck.deck.slides.map((slide) =>
-                slide.kind === 'song' ? { ...slide, display: item.display } : slide,
+                slide.kind === 'song'
+                  ? {
+                      ...slide,
+                      ...(item.display ? { display: item.display } : {}),
+                      ...(item.style ? { style: item.style } : {}),
+                    }
+                  : slide,
               );
         return { slides, labels: songDeck.deck.labels };
       }
@@ -2347,6 +2372,21 @@ export function PlanPanel({
                 </span>
               )}
 
+              <ItemTextStyleControls
+                value={current.style}
+                showScale={false}
+                onChange={(style) => {
+                  const next = items.map((i) =>
+                    i.id === current.id && i.type === 'song'
+                      ? { ...i, ...(style ? { style } : { style: undefined }) }
+                      : i,
+                  );
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated) refreshLive(updated);
+                }}
+              />
+
               {/*
                 찬양에는 **참조 표기와 소제목이 없다** — renderSong 이 비운다.
                 그래서 뜻이 있는 것은 절 번호뿐이고, 없는 것을 보여 주면 눌러도 아무 일이
@@ -2409,7 +2449,7 @@ export function PlanPanel({
                     uploaded={bgFiles}
                     onChange={(background) => patchReading({ background })}
                   />
-                  <ReadingStyleControls
+                  <ItemTextStyleControls
                     value={reading.style}
                     onChange={(style) => patchReading({ style })}
                     baseFontSize={baseFontSizeFor(reading, 64)}
@@ -2543,7 +2583,7 @@ export function PlanPanel({
                       onChange={(background) => patchLiturgy({ background })}
                     />
 
-                    <ReadingStyleControls
+                    <ItemTextStyleControls
                       value={liturgy.style}
                       onChange={(style) => patchLiturgy({ style })}
                       longestLineChars={shown.reduce((max, l) => Math.max(max, l.length), 0)}
@@ -2606,6 +2646,21 @@ export function PlanPanel({
 
           {current.type === 'bible' && (
             <div className="row detail-controls">
+              <ItemTextStyleControls
+                value={current.style}
+                showScale={false}
+                onChange={(style) => {
+                  const next = items.map((i) =>
+                    i.id === current.id && i.type === 'bible'
+                      ? { ...i, ...(style ? { style } : { style: undefined }) }
+                      : i,
+                  );
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated) refreshLive(updated);
+                }}
+              />
+
               <DisplayToggles
                 value={current.display}
                 template={itemTemplateFor(current)}

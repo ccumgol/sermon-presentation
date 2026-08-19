@@ -86,10 +86,23 @@ interface TextStyleFieldsProps {
   title: string;
   style: TextStyle;
   onChange: (patch: Partial<TextStyle>) => void;
+  /**
+   * 글꼴 칸을 보일지.
+   *
+   * **주·보조 텍스트에서는 감춘다** — 폰트는 예배 순서 탭의 항목에서 고른다
+   * (고딕/명조, 요청 5). 참조 표기·소제목·절 번호는 항목 폰트가 걸리지 않는 자리라
+   * (`--item-font` 는 `.line-primary`·`.line-secondary` 에만 걸린다) 여기서 정한다.
+   */
+  showFontChain?: boolean;
 }
 
 /** 한 역할(주 역본·보조 역본 등)의 글자 스타일 편집 묶음 */
-export function TextStyleFields({ title, style, onChange }: TextStyleFieldsProps): React.JSX.Element {
+export function TextStyleFields({
+  title,
+  style,
+  onChange,
+  showFontChain = true,
+}: TextStyleFieldsProps): React.JSX.Element {
   return (
     <details className="style-group" open>
       <summary>{title}</summary>
@@ -118,18 +131,26 @@ export function TextStyleFields({ title, style, onChange }: TextStyleFieldsProps
         </div>
       </div>
 
-      <div className="field">
-        <label>글꼴 (쉼표로 구분된 후보 목록)</label>
-        <input
-          type="text"
-          value={style.fontFamily}
-          onChange={(e) => onChange({ fontFamily: e.target.value })}
-          spellCheck={false}
-        />
-      </div>
+      {showFontChain ? (
+        <>
+          <div className="field">
+            <label>글꼴 (쉼표로 구분된 후보 목록)</label>
+            <input
+              type="text"
+              value={style.fontFamily}
+              onChange={(e) => onChange({ fontFamily: e.target.value })}
+              spellCheck={false}
+            />
+          </div>
 
-      {/* 적어 넣은 이름이 실제로 잡히는지 재서 보여 준다 (설치했는데 안 잡히는 함정 방지) */}
-      <FontChainStatus value={style.fontFamily} />
+          {/* 적어 넣은 이름이 실제로 잡히는지 재서 보여 준다 (설치했는데 안 잡히는 함정 방지) */}
+          <FontChainStatus value={style.fontFamily} />
+        </>
+      ) : (
+        <p className="hintline muted">
+          글꼴(고딕/명조)은 <b>예배 순서</b> 탭의 항목에서 고릅니다.
+        </p>
+      )}
 
       {/* 외곽선 — 밝은 영상 위에서 글자를 읽히게 하는 가장 효과적인 수단 */}
       <div className="row">

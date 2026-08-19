@@ -376,7 +376,16 @@ export type BackgroundFit = 'cover' | 'contain';
  * 작게 두고 싶을 수 있다. 템플릿이면 그때마다 템플릿을 새로 만들어야 한다.
  * 지정하지 않으면 템플릿 값을 그대로 쓴다.
  */
-export interface ReadingStyle {
+/**
+ * 항목이 정하는 **글자 모양** — 폰트와 크기.
+ *
+ * 처음에는 교독문·전례문 전용이라 `ReadingStyle` 이었는데, 성경·찬양도 폰트를 항목에서
+ * 고르게 되어(요청 5) 이름을 고쳤다. 쓰는 곳이 넷이면 이름이 하나를 가리켜서는 안 된다.
+ *
+ * **크기(`scale`)는 교독문·전례문에서만 화면에 노출한다.** 성경·찬양은 본문 길이가
+ * 매번 달라 자동 축소가 개입하므로, 크기를 항목마다 주면 무엇이 이겼는지 알기 어렵다.
+ */
+export interface ItemTextStyle {
   /** `sans` 고딕 · `serif` 명조. 없으면 템플릿 폰트 */
   font?: 'sans' | 'serif';
   /**
@@ -518,6 +527,8 @@ export type CueItem =
       paging?: string;
       /** 참조 표기·소제목·절 번호를 이 항목에서만 켜고 끈다 */
       display?: ItemDisplay;
+      /** 폰트(고딕/명조). 크기는 자동 축소와 겹쳐 항목에서 정하지 않는다 */
+      style?: ItemTextStyle;
       templateId?: number;
       note?: string;
     }
@@ -536,6 +547,8 @@ export type CueItem =
        * 그래서 `reference`·`headings` 는 찬양에서 아무 일도 하지 않는다.
        */
       display?: ItemDisplay;
+      /** 폰트(고딕/명조) */
+      style?: ItemTextStyle;
       templateId?: number;
       note?: string;
     }
@@ -603,7 +616,7 @@ export type CueItem =
       /** 이 항목에만 깔 배경 그림 (템플릿 배경을 덮는다) */
       background?: ItemBackground;
       /** 폰트·글자 크기 (없으면 템플릿 값) */
-      style?: ReadingStyle;
+      style?: ItemTextStyle;
       templateId?: number;
       note?: string;
     }
@@ -624,7 +637,7 @@ export type CueItem =
       /** 이 항목에만 깔 배경 그림 (템플릿 배경을 덮는다) */
       background?: ItemBackground;
       /** 폰트·글자 크기 (없으면 템플릿 값) */
-      style?: ReadingStyle;
+      style?: ItemTextStyle;
       templateId?: number;
       note?: string;
     }
@@ -745,6 +758,8 @@ export type SlidePayload =
       heading?: string;
       /** 항목이 정한 표시 여부 (없으면 템플릿 따름) */
       display?: ItemDisplay;
+      /** 항목이 정한 폰트 (없으면 템플릿 따름) */
+      style?: ItemTextStyle;
     }
   | {
       kind: 'song';
@@ -761,9 +776,11 @@ export type SlidePayload =
       credit?: string;
       /** 항목이 정한 표시 여부 (없으면 템플릿 따름) */
       display?: ItemDisplay;
+      /** 항목이 정한 폰트 (없으면 템플릿 따름) */
+      style?: ItemTextStyle;
     }
   /** `background`·`style` 은 전례문(주기도문·사도신경)이 실어 보낼 때만 찬다 */
-  | { kind: 'text'; lines: string[]; background?: ItemBackground; style?: ReadingStyle }
+  | { kind: 'text'; lines: string[]; background?: ItemBackground; style?: ItemTextStyle }
   /**
    * 순서 표시 — **왼쪽에 순서 이름, 오른쪽에 담당자**를 한 줄로 놓고 담당자 아래에 밑줄.
    *
@@ -795,7 +812,7 @@ export type SlidePayload =
       /** '시편 1편' 처럼 작게 붙는 표기 */
       reference?: string;
       background?: ItemBackground;
-      style?: ReadingStyle;
+      style?: ItemTextStyle;
     }
   | { kind: 'blank' };
 

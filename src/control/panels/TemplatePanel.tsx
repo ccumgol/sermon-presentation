@@ -484,8 +484,13 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
 
       <div className="card">
         <h2>글자</h2>
-        <TextStyleFields title="주 역본 / 주 언어" style={draft.text.primary} onChange={(p) => patchText('primary', p)} />
-        <TextStyleFields title="보조 역본 / 보조 언어" style={draft.text.secondary} onChange={(p) => patchText('secondary', p)} />
+        {/*
+          주·보조는 글꼴 칸을 감춘다 — 폰트는 예배 순서 탭의 항목에서 고른다(요청 5).
+          아래 셋(절 번호·참조 표기·소제목)은 `--item-font` 가 걸리지 않는 자리라
+          (CSS 가 .line-primary·.line-secondary 에만 건다) 여기서 정해야 한다.
+        */}
+        <TextStyleFields title="주 역본 / 주 언어" style={draft.text.primary} onChange={(p) => patchText('primary', p)} showFontChain={false} />
+        <TextStyleFields title="보조 역본 / 보조 언어" style={draft.text.secondary} onChange={(p) => patchText('secondary', p)} showFontChain={false} />
         <TextStyleFields title="절 번호" style={draft.text.verseNum} onChange={(p) => patchText('verseNum', p)} />
         <TextStyleFields title="참조 표기" style={draft.text.reference} onChange={(p) => patchText('reference', p)} />
         <TextStyleFields title="소제목" style={draft.text.heading} onChange={(p) => patchText('heading', p)} />
