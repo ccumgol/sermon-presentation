@@ -575,6 +575,23 @@ select:focus {
   display: none;
 }
 
+/* 항목 표시 옵션 — 라벨 · 세 갈래 버튼 · 실효값을 한 줄에 */
+.display-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.display-row > label {
+  flex: none;
+  min-width: 62px;
+}
+.display-effective {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 /* 템플릿 동작 줄 — 버튼 5개가 한 줄에 들어가야 한다 (덮어쓰기·사본·취소·원본·삭제) */
 .template-actions {
   flex-wrap: wrap;

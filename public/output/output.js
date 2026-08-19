@@ -197,11 +197,38 @@
 
   }
 
+  /**
+   * 표시 여부를 정한다 — **모양은 템플릿, 켜고 끄기는 항목.**
+   *
+   * 규칙의 원본은 `lib/item-display.ts` 다. 이 파일은 **의존성 0** 이 원칙이라(OBS
+   * 브라우저 소스가 죽지 않게) import 할 수 없어 같은 규칙을 여기에도 적어 둔다.
+   *
+   * **결정을 여기서 한다.** 컨트롤 패널이 미리 풀어 슬라이드에 담으면, 나중에 템플릿만
+   * 바꿨을 때(template:set) 그 값이 따라오지 않는다.
+   *
+   * 항목 값은 세 갈래다 — 없으면 템플릿 따름, true/false 면 그것이 이긴다.
+   * 없는 것을 false 로 보면 이미 저장된 순서표가 모두 '끔' 이 된다.
+   */
+  function resolveDisplay(behavior, display) {
+    var d = display || {};
+    // showVerseNumbers 는 '없으면 켬' 이 기존 동작이다
+    var reference = behavior.showReference || 'none';
+    if (d.reference === false) reference = 'none';
+    else if (d.reference === true && reference === 'none') reference = 'bottom';
+
+    return {
+      verseNumbers: d.verseNumbers !== undefined ? d.verseNumbers : behavior.showVerseNumbers !== false,
+      headings: d.headings !== undefined ? d.headings : behavior.showHeadings === true,
+      reference: reference,
+    };
+  }
+
   /** 성경 본문 블록 렌더 */
   function renderBible(payload) {
     clearChildren(el.blocks);
     var behavior = (template && template.behavior) || {};
-    var showNums = behavior.showVerseNumbers !== false;
+    var show = resolveDisplay(behavior, payload.display);
+    var showNums = show.verseNumbers;
 
     payload.blocks.forEach(function (block, index) {
       var div = document.createElement('div');
@@ -233,12 +260,12 @@
       el.blocks.appendChild(div);
     });
 
-    setOptional(el.heading, behavior.showHeadings === false ? null : payload.heading);
-    setOptional(el.reference, behavior.showReference === 'none' ? null : payload.reference);
+    setOptional(el.heading, show.headings ? payload.heading : null);
+    setOptional(el.reference, show.reference === 'none' ? null : payload.reference);
     setOptional(el.credit, null);
 
     // 참조를 위에 둘지 아래에 둘지 — DOM 순서를 바꿔 반영한다
-    if (behavior.showReference === 'top') el.slide.insertBefore(el.reference, el.blocks);
+    if (show.reference === 'top') el.slide.insertBefore(el.reference, el.blocks);
     else el.slide.appendChild(el.reference);
   }
 
@@ -258,8 +285,18 @@
   function renderSong(payload) {
     clearChildren(el.blocks);
 
-    // 절 번호는 **그 절의 첫 장, 첫 줄에만** 붙인다
-    var prefix = payload.sectionStart ? verseNumberPrefix(payload.sectionLabel) : '';
+    /*
+     * 절 번호는 **그 절의 첫 장, 첫 줄에만** 붙인다.
+     *
+     * **템플릿의 showVerseNumbers 는 보지 않는다.** 찬양에서는 원래부터 그 값을 보지
+     * 않고 늘 붙였고, 이제 와서 보게 하면 '찬양 — 전체' 프리셋(false)에서 절 번호가
+     * 조용히 사라진다 — 사용자가 요청하지 않은 변화다(실측으로 확인해 되돌렸다).
+     *
+     * 항목이 **명시적으로 끈 경우에만** 끈다. 새 기능은 새 값으로만 동작한다.
+     */
+    var songDisplay = payload.display || {};
+    var songNumbers = songDisplay.verseNumbers !== false;
+    var prefix = payload.sectionStart && songNumbers ? verseNumberPrefix(payload.sectionLabel) : '';
 
     payload.lines.forEach(function (pair, lineIndex) {
       var lineWrap = document.createElement('div');

@@ -539,23 +539,22 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           같은 글자는 언제나 같은 모양이라 예배마다 화면이 달라지지 않습니다.
         </p>
 
+        {/*
+          '절 번호'·'소제목' 체크박스를 여기서 없앴다 (2026-08-19, 사용자 요청).
+          **모양은 템플릿, 켜고 끄기는 항목** 으로 나눴다 — 크기·색·테두리는 매주 같지만
+          '이 본문에는 소제목을 띄우자' 는 그 주에 정하는 일이다. 전에는 둘이 함께 있어
+          한 번 끄려면 템플릿을 고치거나 사본을 만들어야 했다.
+          → 예배 순서 탭의 성경·찬양 항목에서 정한다.
+
+          아래 '글자' 섹션의 **절 번호·소제목 스타일은 그대로 둔다** — 켰을 때
+          크기·색을 정할 곳이 필요하다. 지우면 켜도 모양을 잡을 수 없다.
+        */}
+        <p className="hintline muted">
+          <b>참조 표기·소제목·절 번호를 켜고 끄는 것</b>은 예배 순서 탭의 항목에서 정합니다.
+          여기서는 <b>위치와 모양</b>만 정합니다.
+        </p>
+
         <div className="row">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={draft.behavior.showVerseNumbers}
-              onChange={(e) => patchDraft((c) => ({ ...c, behavior: { ...c.behavior, showVerseNumbers: e.target.checked } }))}
-            />
-            절 번호
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={draft.behavior.showHeadings}
-              onChange={(e) => patchDraft((c) => ({ ...c, behavior: { ...c.behavior, showHeadings: e.target.checked } }))}
-            />
-            소제목
-          </label>
           <label className="check" title="넘치는 본문을 배율로 줄여 화면에 맞춥니다">
             <input
               type="checkbox"
@@ -568,7 +567,7 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
 
         <div className="row" style={{ marginTop: 12 }}>
           <div className="field grow">
-            <label>참조 표기 위치</label>
+            <label title="켜고 끄는 것은 항목에서 정합니다">참조 표기 위치</label>
             <select
               value={draft.behavior.showReference}
               onChange={(e) =>

@@ -386,6 +386,24 @@ export interface ReadingStyle {
   scale?: number;
 }
 
+/**
+ * 항목이 정하는 **표시 여부** — 모양이 아니라 켜고 끄기다.
+ *
+ * 세 값 모두 세 갈래다: `undefined`(템플릿 따름) · `true` · `false`.
+ * `false` 를 기본값으로 두면 이미 저장된 순서표가 모두 '끔' 이 되어 다음 예배에
+ * 소제목·절 번호가 사라진다. 지정하지 않은 것은 지금까지와 똑같이 동작해야 한다.
+ *
+ * 크기·색·테두리 같은 **모양은 템플릿**에 남는다 (`text.reference` 등).
+ */
+export interface ItemDisplay {
+  /** 참조 표기 (`요 3:16`). 켜면 템플릿이 정한 자리에 놓는다 */
+  reference?: boolean;
+  /** 소제목 (성경 본문의 단락 제목) */
+  headings?: boolean;
+  /** 절 번호 */
+  verseNumbers?: boolean;
+}
+
 export interface ItemBackground {
   /** 파일 이름만 (경로 구분자가 들어오면 서버가 거른다) */
   src: string;
@@ -498,6 +516,8 @@ export type CueItem =
       primary: string;
       secondary: string[];
       paging?: string;
+      /** 참조 표기·소제목·절 번호를 이 항목에서만 켜고 끈다 */
+      display?: ItemDisplay;
       templateId?: number;
       note?: string;
     }
@@ -509,6 +529,13 @@ export type CueItem =
       songTitle: string;
       langs: LangCode[];
       lines?: string;
+      /**
+       * 절 번호·저작권 표기를 이 항목에서만 켜고 끈다.
+       *
+       * 찬양 슬라이드에는 **참조 표기와 소제목이 없다** (`renderSong` 이 비운다).
+       * 그래서 `reference`·`headings` 는 찬양에서 아무 일도 하지 않는다.
+       */
+      display?: ItemDisplay;
       templateId?: number;
       note?: string;
     }
@@ -716,6 +743,8 @@ export type SlidePayload =
       reference: string;
       blocks: PassageBlock[];
       heading?: string;
+      /** 항목이 정한 표시 여부 (없으면 템플릿 따름) */
+      display?: ItemDisplay;
     }
   | {
       kind: 'song';
@@ -730,6 +759,8 @@ export type SlidePayload =
       /** 줄 배열. 각 줄은 언어별 텍스트 페어 묶음. */
       lines: SongLine[][];
       credit?: string;
+      /** 항목이 정한 표시 여부 (없으면 템플릿 따름) */
+      display?: ItemDisplay;
     }
   /** `background`·`style` 은 전례문(주기도문·사도신경)이 실어 보낼 때만 찬다 */
   | { kind: 'text'; lines: string[]; background?: ItemBackground; style?: ReadingStyle }

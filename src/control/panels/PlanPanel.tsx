@@ -20,6 +20,7 @@ import {
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
+import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import {
@@ -699,20 +700,42 @@ export function PlanPanel({
         if (!passage.parse.ok) return { slides: [], labels: [], error: passage.parse.message };
         if (!passage.passage || !passage.deck) return { slides: [], labels: [], error: '본문을 찾지 못했습니다' };
 
+        /*
+         * 항목이 정한 표시 여부를 슬라이드마다 실어 보낸다.
+         *
+         * **결정은 출력 페이지가 한다** — 여기서 풀어 담으면 나중에 템플릿만 바꿨을 때
+         * 그 값이 따라오지 않는다. 여기서는 항목의 뜻을 전달만 한다.
+         */
+        const withDisplay = (slides: SlidePayload[]): SlidePayload[] =>
+          item.display === undefined
+            ? slides
+            : slides.map((slide) =>
+                slide.kind === 'bible' ? { ...slide, display: item.display } : slide,
+              );
+
         if ((item.paging ?? 'verse') === 'auto') {
           const paginated = await paginateByMeasure(passage.passage, (slide) =>
             measurer.measure(slide, template ?? undefined),
           );
           if (paginated.slides.length > 0) {
-            return { slides: paginated.slides, labels: paginated.slides.map((_, i) => `${i + 1}`) };
+            return {
+              slides: withDisplay(paginated.slides),
+              labels: paginated.slides.map((_, i) => `${i + 1}`),
+            };
           }
         }
-        return { slides: passage.deck.slides, labels: passage.deck.labels };
+        return { slides: withDisplay(passage.deck.slides), labels: passage.deck.labels };
       }
 
       if (item.type === 'song') {
         const songDeck = await api.songDeck(item.songId, item.langs, item.lines ?? '2', undefined, maxChars);
-        return { slides: songDeck.deck.slides, labels: songDeck.deck.labels };
+        const slides =
+          item.display === undefined
+            ? songDeck.deck.slides
+            : songDeck.deck.slides.map((slide) =>
+                slide.kind === 'song' ? { ...slide, display: item.display } : slide,
+              );
+        return { slides, labels: songDeck.deck.labels };
       }
 
       if (item.type === 'text') {
@@ -2324,6 +2347,27 @@ export function PlanPanel({
                 </span>
               )}
 
+              {/*
+                찬양에는 **참조 표기와 소제목이 없다** — renderSong 이 비운다.
+                그래서 뜻이 있는 것은 절 번호뿐이고, 없는 것을 보여 주면 눌러도 아무 일이
+                일어나지 않아 고장으로 읽힌다.
+              */}
+              <DisplayToggles
+                value={current.display}
+                template={itemTemplateFor(current)}
+                keys={['verseNumbers']}
+                onChange={(display) => {
+                  const next = items.map((i) =>
+                    i.id === current.id && i.type === 'song'
+                      ? { ...i, ...(display ? { display } : { display: undefined }) }
+                      : i,
+                  );
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated) refreshLive(updated);
+                }}
+              />
+
               <label>화면 넘김</label>
               <select
                 value={current.lines ?? '2'}
@@ -2562,6 +2606,22 @@ export function PlanPanel({
 
           {current.type === 'bible' && (
             <div className="row detail-controls">
+              <DisplayToggles
+                value={current.display}
+                template={itemTemplateFor(current)}
+                keys={['reference', 'headings', 'verseNumbers']}
+                onChange={(display) => {
+                  const next = items.map((i) =>
+                    i.id === current.id && i.type === 'bible'
+                      ? { ...i, ...(display ? { display } : { display: undefined }) }
+                      : i,
+                  );
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated) refreshLive(updated);
+                }}
+              />
+
               <label>화면 넘김</label>
               <select
                 value={current.paging ?? 'verse'}

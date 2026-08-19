@@ -26,6 +26,7 @@ import {
   type ApiResponse,
   type CueItem,
   type ItemBackground,
+  type ItemDisplay,
   type ReadingStyle,
   type PlanDefaults,
   type PlanKind,
@@ -61,6 +62,25 @@ function readItemBackground(raw: unknown): ItemBackground | undefined {
   // 기본은 cover — 배경이 화면을 못 채우면 글자 뒤에 빈 자리가 보인다
   const fit = value.fit === 'contain' ? 'contain' : undefined;
   return { src, source, ...(fit ? { fit } : {}) };
+}
+
+/**
+ * 항목의 표시 여부 지정을 검증한다.
+ *
+ * 세 값 모두 **참/거짓만** 받고, 없으면 담지 않는다. `false` 로 채워 두면 이미 저장된
+ * 순서표가 모두 '끔' 이 되어 다음 예배에 소제목·절 번호가 사라진다.
+ * 아무것도 남지 않으면 `undefined` — 빈 객체를 저장하면 순서표 JSON 만 커진다.
+ */
+function readItemDisplay(raw: unknown): ItemDisplay | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const value = raw as Record<string, unknown>;
+
+  const picked: ItemDisplay = {
+    ...(typeof value.reference === 'boolean' ? { reference: value.reference } : {}),
+    ...(typeof value.headings === 'boolean' ? { headings: value.headings } : {}),
+    ...(typeof value.verseNumbers === 'boolean' ? { verseNumbers: value.verseNumbers } : {}),
+  };
+  return Object.keys(picked).length > 0 ? picked : undefined;
 }
 
 /**
@@ -144,6 +164,10 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           primary: typeof bible.primary === 'string' ? bible.primary : 'nkrv',
           secondary: Array.isArray(bible.secondary) ? bible.secondary.filter((s) => typeof s === 'string') : [],
           ...(typeof bible.paging === 'string' ? { paging: bible.paging } : {}),
+          ...(() => {
+            const display = readItemDisplay(fields.display);
+            return display ? { display } : {};
+          })(),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
@@ -163,6 +187,10 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           songTitle: typeof song.songTitle === 'string' ? song.songTitle : '(제목 없음)',
           langs: Array.isArray(song.langs) ? song.langs.filter((l) => typeof l === 'string').slice(0, MAX_LANGS) : ['ko'],
           ...(typeof song.lines === 'string' ? { lines: song.lines } : {}),
+          ...(() => {
+            const display = readItemDisplay(fields.display);
+            return display ? { display } : {};
+          })(),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
         });
