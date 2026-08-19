@@ -885,6 +885,42 @@ export function PlanPanel({
     [connected, items, deck, send, resolveItem, liveSlide, liveLabel],
   );
 
+  /**
+   * 화면에 나가 있는 항목을 고쳤으면 **다시 보낸다.**
+   *
+   * 없으면 폰트·글자 크기를 돌려도 화면이 그대로다 — 다시 ▶ 를 눌러야 반영된다.
+   * 이 값들은 '돌려 보면서 맞추는' 성격이라, 눈이 따라오지 않으면 옵션이 없는 것과 같다
+   * (실사용에서 '변경되지 않는다'로 보고된 증상이 이것이다).
+   *
+   * **단독 송출 중일 때만** 한다. 순서표 전체가 올라가 있으면 덱을 통째로 바꾸는 셈이라
+   * 예배 중에 진행 위치를 잃는다 — 담당자 크기·글자 조정이 쓰는 규칙과 같다.
+   *
+   * 짧게 모아 한 번만 보낸다. 슬라이더를 끌면 값이 연달아 바뀌는데, 교독문은 본문을
+   * 서버에서 다시 읽어 오므로(비동기) 늦게 온 옛 응답이 새 화면을 덮을 수 있다.
+   */
+  const liveRefresh = useRef<number | null>(null);
+  const refreshLive = useCallback(
+    (item: CueItem): void => {
+      if (liveItemId !== item.id) return;
+      if (liveRefresh.current !== null) clearTimeout(liveRefresh.current);
+      liveRefresh.current = window.setTimeout(() => {
+        liveRefresh.current = null;
+        // 보고 있던 장에 그대로 머문다 — 크기를 만질 때마다 첫 장으로 돌아가면 못 쓴다.
+        // 장 수가 줄어드는 경우(4줄씩 → 전체 한 장)는 sendItem 이 잘라 준다.
+        void sendItem(item, currentIndex);
+      }, 120);
+    },
+    [liveItemId, sendItem, currentIndex],
+  );
+
+  // 남은 타이머가 사라진 화면을 향해 쏘지 않게 한다
+  useEffect(
+    () => () => {
+      if (liveRefresh.current !== null) clearTimeout(liveRefresh.current);
+    },
+    [],
+  );
+
   /** 인용구를 띄우기 직전 화면으로 되돌린다 */
   const restoreBefore = useCallback(() => {
     if (!before || !connected) return;
@@ -1346,6 +1382,17 @@ export function PlanPanel({
     return start === undefined ? -1 : currentIndex - start;
   })();
 
+  /**
+   * 순서표 **전체**가 올라간 채로 이 항목이 화면에 나가 있는가.
+   *
+   * 이때는 항목을 고쳐도 화면이 따라오지 않는다 — 덱을 통째로 다시 만들면 예배 중에
+   * 진행 위치를 잃기 때문이다(의도된 제약). ▶ 도 소용없다: 올라간 덱 안에서 goto 로
+   * 자리만 옮기므로 옛 슬라이드가 그대로 나온다(실측 확인). 되살리는 길은 다시 올리기뿐이다.
+   * 그렇다면 최소한 **왜 안 바뀌는지와 무엇을 눌러야 하는지**는 보여야 한다.
+   * 말없이 안 바뀌면 옵션이 고장난 것으로 읽힌다.
+   */
+  const liveViaPlanDeck = liveItemId === null && liveItemIndex >= 0;
+
   /** 기본 설정에서 이 항목이 어느 칸에 해당하는지 */
   function defaultsKeyFor(item: CueItem): 'bible' | 'song' | 'order' | 'text' | null {
     if (item.type === 'bible') return 'bible';
@@ -1499,6 +1546,21 @@ export function PlanPanel({
                 랩탑(높이 900px)에서 목록이 285px 밖에 안 됐다.
               */}
               <div className="plan-head plan-actions">
+                {/*
+                  '예배용으로 올리기' — 순서표 전체를 하나의 덱으로 올리는 **주 동작**이다.
+                  110eac5 의 한 줄 합치기에서 이 버튼만 빠져(회귀), 순서표 전체를 올릴 길이
+                  없어졌다. 항목마다 ▶ 를 누르는 것으로는 화살표로 끝까지 진행할 수 없다.
+                  .plan-actions > button.primary 의 `flex: 2` 는 원래 이 버튼 자리다.
+                */}
+                <button
+                  type="button"
+                  className="primary grow"
+                  onClick={() => void loadForService()}
+                  disabled={!connected || busy || items.length === 0}
+                  title="순서표 전체를 하나로 올립니다. 이후 화살표로 끝까지 진행합니다."
+                >
+                  예배용으로 올리기
+                </button>
                 <button
                   type="button"
                   className="grow"
@@ -2175,11 +2237,13 @@ export function PlanPanel({
               const reading = current;
 
               function patchReading(patch: Partial<Extract<CueItem, { type: 'reading' }>>): void {
-                patchItems(
-                  items.map((i) =>
-                    i.id === reading.id && i.type === 'reading' ? { ...i, ...patch } : i,
-                  ),
+                const next = items.map((i) =>
+                  i.id === reading.id && i.type === 'reading' ? { ...i, ...patch } : i,
                 );
+                patchItems(next);
+                // 배경·폰트·글자 크기를 만지면 화면이 바로 따라와야 맞출 수 있다
+                const updated = next.find((i) => i.id === reading.id);
+                if (updated) refreshLive(updated);
               }
 
               return (
@@ -2196,6 +2260,12 @@ export function PlanPanel({
                     onChange={(style) => patchReading({ style })}
                     baseFontSize={baseFontSizeFor(reading, 64)}
                   />
+                  {liveViaPlanDeck && items[liveItemIndex]?.id === reading.id && (
+                    <p className="hintline muted">
+                      순서표 전체가 올라가 있어 화면은 그대로입니다 — <b>예배용으로 올리기</b>
+                      를 다시 누르면 반영됩니다 (▶ 는 올라간 덱 안에서 자리만 옮깁니다)
+                    </p>
+                  )}
                 </div>
               );
             })()}
@@ -2267,11 +2337,13 @@ export function PlanPanel({
 
               function patchLiturgy(patch: Partial<Extract<CueItem, { type: 'liturgy' }>>): void {
                 // type 까지 좁혀야 유니온 전체로 퍼지지 않는다
-                patchItems(
-                  items.map((i) =>
-                    i.id === liturgy.id && i.type === 'liturgy' ? { ...i, ...patch } : i,
-                  ),
+                const next = items.map((i) =>
+                  i.id === liturgy.id && i.type === 'liturgy' ? { ...i, ...patch } : i,
                 );
+                patchItems(next);
+                // 판본·배경·폰트·글자 크기·화면 넘김 모두 눈으로 보며 맞추는 값이다
+                const updated = next.find((i) => i.id === liturgy.id);
+                if (updated) refreshLive(updated);
               }
 
               /**
@@ -2336,6 +2408,13 @@ export function PlanPanel({
                       <option value="6">6줄씩</option>
                       <option value="0">전체 한 장</option>
                     </select>
+
+                    {liveViaPlanDeck && items[liveItemIndex]?.id === liturgy.id && (
+                      <p className="hintline muted">
+                        순서표 전체가 올라가 있어 화면은 그대로입니다 — <b>예배용으로 올리기</b>
+                      를 다시 누르면 반영됩니다 (▶ 는 올라간 덱 안에서 자리만 옮깁니다)
+                      </p>
+                    )}
                   </div>
 
                   {/* 교회마다 '나라이/나라가' 처럼 갈리는 자리가 있어 직접 고칠 길을 둔다 */}
