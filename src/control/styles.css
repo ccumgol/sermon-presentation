@@ -535,6 +535,24 @@ select:focus {
   color: var(--warn, #fbbf24);
 }
 
+/*
+  영어 붙여 넣기 결과 — 넘친 줄·모자란 줄을 사람이 보고 넘어가야 한다.
+  테두리로 묶어 편집 칸과 구분한다: 저장 전에 읽어야 하는 내용이다.
+*/
+.merge-report {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--row-flat);
+}
+.merge-report > .hintline {
+  margin: 0 0 4px;
+}
+.merge-report > .hintline:last-child {
+  margin-bottom: 0;
+}
+
 .candidates {
   display: flex;
   gap: 6px;

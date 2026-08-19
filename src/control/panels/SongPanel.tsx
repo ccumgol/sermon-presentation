@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { mergeSecondaryLyrics } from '../../../lib/lyrics-merge.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
@@ -58,6 +59,10 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftLyrics, setDraftLyrics] = useState('');
+  /** 붙여 넣은 영어 원문 — 짝을 맞추기 전의 날글 */
+  const [englishPaste, setEnglishPaste] = useState('');
+  /** 마지막 짝 맞추기 결과 — 넘친 줄·모자란 줄을 사람이 보게 한다 */
+  const [mergeReport, setMergeReport] = useState<{ paired: number; replaced: number; dropped: string[]; problems: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -486,11 +491,71 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 rows={18}
                 aria-label="가사"
               />
+              {/*
+                영어 붙여 넣기 — 손으로 `|` 를 끼우지 않게 한다.
+                4절 × 4줄이면 16번을 정확히 맞춰야 하고, 한 줄만 밀려도 어느 영어가 어느
+                한국어의 번역인지 어긋난 채 저장된다. 화면에서야 드러난다.
+                **저장하지 않는다** — 위 편집 칸을 채워 주고 사람이 보고 누른다.
+              */}
+              <details className="detail-block">
+                <summary>영어 가사 붙여 넣기</summary>
+                <p className="hintline muted">
+                  <b>영어만</b> 절 순서대로 붙여 넣으세요. 절 사이는 빈 줄로 나눕니다
+                  (<code>[2절]</code> 처럼 라벨을 붙이면 그 절에 들어갑니다).
+                  한국어는 <b>한 글자도 고치지 않습니다.</b>
+                </p>
+                <textarea
+                  className="lyrics-editor"
+                  value={englishPaste}
+                  onChange={(e) => setEnglishPaste(e.target.value)}
+                  spellCheck={false}
+                  rows={10}
+                  aria-label="영어 가사"
+                  placeholder={'Verse 1 line 1\nVerse 1 line 2\n\nVerse 2 line 1\nVerse 2 line 2'}
+                />
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const merged = mergeSecondaryLyrics(draftLyrics, englishPaste);
+                      setDraftLyrics(merged.text);
+                      setMergeReport(merged);
+                    }}
+                    disabled={englishPaste.trim().length === 0}
+                    title="위 편집 칸에 짝지어 채웁니다. 저장은 따로 누르세요."
+                  >
+                    짝 맞춰 채우기
+                  </button>
+                  <button type="button" onClick={() => { setEnglishPaste(''); setMergeReport(null); }}>
+                    비우기
+                  </button>
+                </div>
+
+                {mergeReport && (
+                  <div className="merge-report">
+                    <p className="hintline">
+                      {mergeReport.paired}줄을 짝지었습니다
+                      {mergeReport.replaced > 0 && ` (있던 영어 ${mergeReport.replaced}줄은 갈아 끼웠습니다)`}
+                      . 위 칸을 확인하고 <b>가사 저장</b>을 누르세요.
+                    </p>
+                    {mergeReport.problems.map((problem) => (
+                      <p key={problem} className="hintline warn">⚠ {problem}</p>
+                    ))}
+                  </div>
+                )}
+              </details>
+
               <div className="row" style={{ marginTop: 10 }}>
                 <button type="button" className="primary" onClick={() => void saveLyrics()} disabled={busy}>
                   가사 저장
                 </button>
-                <button type="button" onClick={() => setDraftLyrics(formatLyrics(song.sections))}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraftLyrics(formatLyrics(song.sections));
+                    setMergeReport(null);
+                  }}
+                >
                   되돌리기
                 </button>
               </div>
