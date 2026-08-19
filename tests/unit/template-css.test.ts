@@ -210,10 +210,27 @@ describe('diffCssVars', () => {
 });
 
 describe('내장 프리셋', () => {
-  it('11종이 있고 id 가 겹치지 않는다', () => {
-    expect(BUILTIN_TEMPLATES).toHaveLength(11);
+  it('8종이 있고 id 가 겹치지 않는다', () => {
+    /*
+     * 2026-08-19: 11 → 8 로 정리했다 (사용자 요청).
+     * '단일/이중' 과 '본문/찬양' 은 아무것도 가르지 않았다 — 역할은 내용이 정하고
+     * 템플릿은 모양만 정한다. 그래서 넷(-1·-2·-4·-5)을 '하단' 하나로 합쳤다.
+     */
+    expect(BUILTIN_TEMPLATES).toHaveLength(8);
     const ids = BUILTIN_TEMPLATES.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('성경·찬송 겸용 셋과 전용 셋으로 나뉜다', () => {
+    const names = BUILTIN_TEMPLATES.map((t) => t.name);
+    // 겸용 — 이름에 겸용임을 밝힌다 (kind 는 라벨일 뿐이라 이름이 유일한 안내다)
+    expect(names.filter((n) => n.includes('겸용'))).toHaveLength(3);
+    expect(names[0]).toContain('하단');
+  });
+
+  it('없어진 프리셋 id 를 다시 쓰지 않는다 — 옛 백업이 엉뚱한 자리에 들어가지 않게', () => {
+    const ids = BUILTIN_TEMPLATES.map((t) => t.id);
+    for (const gone of [-2, -4, -5]) expect(ids).not.toContain(gone);
   });
 
   it('프리셋 id 는 모두 음수다 (사용자 템플릿과 절대 충돌하지 않게)', () => {

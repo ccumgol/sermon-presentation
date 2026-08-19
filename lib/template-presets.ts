@@ -183,67 +183,43 @@ function preset(input: PresetInput): Template {
  * 사용자 템플릿은 SQLite AUTOINCREMENT 로 1부터 올라가므로 절대 충돌하지 않는다.
  */
 export const BUILTIN_TEMPLATES: readonly Template[] = [
+  /*
+   * 하단 — **성경·찬송 겸용.** 가장 많이 쓰는 배치라 첫 자리에 둔다.
+   *
+   * '단일 역본 / 이중 역본' 을 나누지 않는다. 역할(주·보조)은 **내용이 정한다** —
+   * 역본이나 언어를 둘 고르면 둘째 줄이 그냥 나온다. 출력 렌더러가
+   * `index === 0 ? primary : secondary` 뿐이라 템플릿은 모양만 정하고,
+   * '단일' 템플릿으로 두 역본을 띄우면 둘 다 나왔다(사용자 지적, 2026-08-19).
+   *
+   * 값은 **사용자가 실제 화면을 보며 조정한 것**이다 (옛 `설교본문 — 단일 역본 사본`,
+   * app.sqlite id 3, 2026-08-16 수정). 테두리 색을 검정이 아닌 값으로 고르고 보조
+   * 굵기를 700 으로 올린 것이라, 이것이 이 교회의 기준값이다. 그래서 코드에 둔다 —
+   * '원본 불러오기' 를 누르면 이 값으로 돌아간다.
+   */
   preset({
     id: -1,
-    name: '설교본문 — 단일 역본',
+    name: '하단 — 성경·찬송 겸용',
     kind: 'bible',
     anchor: 'bottom-center',
-    text: { primary: { fontSize: 68 } },
-  }),
-
-  preset({
-    id: -2,
-    name: '설교본문 — 이중 역본 (위/아래)',
-    kind: 'bible',
-    anchor: 'bottom-center',
-    layout: { direction: 'column', gap: 28 },
-    text: { primary: { fontSize: 60 }, secondary: { fontSize: 40 } },
-  }),
-
-  preset({
-    id: -3,
-    name: '본문 — 좌우 분할 (원어 대조)',
-    kind: 'bible',
-    anchor: 'center',
-    layout: { direction: 'row', gap: 56, align: 'left', width: 1640 },
-    text: { primary: { fontSize: 46 }, secondary: { fontSize: 44 } },
-    behavior: { showReference: 'top' },
-  }),
-
-  preset({
-    id: -4,
-    name: '찬양 — 이중 언어',
-    kind: 'song',
-    anchor: 'bottom-center',
-    safeArea: { bottom: 120 },
-    layout: { direction: 'column', gap: 18 },
+    safeArea: { top: 80, right: 50, bottom: 50, left: 50 },
+    layout: { direction: 'column', gap: 0, align: 'center', verticalAlign: 'bottom' },
     text: {
-      primary: { fontSize: 62 },
-      secondary: { fontSize: 44, italic: true, color: '#e8f0ff' },
+      primary: { fontSize: 68, fontWeight: 700, stroke: { width: 10, color: '#875a5a' } },
+      secondary: { fontSize: 50, fontWeight: 700, color: '#ffe9a8', stroke: { width: 8, color: '#4151c8' } },
+      verseNum: { fontSize: 36, fontWeight: 700, color: '#ffd24a', stroke: { width: 8, color: '#000000' } },
+      reference: { fontSize: 48, fontWeight: 500, color: '#ffffff', opacity: 0.9, stroke: { width: 8, color: '#9d4848' } },
+      heading: { fontSize: 46 },
     },
-    behavior: {
-      showVerseNumbers: false,
-      showReference: 'none',
-      showHeadings: false,
-      showCredit: true,
-      // 한/영을 위아래로 겹쳐 두 줄로 — 운율 행을 24자까지 묶는다
-      maxCharsPerLine: 24,
-    },
+    behavior: { showReference: 'top', showHeadings: false },
   }),
 
-  preset({
-    id: -5,
-    name: '찬양 — 단일 언어',
-    kind: 'song',
-    anchor: 'bottom-center',
-    safeArea: { bottom: 120 },
-    text: { primary: { fontSize: 70 } },
-    behavior: { showVerseNumbers: false, showReference: 'none', showHeadings: false, showCredit: true, maxCharsPerLine: 24 },
-  }),
-
+  /*
+   * 전체 — 화면을 채우는 큰 글씨. 옛 '찬양 — 전체화면 큰 글씨' 다.
+   * 성경에도 쓸 수 있으므로 이름에서 '찬양' 을 뗐다.
+   */
   preset({
     id: -8,
-    name: '찬양 — 전체화면 큰 글씨',
+    name: '전체 — 성경·찬송 겸용',
     kind: 'song',
     anchor: 'center',
     layout: { gap: 24 },
@@ -256,6 +232,19 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
       // 글씨가 크므로 운율 행을 묶지 않는다 — 9자 4행이 그대로 나간다
       maxCharsPerLine: 14,
     },
+  }),
+
+  /*
+   * 좌우 — 두 벌을 나란히. 원어 대조에 쓰지만 한/영 찬양에도 쓸 수 있다.
+   */
+  preset({
+    id: -3,
+    name: '좌우 — 성경·찬송 겸용',
+    kind: 'bible',
+    anchor: 'center',
+    layout: { direction: 'row', gap: 56, align: 'left', width: 1640 },
+    text: { primary: { fontSize: 46 }, secondary: { fontSize: 44 } },
+    behavior: { showReference: 'top' },
   }),
 
   preset({
@@ -466,7 +455,14 @@ export const BUILTIN_TEMPLATES: readonly Template[] = [
 ];
 
 /** 기본 템플릿 — 서버가 처음 기동할 때 선택되는 것 */
-export const DEFAULT_TEMPLATE_ID = -2;
+/**
+ * 기본 프리셋 — **하단.** 가장 많이 쓰는 배치다.
+ *
+ * 전에는 `-2`(설교본문 — 이중 역본)였는데 그 프리셋이 하단으로 합쳐져 없어졌다.
+ * 이 값은 서버 시작 상태·템플릿이 사라졌을 때의 대체·삭제 후 복구에 쓰이므로,
+ * 없는 id 를 가리키면 목록의 첫 번째로 조용히 떨어진다.
+ */
+export const DEFAULT_TEMPLATE_ID = -1;
 
 export function getBuiltinTemplate(id: number): Template | undefined {
   return BUILTIN_TEMPLATES.find((t) => t.id === id);
