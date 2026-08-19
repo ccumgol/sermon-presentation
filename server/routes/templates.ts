@@ -119,6 +119,28 @@ export async function registerTemplateRoutes(app: FastifyInstance, hooks: Templa
     }
   });
 
+  /**
+   * 프리셋을 코드의 값으로 되돌린다 — 덮어쓴 행을 지운다.
+   *
+   * `DELETE /api/templates/:id` 와 **일부러 다른 동사**다. 프리셋은 코드에 있으므로
+   * 지운다는 말이 성립하지 않고, 두 뜻을 한 동사에 담으면 잘못 눌렀을 때 무엇이
+   * 일어날지 알 수 없다.
+   */
+  app.post<{ Params: { id: string } }>('/api/templates/:id/restore', async (request, reply) => {
+    const id = Number(request.params.id);
+    if (!store.getTemplate(id)) return reply.code(404).send(fail('템플릿을 찾을 수 없습니다'));
+
+    try {
+      const restored = store.restoreBuiltin(id);
+      // 되돌린 것이 송출 중이면 화면도 바로 원본으로
+      if (hooks.currentTemplateId() === id) hooks.onTemplateChanged(restored);
+      return ok(restored);
+    } catch (err) {
+      if (err instanceof store.NotAPresetError) return reply.code(409).send(fail(err.message));
+      throw err;
+    }
+  });
+
   app.post<{ Params: { id: string }; Body: { name?: string } }>(
     '/api/templates/:id/duplicate',
     async (request, reply) => {

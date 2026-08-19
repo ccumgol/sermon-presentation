@@ -198,11 +198,14 @@ export const api = {
     }>('/api/backgrounds'),
 
   templates: () => get<Template[]>('/api/templates'),
+  createTemplate: (template: Partial<Template>) => send<Template>('POST', '/api/templates', template),
   currentTemplate: () => get<Template>('/api/template/current'),
   updateTemplate: (id: number, patch: Partial<Template>) => send<Template>('PUT', `/api/templates/${id}`, patch),
   duplicateTemplate: (id: number, name?: string) =>
     send<Template>('POST', `/api/templates/${id}/duplicate`, name ? { name } : {}),
   deleteTemplate: (id: number) => send<{ deleted: number }>('DELETE', `/api/templates/${id}`),
+  /** 프리셋을 코드의 값으로 되돌린다 (덮어쓴 행을 지운다). 삭제와 다른 동작이다 */
+  restoreTemplate: (id: number) => send<Template>('POST', `/api/templates/${id}/restore`, {}),
 };
 
 export { ApiError };

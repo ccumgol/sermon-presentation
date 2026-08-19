@@ -88,27 +88,43 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
     send({ t: 'template:set', id });
   }
 
+  /**
+   * 지금 값을 그 자리에 저장한다. **프리셋도 덮어쓴다.**
+   *
+   * 전에는 프리셋이면 강제로 복제했다. 그래서 사본이 쌓이고 같은 이름이 둘이 되어
+   * 목록에서 구분이 안 됐다. 이제는 그 자리에 쓰고, **원본은 코드에 남아 있어**
+   * '원본 불러오기' 로 언제든 되돌아온다.
+   */
   async function save(): Promise<void> {
     if (!draft) return;
     setBusy(true);
     setError(null);
     try {
-      if (draft.isBuiltin) {
-        // 프리셋은 고칠 수 없다 — 복제해 사용자 템플릿으로 저장한다
-        const created = await api.duplicateTemplate(draft.id, `${draft.name} 사본`);
-        const saved = await api.updateTemplate(created.id, { ...draft, name: created.name });
-        await reload();
-        setDirty(false);
-        setNotice(`'${saved.name}' 으로 새로 저장했습니다 (프리셋은 그대로 유지)`);
-        send({ t: 'template:set', id: saved.id });
-      } else {
-        await api.updateTemplate(draft.id, draft);
-        await reload();
-        setDirty(false);
-        setNotice('저장했습니다');
-      }
+      await api.updateTemplate(draft.id, draft);
+      await reload();
+      setDirty(false);
+      setNotice(draft.isBuiltin ? '프리셋을 덮어썼습니다 (원본 불러오기로 되돌릴 수 있습니다)' : '저장했습니다');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 프리셋을 코드의 값으로 되돌린다 — 되돌릴 수 없으므로 확인을 받는다 */
+  async function restoreOriginal(): Promise<void> {
+    if (!draft) return;
+    if (!window.confirm(`'${draft.name}' 을 원본 프리셋으로 되돌립니다. 고친 내용은 사라집니다.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const restored = await api.restoreTemplate(draft.id);
+      await reload();
+      setDirty(false);
+      setNotice(`'${restored.name}' 원본을 불러왔습니다`);
+      send({ t: 'template:set', id: restored.id });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '되돌리지 못했습니다');
     } finally {
       setBusy(false);
     }
@@ -165,6 +181,77 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
     URL.revokeObjectURL(url);
   }
 
+  /**
+   * 템플릿 전부를 한 파일로 — **손대지 않은 프리셋은 담지 않는다.**
+   *
+   * 코드가 원본이므로 옮길 필요가 없고, 담으면 파일이 커져 무엇이 내 설정인지
+   * 알아보기 어렵다. 담는 것은 **덮어쓴 프리셋 + 사용자 사본**이다.
+   */
+  function backupTemplates(): void {
+    const mine = templates.filter((t) => !t.isBuiltin || t.isOverridden === true);
+    if (mine.length === 0) {
+      setNotice('내보낼 것이 없습니다 — 프리셋을 고치거나 사본을 만든 뒤에 쓰세요');
+      return;
+    }
+    const blob = new Blob([JSON.stringify({ templates: mine }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `templates-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setNotice(`${mine.length}개를 내보냈습니다 (덮어쓴 프리셋 + 사본)`);
+  }
+
+  /**
+   * 파일에서 되살린다.
+   *
+   * 프리셋 id(음수)는 **그 프리셋을 덮어쓴다.** 새로 만들면 사본이 되어 프리셋은
+   * 원본 그대로 남고, 옮긴 설정이 적용되지 않는다.
+   */
+  async function restoreTemplatesFromFile(file: File): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const parsed = JSON.parse(await file.text()) as { templates?: Template[] };
+      const list = Array.isArray(parsed.templates) ? parsed.templates : [];
+      if (list.length === 0) throw new ApiError('파일에 템플릿이 없습니다');
+
+      let overwritten = 0;
+      let created = 0;
+      const skipped: string[] = [];
+
+      for (const item of list) {
+        if (typeof item?.name !== 'string' || !item.canvas) {
+          skipped.push(String(item?.name ?? '?'));
+          continue;
+        }
+        const { id, isBuiltin: _b, isOverridden: _o, ...rest } = item;
+        try {
+          if (typeof id === 'number' && id < 0) {
+            await api.updateTemplate(id, rest);
+            overwritten++;
+          } else {
+            await api.createTemplate(rest);
+            created++;
+          }
+        } catch {
+          skipped.push(item.name);
+        }
+      }
+
+      await reload();
+      setNotice(
+        `프리셋 덮어쓰기 ${overwritten}개 · 사본 ${created}개를 불러왔습니다` +
+          (skipped.length > 0 ? ` · 건너뜀 ${skipped.length}개 (${skipped.join(', ')})` : ''),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '불러오지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!draft) return <p className="hintline muted">템플릿을 불러오는 중…</p>;
 
   const background = draft.canvas.background;
@@ -195,39 +282,79 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.isBuiltin ? `[프리셋] ${t.name}` : t.name}
+                {t.isBuiltin ? `[프리셋${t.isOverridden ? '·고침' : ''}] ${t.name}` : t.name}
               </option>
             ))}
           </select>
-          <button type="button" onClick={() => void duplicate()} disabled={busy}>복제</button>
-          <button type="button" onClick={exportJson}>내보내기</button>
         </div>
 
         {draft.isBuiltin && (
-          <p className="hintline muted">
-            내장 프리셋입니다. 값을 바꿔 저장하면 프리셋은 그대로 두고 사본이 만들어집니다.
+          <p className={`hintline ${draft.isOverridden ? 'warn' : 'muted'}`}>
+            {draft.isOverridden
+              ? '이 프리셋은 고쳐 둔 상태입니다. 원본 불러오기로 코드의 값으로 되돌릴 수 있습니다.'
+              : '내장 프리셋입니다. 고쳐 저장하면 이 자리에 덮어씁니다 — 원본은 코드에 남아 언제든 되돌아옵니다.'}
           </p>
         )}
 
-        {!draft.isBuiltin && (
-          <div className="field" style={{ marginTop: 12 }}>
-            <label>이름</label>
-            <input
-              type="text"
-              value={draft.name}
-              onChange={(e) => patchDraft((c) => ({ ...c, name: e.target.value }))}
-            />
-          </div>
-        )}
+        {/* 프리셋도 이름을 고칠 수 있다 — '교독문' 을 '교독문 (우리 교회)' 로 두고 싶을 수 있다 */}
+        <div className="field" style={{ marginTop: 12 }}>
+          <label>이름</label>
+          <input
+            type="text"
+            value={draft.name}
+            onChange={(e) => patchDraft((c) => ({ ...c, name: e.target.value }))}
+          />
+        </div>
 
-        <div className="row" style={{ marginTop: 12 }}>
+        <div className="row template-actions" style={{ marginTop: 12 }}>
           <button type="button" className="primary" onClick={() => void save()} disabled={busy || !dirty}>
-            {dirty ? '저장' : '변경 없음'}
+            {dirty ? (draft.isBuiltin ? '프리셋 덮어쓰기' : '저장') : '변경 없음'}
           </button>
-          <button type="button" onClick={revert} disabled={!dirty}>되돌리기</button>
-          {!draft.isBuiltin && (
-            <button type="button" onClick={() => void remove()} disabled={busy}>삭제</button>
+          <button type="button" onClick={() => void duplicate()} disabled={busy}>사본 만들기</button>
+          <button type="button" onClick={revert} disabled={!dirty} title="저장하기 전 값으로">
+            편집 취소
+          </button>
+          {draft.isBuiltin && (
+            <button
+              type="button"
+              onClick={() => void restoreOriginal()}
+              disabled={busy || !draft.isOverridden}
+              title={draft.isOverridden ? '코드의 원본 값으로 되돌립니다' : '고친 내용이 없습니다'}
+            >
+              원본 불러오기
+            </button>
           )}
+          {!draft.isBuiltin && (
+            <button type="button" className="del" onClick={() => void remove()} disabled={busy}>
+              삭제
+            </button>
+          )}
+        </div>
+
+        {/*
+          백업·불러오기는 **템플릿만** 담는 파일이다. 설정 탭의 '데이터 이전' 은 곡·순서표까지
+          담으므로 PC 를 옮길 때 쓰고, 이쪽은 화면 꾸밈만 옮길 때 쓴다.
+        */}
+        <div className="row template-actions" style={{ marginTop: 8 }}>
+          <button type="button" onClick={backupTemplates} disabled={busy}>
+            프리셋 백업
+          </button>
+          <label className="file-button">
+            프리셋 불러오기
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // 같은 파일을 다시 골라도 onChange 가 오도록 값을 비운다
+                e.target.value = '';
+                if (file) void restoreTemplatesFromFile(file);
+              }}
+            />
+          </label>
+          <button type="button" onClick={exportJson} title="지금 고른 템플릿 하나만">
+            이 템플릿만 내보내기
+          </button>
         </div>
       </div>
 

@@ -553,6 +553,39 @@ select:focus {
   margin-bottom: 0;
 }
 
+/* 파일 고르기를 버튼처럼 — <input type=file> 은 그대로 두면 모양을 맞출 수 없다 */
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ctl-h);
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--fg);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.file-button:hover {
+  background: var(--row-hover);
+}
+.file-button > input[type='file'] {
+  display: none;
+}
+
+/* 템플릿 동작 줄 — 버튼 5개가 한 줄에 들어가야 한다 (덮어쓰기·사본·취소·원본·삭제) */
+.template-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.template-actions > button {
+  min-height: var(--ctl-h);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 /* ── 가사 비교·편집 격자 ──
    언어를 열이 아니라 행으로 놓는다. 열 배치는 479px 칸에 865px 이 필요해
    좌우 스크롤이 생긴다(1440×900 실측). 각 언어가 전체 폭을 쓰게 한다. */

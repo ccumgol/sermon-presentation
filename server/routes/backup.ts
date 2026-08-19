@@ -75,8 +75,16 @@ function readFonts(): Array<{ name: string; base64: string }> {
 }
 
 export function buildBundle(): Bundle {
-  // 사용자 템플릿만 담는다 — 내장 프리셋은 코드가 출처이므로 옮길 필요가 없다
-  const userTemplates = templates.listTemplates().filter((t) => !t.isBuiltin);
+  /*
+   * 사용자 템플릿 + **덮어쓴 프리셋.**
+   *
+   * 손대지 않은 프리셋은 담지 않는다 — 코드가 출처라 옮길 필요가 없다. 하지만
+   * 덮어쓴 것은 **사용자가 만든 값**이므로 담아야 한다. 안 담으면 PC 를 옮겼을 때
+   * 프리셋 조정이 조용히 사라진다.
+   */
+  const userTemplates = templates
+    .listTemplates()
+    .filter((t) => !t.isBuiltin || t.isOverridden === true);
 
   // 곡 전체(섹션·줄 포함)를 담는다. 실측: 찬송가 1,202곡 = 약 1.6MB.
   const allSongs = songs
@@ -153,8 +161,10 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
 
     // 사용자 데이터만 지운다. 성경 DB 와 내장 프리셋은 건드리지 않는다.
     for (const song of songs.listSongs(100000)) songs.deleteSong(song.id);
-    for (const template of templates.listTemplates().filter((t) => !t.isBuiltin)) {
-      templates.deleteTemplate(template.id);
+    for (const template of templates.listTemplates()) {
+      // 덮어쓴 프리셋은 지우는 것이 아니라 **원본으로 되돌린다** (코드가 원본이다)
+      if (template.isOverridden === true) templates.restoreBuiltin(template.id);
+      else if (!template.isBuiltin) templates.deleteTemplate(template.id);
     }
     for (const plan of plans.listPlans()) plans.deletePlan(plan.id);
   }
@@ -198,8 +208,17 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
       continue;
     }
     try {
-      const { id: _id, isBuiltin: _b, ...rest } = template;
-      templates.createTemplate(rest);
+      const { id, isBuiltin: _b, isOverridden: _o, ...rest } = template;
+      /*
+       * 프리셋 id(음수)로 담긴 것은 **그 프리셋의 덮어쓰기**다. `createTemplate` 로
+       * 넣으면 양수 id 의 사본이 되어 프리셋은 원본 그대로 남는다 — 옮긴 설정이
+       * 적용되지 않고 목록에 사본만 하나 늘어난다.
+       */
+      if (typeof id === 'number' && id < 0 && templates.getTemplate(id)?.isBuiltin === true) {
+        templates.updateTemplate(id, rest);
+      } else {
+        templates.createTemplate(rest);
+      }
       result.templates++;
     } catch (err) {
       result.skipped.push(`템플릿 '${template.name}': ${err instanceof Error ? err.message : '저장 실패'}`);

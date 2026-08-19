@@ -2,7 +2,8 @@
  * 템플릿 REST 통합 테스트.
  *
  * 핵심은 두 가지다:
- *  - 내장 프리셋은 어떤 경로로도 수정·삭제되지 않는다 (기준점이 사라지면 복구 수단이 없다)
+ *  - 내장 프리셋의 **원본이 사라지지 않는다** — 덮어쓸 수는 있지만 코드가 원본이라
+ *    언제든 되돌아온다 (2026-08-19 덮어쓰기 구조. 지우기는 여전히 거부한다)
  *  - 부분 패치가 나머지 값을 지우지 않는다 (편집 UI 가 바뀐 필드만 보내기 때문)
  */
 
@@ -78,19 +79,26 @@ describe('GET /api/templates/:id', () => {
 });
 
 describe('내장 프리셋 보호', () => {
-  it('수정하려 하면 409 로 거부한다', async () => {
-    const { status, body } = await send('PUT', `/api/templates/${DEFAULT_TEMPLATE_ID}`, { name: '바꿔치기' });
+  /*
+   * 2026-08-19 부터 프리셋은 **덮어쓸 수 있다** (덮어쓰기 구조 — 요청 8).
+   * 지켜야 하는 것은 '고칠 수 없다' 가 아니라 **'원본이 사라지지 않는다'** 다.
+   * 코드가 원본이므로 언제든 되돌아온다. 자세한 것은 template-override.test.ts.
+   */
+  it('삭제하려 하면 409 로 거부한다 — 코드에 있는 것을 지운다는 말은 성립하지 않는다', async () => {
+    const { status, body } = await send('DELETE', `/api/templates/${DEFAULT_TEMPLATE_ID}`);
     expect(status).toBe(409);
-    expect(body.error).toContain('복제');
+    // 무엇을 눌러야 하는지 알려 준다
+    expect(body.error).toContain('원본');
   });
 
-  it('삭제하려 하면 409 로 거부한다', async () => {
-    expect((await send('DELETE', `/api/templates/${DEFAULT_TEMPLATE_ID}`)).status).toBe(409);
-  });
+  it('덮어써도 원본은 코드에 남아 있어 되돌아온다', async () => {
+    const before = BUILTIN_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID)!.name;
 
-  it('거부된 뒤에도 프리셋 값이 그대로다', async () => {
-    const { body } = await get<Template>(`/api/templates/${DEFAULT_TEMPLATE_ID}`);
-    expect(body.data?.name).toBe(BUILTIN_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID)!.name);
+    expect((await send('PUT', `/api/templates/${DEFAULT_TEMPLATE_ID}`, { name: '바꿔치기' })).status).toBe(200);
+    expect((await get<Template>(`/api/templates/${DEFAULT_TEMPLATE_ID}`)).body.data!.name).toBe('바꿔치기');
+
+    await send('POST', `/api/templates/${DEFAULT_TEMPLATE_ID}/restore`);
+    expect((await get<Template>(`/api/templates/${DEFAULT_TEMPLATE_ID}`)).body.data!.name).toBe(before);
   });
 });
 

@@ -475,6 +475,14 @@ export interface Template {
   overridesByLang?: Record<LangCode, Partial<TextStyle>>;
   behavior: TemplateBehavior;
   isBuiltin?: boolean;
+  /**
+   * 프리셋인데 **사용자가 덮어쓴** 상태.
+   *
+   * `isBuiltin` 은 그대로 참이다 — 목록에서 프리셋 자리를 지킨다. 이 값이 있으면
+   * '원본 불러오기' 로 코드의 값으로 되돌릴 수 있다. 표시하지 않으면 어느 줄이 원본과
+   * 다른지 모르고, 되돌릴 생각도 못 한다.
+   */
+  isOverridden?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────
