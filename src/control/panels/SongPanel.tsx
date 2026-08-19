@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang as nextLangs } from '../../../lib/lang-select.ts';
+import {
+  LANG_LABELS, MAX_LANGS, orderLangs, SELECTABLE_LANGS, toggleLang as nextLangs,
+} from '../../../lib/lang-select.ts';
+import { LyricsGrid } from '../components/LyricsGrid.tsx';
 import { mergeSecondaryLyrics } from '../../../lib/lyrics-merge.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type {
@@ -60,7 +63,16 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftLyrics, setDraftLyrics] = useState('');
-  /** 붙여 넣은 영어 원문 — 짝을 맞추기 전의 날글 */
+  /**
+   * 격자에 보일 언어. 곡이 가진 언어에 사람이 더 고른 것을 얹는다.
+   *
+   * 표시 언어(`langs`)와 따로 두는 이유: 표시 언어는 **송출할 것**이고 이것은
+   * **편집할 것**이다. 中文 을 넣는 동안 화면에는 한/영만 내보내고 싶을 수 있다.
+   */
+  const [gridLangs, setGridLangs] = useState<LangCode[] | null>(null);
+  /** 붙여 넣을 대상 언어 — 어느 언어를 채우는지 골라야 다른 언어를 지우지 않는다 */
+  const [pasteLang, setPasteLang] = useState<LangCode>('en');
+  /** 붙여 넣은 번역 원문 — 짝을 맞추기 전의 날글 */
   const [englishPaste, setEnglishPaste] = useState('');
   /** 마지막 짝 맞추기 결과 — 넘친 줄·모자란 줄을 사람이 보게 한다 */
   const [mergeReport, setMergeReport] = useState<{ paired: number; replaced: number; dropped: string[]; problems: string[] } | null>(null);
@@ -124,6 +136,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setSong(loaded);
       setLangs(availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
       setDraftLyrics(formatLyrics(loaded.sections));
+      // 곡이 바뀌면 격자 언어도 그 곡 기준으로 — 앞 곡의 선택이 남으면 헷갈린다
+      setGridLangs(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '곡을 불러오지 못했습니다');
     }
@@ -484,18 +498,73 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           {editing && (
             <div className="card">
               <h2>가사 편집</h2>
-              <p className="hintline muted">
-                <code>[1절]</code> 로 섹션을 나누고, <code>|</code> 로 시작하는 줄은 직전 줄의 번역이 됩니다.
-                줄바꿈이 그대로 화면 줄이 됩니다.
-              </p>
-              <textarea
-                className="lyrics-editor"
-                value={draftLyrics}
-                onChange={(e) => setDraftLyrics(e.target.value)}
-                spellCheck={false}
-                rows={18}
-                aria-label="가사"
-              />
+              {/*
+                격자를 **먼저** 둔다. 여러 언어를 다룰 때 실제로 하는 일은
+                '줄이 맞는지 보고 고치기' 이고, 원문 텍스트는 대량으로 붙여 넣을 때만
+                필요하다. 자주 쓰는 것을 위에 둔다.
+              */}
+              {(() => {
+                // DB 는 알파벳 순으로 준다 (['en','ko','zh']). 기준 언어를 앞으로 돌린다 —
+                // 진하게 그리는 줄이 맨 위여야 무엇에 맞추는지 보인다
+                const songLangs = orderLangs(song.langs.length > 0 ? song.langs : ['ko']);
+                const shown = orderLangs(gridLangs ?? songLangs);
+                return (
+                  <>
+                    <div className="row detail-controls">
+                      <label title="격자에 보일 언어입니다. 송출 언어와는 따로입니다">
+                        편집할 언어
+                      </label>
+                      <span className="candidates">
+                        {SELECTABLE_LANGS.map((lang) => {
+                          const on = shown.includes(lang);
+                          const has = song.langs.includes(lang);
+                          return (
+                            <button
+                              key={lang}
+                              type="button"
+                              className={on ? 'primary' : undefined}
+                              onClick={() =>
+                                setGridLangs(
+                                  on
+                                    ? shown.filter((l) => l !== lang)
+                                    : [...shown, lang],
+                                )
+                              }
+                              title={has ? '' : '아직 이 언어 가사가 없습니다 — 켜면 넣을 자리가 생깁니다'}
+                            >
+                              {LANG_LABELS[lang] ?? lang}
+                              {!has && ' +'}
+                            </button>
+                          );
+                        })}
+                      </span>
+                    </div>
+
+                    <LyricsGrid
+                      text={draftLyrics}
+                      langs={shown.length > 0 ? shown : ['ko']}
+                      onChange={setDraftLyrics}
+                    />
+                  </>
+                );
+              })()}
+
+              <details className="detail-block">
+                <summary>원문으로 편집 (대량 붙여 넣기)</summary>
+                <p className="hintline muted">
+                  <code>[1절]</code> 로 섹션을 나눕니다. <code>|</code> 로 시작하는 줄은 직전 줄의
+                  번역이고, <code>|zh</code> 처럼 언어를 붙일 수 있습니다 (없으면 영어).
+                  줄바꿈이 그대로 화면 줄이 됩니다.
+                </p>
+                <textarea
+                  className="lyrics-editor"
+                  value={draftLyrics}
+                  onChange={(e) => setDraftLyrics(e.target.value)}
+                  spellCheck={false}
+                  rows={14}
+                  aria-label="가사"
+                />
+              </details>
               {/*
                 영어 붙여 넣기 — 손으로 `|` 를 끼우지 않게 한다.
                 4절 × 4줄이면 16번을 정확히 맞춰야 하고, 한 줄만 밀려도 어느 영어가 어느
@@ -503,26 +572,46 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 **저장하지 않는다** — 위 편집 칸을 채워 주고 사람이 보고 누른다.
               */}
               <details className="detail-block">
-                <summary>영어 가사 붙여 넣기</summary>
+                <summary>번역 붙여 넣기</summary>
                 <p className="hintline muted">
-                  <b>영어만</b> 절 순서대로 붙여 넣으세요. 절 사이는 빈 줄로 나눕니다
+                  고른 언어만 절 순서대로 붙여 넣으세요. 절 사이는 빈 줄로 나눕니다
                   (<code>[2절]</code> 처럼 라벨을 붙이면 그 절에 들어갑니다).
-                  한국어는 <b>한 글자도 고치지 않습니다.</b>
+                  한국어와 <b>다른 언어는 건드리지 않습니다.</b>
                 </p>
+
+                {/*
+                  대상 언어를 고르게 한다. 전에는 늘 영어로 넣어서, 中文 을 붙이면
+                  English 가 사라졌다 (실측 확인한 데이터 손실).
+                */}
+                <div className="row detail-controls">
+                  <label>넣을 언어</label>
+                  <span className="candidates">
+                    {SELECTABLE_LANGS.filter((lang) => lang !== 'ko').map((lang) => (
+                      <button
+                        key={lang}
+                        type="button"
+                        className={pasteLang === lang ? 'primary' : undefined}
+                        onClick={() => setPasteLang(lang)}
+                      >
+                        {LANG_LABELS[lang] ?? lang}
+                      </button>
+                    ))}
+                  </span>
+                </div>
                 <textarea
                   className="lyrics-editor"
                   value={englishPaste}
                   onChange={(e) => setEnglishPaste(e.target.value)}
                   spellCheck={false}
                   rows={10}
-                  aria-label="영어 가사"
-                  placeholder={'Verse 1 line 1\nVerse 1 line 2\n\nVerse 2 line 1\nVerse 2 line 2'}
+                  aria-label="번역 가사"
+                  placeholder={'1절 첫 줄\n1절 둘째 줄\n\n2절 첫 줄\n2절 둘째 줄'}
                 />
                 <div className="row" style={{ marginTop: 8 }}>
                   <button
                     type="button"
                     onClick={() => {
-                      const merged = mergeSecondaryLyrics(draftLyrics, englishPaste);
+                      const merged = mergeSecondaryLyrics(draftLyrics, englishPaste, pasteLang);
                       setDraftLyrics(merged.text);
                       setMergeReport(merged);
                     }}
@@ -540,7 +629,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                   <div className="merge-report">
                     <p className="hintline">
                       {mergeReport.paired}줄을 짝지었습니다
-                      {mergeReport.replaced > 0 && ` (있던 영어 ${mergeReport.replaced}줄은 갈아 끼웠습니다)`}
+                      {mergeReport.replaced > 0 &&
+                        ` (있던 ${LANG_LABELS[pasteLang] ?? pasteLang} ${mergeReport.replaced}줄은 갈아 끼웠습니다)`}
                       . 위 칸을 확인하고 <b>가사 저장</b>을 누르세요.
                     </p>
                     {mergeReport.problems.map((problem) => (

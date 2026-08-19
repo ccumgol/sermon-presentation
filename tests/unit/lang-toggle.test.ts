@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { toggleLang } from '../../lib/lang-select.ts';
+import { orderLangs, toggleLang } from '../../lib/lang-select.ts';
+import type { LangCode } from '../../shared/types.ts';
 
 describe('켜고 끄기', () => {
   it('없는 언어를 누르면 뒤에 붙는다 — 먼저 고른 것이 위', () => {
@@ -54,5 +55,34 @@ describe('경계', () => {
     const original: ReadonlyArray<'ko'> = ['ko'];
     toggleLang(original, 'en');
     expect(original).toEqual(['ko']);
+  });
+});
+
+describe('보기 순서 정렬', () => {
+  it('기준 언어가 맨 앞으로 온다 — DB 는 알파벳 순으로 준다', () => {
+    // 실제로 이렇게 왔다: song.langs = ['en','ko','zh']
+    expect(orderLangs(['en', 'ko', 'zh'])).toEqual(['ko', 'en', 'zh']);
+  });
+
+  it('기준 언어를 바꿀 수 있다', () => {
+    expect(orderLangs(['en', 'ko', 'zh'], 'zh')).toEqual(['zh', 'ko', 'en']);
+  });
+
+  it('정해진 순서를 따른다 (ko en zh ja)', () => {
+    expect(orderLangs(['ja', 'zh', 'en', 'ko'])).toEqual(['ko', 'en', 'zh', 'ja']);
+  });
+
+  it('모르는 언어는 버리지 않고 뒤로 보낸다', () => {
+    expect(orderLangs(['grc', 'ko', 'en'])).toEqual(['ko', 'en', 'grc']);
+  });
+
+  it('중복을 없앤다', () => {
+    expect(orderLangs(['ko', 'ko', 'en'])).toEqual(['ko', 'en']);
+  });
+
+  it('원래 배열을 고치지 않는다', () => {
+    const original: LangCode[] = ['en', 'ko'];
+    orderLangs(original);
+    expect(original).toEqual(['en', 'ko']);
   });
 });

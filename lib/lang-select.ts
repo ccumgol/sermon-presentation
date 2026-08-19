@@ -45,3 +45,24 @@ export function toggleLang(current: readonly LangCode[], lang: LangCode): LangCo
   if (current.length >= MAX_LANGS) return [current[0]!, lang];
   return [...current, lang];
 }
+
+/**
+ * 언어를 **보기 좋은 순서**로 정렬한다 — 기준 언어가 맨 앞, 나머지는 정해진 순서.
+ *
+ * DB 는 `('en','ko','zh')` 처럼 알파벳 순으로 돌려준다. 그대로 격자에 그리면
+ * 기준 언어(한국어)가 가운데에 오고, 진하게 그린 줄이 맨 위가 아니어서
+ * 무엇을 기준으로 맞추는지 헷갈린다.
+ *
+ * **송출 언어(`langs`)에는 쓰지 않는다.** 그쪽은 사람이 누른 순서가 곧 화면
+ * 위아래 순서라는 뜻이 있다. 이 함수는 **비교 격자**처럼 순서에 뜻이 없는 곳에 쓴다.
+ */
+export function orderLangs(langs: readonly LangCode[], primaryLang: LangCode = 'ko'): LangCode[] {
+  const unique = [...new Set(langs)];
+  const rank = (lang: LangCode): number => {
+    if (lang === primaryLang) return -1;
+    const index = SELECTABLE_LANGS.indexOf(lang);
+    // 모르는 언어는 뒤로 — 버리지 않는다
+    return index >= 0 ? index : SELECTABLE_LANGS.length;
+  };
+  return unique.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
