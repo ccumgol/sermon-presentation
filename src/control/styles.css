@@ -553,6 +553,12 @@ select:focus {
   margin-bottom: 0;
 }
 
+/* 표시 언어의 위/아래를 밝히는 짧은 꼬리표 — 버튼 옆에 붙는다 */
+.lang-order {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .candidates {
   display: flex;
   gap: 6px;

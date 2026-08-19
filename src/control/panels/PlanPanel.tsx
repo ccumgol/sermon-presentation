@@ -19,13 +19,14 @@ import {
   moveItem, newItemId,
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
+import { LANG_LABELS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
   AUTO_HOLD_MS_MAX,
   AUTO_HOLD_MS_MIN,
-  type ClientMsg, type CueItem, type Deck, type ItemBackground, type ReadingStyle, type PlanDefaults, type PlanKind, type ServicePlan,
+  type ClientMsg, type CueItem, type Deck, type ItemBackground, type LangCode, type ReadingStyle, type PlanDefaults, type PlanKind, type ServicePlan,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
 import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
@@ -433,6 +434,13 @@ export function PlanPanel({
    * (미리보기는 타이핑하는 대로 따라온다).
    */
   const [liturgyDraft, setLiturgyDraft] = useState<{ id: string; text: string } | null>(null);
+  /**
+   * 고른 찬양 항목이 **실제로 가진** 언어.
+   *
+   * 없는 언어를 켜 놓고 '왜 영어가 안 나오지' 가 되지 않게 흐리게 표시한다
+   * (찬양 탭과 같은 규칙). 항목을 고를 때 한 번만 읽는다.
+   */
+  const [songLangs, setSongLangs] = useState<{ id: number; available: string[] } | null>(null);
 
   /** 교독문 검색 결과 — 입력에 따라 좁혀진다 */
   const [readingHits, setReadingHits] = useState<ReadingSummary[]>([]);
@@ -920,6 +928,29 @@ export function PlanPanel({
     },
     [],
   );
+
+  // 고른 항목이 찬양이면 그 곡이 가진 언어를 읽어 둔다 (버튼을 흐리게 하는 데 쓴다)
+  const currentSongId = (() => {
+    const item = items.find((i) => i.id === expandedId) ?? items[cursor];
+    return item && item.type === 'song' ? item.songId : null;
+  })();
+
+  useEffect(() => {
+    if (currentSongId === null) return;
+    if (songLangs?.id === currentSongId) return;
+    let alive = true;
+    void api
+      .song(currentSongId)
+      .then((loaded) => {
+        // 읽는 사이에 다른 항목으로 옮겼으면 버린다 — 늦게 온 응답이 덮지 않게
+        if (alive) setSongLangs({ id: currentSongId, available: loaded.availableLangs });
+      })
+      // 못 읽어도 순서표 작업은 계속돼야 한다 — 버튼이 흐려지지 않을 뿐이다
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [currentSongId, songLangs?.id]);
 
   /** 인용구를 띄우기 직전 화면으로 되돌린다 */
   const restoreBefore = useCallback(() => {
@@ -1718,6 +1749,34 @@ export function PlanPanel({
                       <option value="all">구간 전체</option>
                     </select>
 
+                    {/*
+                      찬양 표시 언어 기본값 — 이 칸도 없었다. 항목마다 고르는 것은
+                      가능해졌지만, 한/영으로 예배하는 교회는 매주 곡마다 누르게 된다.
+                      '앞으로 넣는 항목'에 채워지는 값이다 (이미 있는 항목은 그대로).
+                    */}
+                    <label title="앞으로 넣는 찬양 항목에 채워집니다">찬양 표시 언어</label>
+                    <span className="candidates">
+                      {SELECTABLE_LANGS.map((lang) => {
+                        const currentLangs = (plan.defaults?.song?.langs ?? ['ko']) as LangCode[];
+                        const active = currentLangs.includes(lang);
+                        return (
+                          <button
+                            key={lang}
+                            type="button"
+                            className={active ? 'primary' : undefined}
+                            onClick={() =>
+                              patchDefaults((c) => ({
+                                ...c,
+                                song: { ...c.song, langs: toggleLang(currentLangs, lang) },
+                              }))
+                            }
+                          >
+                            {LANG_LABELS[lang] ?? lang}
+                          </button>
+                        );
+                      })}
+                    </span>
+
                     <label>찬양 화면 넘김</label>
                     <select
                       value={plan.defaults?.song?.lines ?? '2'}
@@ -2217,12 +2276,63 @@ export function PlanPanel({
 
           {current.type === 'song' && (
             <div className="row detail-controls">
+              {/*
+                표시 언어 — 전에는 이 칸이 없었다. 항목을 만들 때 기본값으로 한 번
+                정해지고 그 뒤로 바꿀 길이 없어서, 영어 가사를 넣어도 순서표의 찬양은
+                늘 한국어만 나갔다. 규칙(lib/lang-select.ts)은 찬양 탭과 공유한다.
+                **순서가 뜻을 갖는다** — 앞에 있는 언어가 화면 위로 간다.
+              */}
+              <label title="누른 순서대로 위에서 아래로 놓입니다">표시 언어 (최대 2)</label>
+              <span className="candidates">
+                {SELECTABLE_LANGS.map((lang) => {
+                  const active = current.langs.includes(lang);
+                  const has = songLangs?.id === current.songId ? songLangs.available.includes(lang) : true;
+                  return (
+                    <button
+                      key={lang}
+                      type="button"
+                      className={active ? 'primary' : undefined}
+                      onClick={() => {
+                        const next = items.map((i) =>
+                          i.id === current.id && i.type === 'song'
+                            ? { ...i, langs: toggleLang(i.langs, lang) }
+                            : i,
+                        );
+                        patchItems(next);
+                        // 단독 송출 중이면 바로 다시 보내 눈으로 보며 맞춘다
+                        const updated = next.find((i) => i.id === current.id);
+                        if (updated) refreshLive(updated);
+                      }}
+                      title={has ? '' : '이 곡에는 이 언어 가사가 없습니다'}
+                    >
+                      {LANG_LABELS[lang] ?? lang}
+                      {!has && ' ·'}
+                    </button>
+                  );
+                })}
+              </span>
+
+              {/*
+                버튼만 보면 어느 언어가 위인지 알 수 없다 — 버튼 자리는 고정이고
+                뜻을 갖는 것은 **고른 순서**다. 순서 행에 'en/ko' 로 나오긴 하지만
+                코드라 읽기 어렵다. 두 개를 골랐을 때만 밝힌다.
+              */}
+              {current.langs.length === 2 && (
+                <span className="muted lang-order">
+                  위 {LANG_LABELS[current.langs[0]!] ?? current.langs[0]} · 아래{' '}
+                  {LANG_LABELS[current.langs[1]!] ?? current.langs[1]}
+                </span>
+              )}
+
               <label>화면 넘김</label>
               <select
                 value={current.lines ?? '2'}
-                onChange={(e) =>
-                  patchItems(items.map((i) => (i.id === current.id ? { ...i, lines: e.target.value } : i)))
-                }
+                onChange={(e) => {
+                  const next = items.map((i) => (i.id === current.id ? { ...i, lines: e.target.value } : i));
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated) refreshLive(updated);
+                }}
               >
                 <option value="1">1줄씩</option>
                 <option value="2">2줄씩</option>
