@@ -8,8 +8,15 @@
 
 import type { LangCode } from '../shared/types.ts';
 
-/** 화면에 함께 올릴 수 있는 언어 수 — 위/아래 두 줄이 한계다 */
-export const MAX_LANGS = 2;
+/**
+ * 화면에 함께 올릴 수 있는 언어 수 — **성경의 '주 역본 + 보조 2개' 와 같게 3개.**
+ *
+ * 3번째 줄은 2번째와 같은 스타일을 받는다(출력 렌더러에 3단계 역할이 없다).
+ * 성경 3역본도 같은 한계이고 `overridesByLang` 으로 구분한다 — 사용자 확인을 받은
+ * 절충이다 (2026-08-19). 넷을 넘기지 않는 이유는 3언어 × 여러 줄이면 세로가
+ * 넘쳐 자동 축소가 개입하기 때문이다.
+ */
+export const MAX_LANGS = 3;
 
 /** 고를 수 있는 언어와 이름 — 순서가 곧 버튼 순서다 */
 export const LANG_LABELS: Readonly<Record<string, string>> = {

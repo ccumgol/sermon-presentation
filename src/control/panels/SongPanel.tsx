@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang as nextLangs } from '../../../lib/lang-select.ts';
 import { mergeSecondaryLyrics } from '../../../lib/lyrics-merge.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type {
@@ -21,7 +22,7 @@ const LINE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'section', label: '섹션 전체' },
 ];
 
-const LANG_LABELS: Record<string, string> = { ko: '한국어', en: 'English', zh: '中文', ja: '日本語' };
+
 
 interface Props {
   deck: Deck | null;
@@ -220,11 +221,15 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     }
   }
 
+  /**
+   * 표시 언어 토글 — 규칙은 `lib/lang-select.ts` 에 있다.
+   *
+   * 전에는 이 파일이 같은 규칙을 자기 안에 또 갖고 있었다. 예배 순서 탭에 같은
+   * 컨트롤을 만들면서 규칙을 공용 모듈로 뺐는데 이 탭만 남아 있었고, 상한이 2 로
+   * 박혀 있어 3언어를 고를 수 없었다. 두 탭이 어긋나지 않게 한 곳만 쓴다.
+   */
   function toggleLang(lang: LangCode): void {
-    setLangs((prev) => {
-      if (prev.includes(lang)) return prev.length === 1 ? prev : prev.filter((l) => l !== lang);
-      return prev.length >= 2 ? [prev[0]!, lang] : [...prev, lang];
-    });
+    setLangs((prev) => nextLangs(prev, lang));
   }
 
   if (managing) {
@@ -408,9 +413,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
 
             <div className="row">
               <div className="field">
-                <label>표시 언어 (최대 2)</label>
+                <label>표시 언어 (최대 {MAX_LANGS})</label>
                 <div className="candidates">
-                  {['ko', 'en', 'zh', 'ja'].map((lang) => {
+                  {SELECTABLE_LANGS.map((lang) => {
                     const has = song.langs.includes(lang);
                     const active = langs.includes(lang);
                     return (

@@ -5,6 +5,7 @@
  * 알 수 없는 필드는 버리고, 필수 필드가 없는 항목은 거부한다.
  */
 
+import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { safeBackgroundName } from './backgrounds.ts';
@@ -160,7 +161,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           type: 'song',
           songId: song.songId,
           songTitle: typeof song.songTitle === 'string' ? song.songTitle : '(제목 없음)',
-          langs: Array.isArray(song.langs) ? song.langs.filter((l) => typeof l === 'string').slice(0, 2) : ['ko'],
+          langs: Array.isArray(song.langs) ? song.langs.filter((l) => typeof l === 'string').slice(0, MAX_LANGS) : ['ko'],
           ...(typeof song.lines === 'string' ? { lines: song.lines } : {}),
           ...(templateId !== undefined ? { templateId } : {}),
           ...(note ? { note } : {}),
@@ -322,7 +323,7 @@ function readDefaults(raw: unknown): PlanDefaults | undefined {
   if (song && typeof song === 'object') {
     const picked: NonNullable<PlanDefaults['song']> = {};
     if (Array.isArray(song.langs)) {
-      picked.langs = song.langs.filter((l): l is string => typeof l === 'string').slice(0, 2);
+      picked.langs = song.langs.filter((l): l is string => typeof l === 'string').slice(0, MAX_LANGS);
     }
     if (typeof song.lines === 'string') picked.lines = song.lines;
     if (Object.keys(picked).length > 0) out.song = picked;

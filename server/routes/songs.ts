@@ -5,6 +5,7 @@
  * 한 번의 요청으로 송출 준비를 마치게 한다.
  */
 
+import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { parseLyrics } from '../../lib/lyrics-parser.ts';
@@ -60,8 +61,8 @@ function parseLangs(raw: unknown, fallback: LangCode[]): LangCode[] {
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
-  // 최대 2개까지만 — 3개 이상은 화면에서 읽을 수 없다
-  return langs.slice(0, 2);
+  // 상한은 한 곳에서 정한다 (lib/lang-select.ts). 성경의 '주 역본 + 보조 2개' 와 같다
+  return langs.slice(0, MAX_LANGS);
 }
 
 export async function registerSongRoutes(app: FastifyInstance): Promise<void> {

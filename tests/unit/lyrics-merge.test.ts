@@ -82,7 +82,7 @@ describe('수가 어긋날 때', () => {
 
   it('영어 절이 한국어 절보다 많으면 알린다', () => {
     const result = mergeSecondaryLyrics(KOREAN, 'a\nb\n\nc\nd\n\ne\nf');
-    expect(result.problems.join(' ')).toContain('영어 절이 1개 더 있습니다');
+    expect(result.problems.join(' ')).toContain('번역 절이 1개 더 있습니다');
     expect(result.dropped).toEqual(['e', 'f']);
   });
 });
@@ -122,5 +122,42 @@ describe('경계', () => {
   it('빈 줄이 여럿이어도 절 하나로 본다', () => {
     const result = mergeSecondaryLyrics(KOREAN, 'a\nb\n\n\n\nc\nd');
     expect(result.paired).toBe(4);
+  });
+});
+
+describe('언어가 셋 이상일 때', () => {
+  const KO_EN = `[1절]
+한국어 첫 줄
+|en English first
+한국어 둘째 줄
+|en English second`;
+
+  it('다른 언어를 붙일 때 **있던 언어를 지우지 않는다**', () => {
+    const result = mergeSecondaryLyrics(KO_EN, '中文 一\n中文 二', 'zh');
+    // 이것이 고장났던 자리다 — 中文 을 붙이면 English 가 사라졌다
+    expect(result.text).toContain('|en English first');
+    expect(result.text).toContain('|zh 中文 一');
+    expect(result.replaced).toBe(0);
+  });
+
+  it('같은 언어를 다시 붙이면 그 언어만 갈아 끼운다', () => {
+    const result = mergeSecondaryLyrics(KO_EN, 'New first\nNew second', 'en');
+    expect(result.text).not.toContain('English first');
+    // 언어가 둘(ko·en)뿐이면 표를 붙이지 않는다 — 손으로 쓰기 쉬운 형태를 지킨다
+    expect(result.text).toContain('| New first');
+    expect(result.replaced).toBe(2);
+  });
+
+  it('언어를 지정하지 않으면 영어로 본다 — 지금까지 쓰던 대로', () => {
+    const result = mergeSecondaryLyrics(KOREAN, 'a\nb\n\nc\nd');
+    expect(result.text).toContain('| a');
+  });
+
+  it('세 언어가 된 뒤에는 모든 보조 줄에 표가 붙는다', () => {
+    const three = mergeSecondaryLyrics(KO_EN, '中文 一\n中文 二', 'zh');
+    // 표가 없으면 다시 읽을 때 어느 줄이 어느 언어인지 알 수 없다
+    for (const line of three.text.split('\n').filter((l) => l.startsWith('|'))) {
+      expect(line).toMatch(/^\|(en|zh) /);
+    }
   });
 });

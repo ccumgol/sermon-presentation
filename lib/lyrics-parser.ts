@@ -50,16 +50,38 @@ export interface ParseLyricsOptions {
 }
 
 /**
+ * 고를 수 있는 언어 표 — `|en` 처럼 `|` 뒤에 붙인다.
+ *
+ * **정해진 표로만 받는다.** 아무 낱말이나 표로 보면 `|English text` 같은 본문이
+ * 언어 표로 잘못 읽힌다. 그래서 아는 코드만 표로 인정하고 나머지는 본문으로 둔다.
+ */
+const LANG_TAGS: ReadonlyArray<LangCode> = ['ko', 'en', 'zh', 'ja', 'grc', 'heb'];
+
+/** `|zh 中文` · `|zh中文` · `| English` 를 가른다 */
+const SECONDARY_LINE = /^\|\s*([a-z]{2,3})?\s*([\s\S]*)$/;
+
+/**
  * 붙여넣기 가사를 구조로 바꾼다.
  *
  * ```
  * [1절]
  * 주 예수보다 더 귀한 것은 없네
  * | I'd rather have Jesus than silver or gold
+ * |zh 我寧願有耶穌
  * ```
  *
  * `[...]` 는 섹션 머리, `|` 로 시작하는 줄은 **직전 줄의 번역**이다.
  * 같은 `lineIndex` 를 공유하므로 화면에서 위아래로 짝지어 표시된다.
+ *
+ * ## 언어 표
+ *
+ * `|` 뒤에 언어 코드를 붙이면 그 언어가 된다 (`|en` `|zh` `|ja`).
+ * 표가 없으면 기본 보조 언어(`secondaryLang`, 기본 `en`)로 읽는다 — 이미 저장된
+ * 글과 손으로 적어 둔 것이 그대로 열려야 하기 때문이다.
+ *
+ * 전에는 표가 없어 **모든 `|` 줄이 하나의 언어**였다. 그래서 3개 언어를 가진 곡은
+ * 같은 `(section, line_index, lang)` 이 두 번 생겨 저장이 500 으로 실패했다.
+ * 표시 언어 버튼에 中文·日本語 가 있는데 넣을 방법이 없던 원인이다.
  */
 export function parseLyrics(text: string, options: ParseLyricsOptions = {}): ParsedSection[] {
   const primaryLang = options.primaryLang ?? 'ko';
@@ -89,11 +111,29 @@ export function parseLyrics(text: string, options: ParseLyricsOptions = {}): Par
     if (!current) startSection('1절');
 
     if (line.startsWith('|')) {
-      const translated = line.slice(1).trim();
+      const match = SECONDARY_LINE.exec(line);
+      const tag = match?.[1];
+      // 아는 코드만 표로 본다. 모르는 낱말이면 본문의 일부다 (`|English text`)
+      const tagged = match !== null && tag !== undefined && LANG_TAGS.includes(tag);
+      const lang = tagged ? tag : secondaryLang;
+      const translated = (tagged ? match[2]! : line.slice(1)).trim();
       if (translated.length === 0) continue;
+
       // 직전 줄의 번역 — 같은 lineIndex 를 쓴다
       const index = Math.max(0, lineIndex - 1);
-      current!.lines.push({ lineIndex: index, lang: secondaryLang, text: translated });
+
+      /*
+       * 같은 언어를 두 번 적었으면 **뒤에 적은 것이 이긴다.**
+       * 그냥 넣으면 UNIQUE(section_id, line_index, lang) 에 걸려 저장 전체가
+       * 500 으로 실패한다. 사람이 고쳐 쓰다 두 줄이 된 경우가 대부분이므로
+       * 마지막 뜻을 따르는 편이 낫다.
+       */
+      const existing = current!.lines.findIndex(
+        (candidate) => candidate.lineIndex === index && candidate.lang === lang,
+      );
+      if (existing >= 0) current!.lines.splice(existing, 1);
+
+      current!.lines.push({ lineIndex: index, lang, text: translated });
       continue;
     }
 
@@ -105,8 +145,25 @@ export function parseLyrics(text: string, options: ParseLyricsOptions = {}): Par
 }
 
 /** 구조를 다시 텍스트로 (편집 UI 의 원문 보기·내보내기용) */
-export function formatLyrics(sections: ParsedSection[] | SongSection[], primaryLang = 'ko'): string {
+export function formatLyrics(
+  sections: ParsedSection[] | SongSection[],
+  primaryLang = 'ko',
+  secondaryLang: LangCode = 'en',
+): string {
   const out: string[] = [];
+
+  /*
+   * 언어 표(`|en`)를 언제 적는가.
+   *
+   * 보조 언어가 **하나뿐이고 그것이 기본 보조 언어**라면 표를 적지 않는다.
+   * `| English` 가 손으로 쓰기 쉬운 형태이고, 지금까지 쓰던 글과 같아야 한다.
+   * 언어가 셋 이상이면 표가 **반드시** 있어야 한다 — 없으면 어느 줄이 어느 언어인지
+   * 알 수 없고, 다시 읽을 때 전부 한 언어로 뭉쳐 저장이 깨진다.
+   */
+  const allLangs = new Set<LangCode>();
+  for (const section of sections) for (const line of section.lines) allLangs.add(line.lang);
+  const others = [...allLangs].filter((lang) => lang !== primaryLang);
+  const needTags = others.length > 1 || (others.length === 1 && others[0] !== secondaryLang);
 
   for (const section of sections) {
     out.push(`[${section.label}]`);
@@ -116,7 +173,9 @@ export function formatLyrics(sections: ParsedSection[] | SongSection[], primaryL
       const atIndex = section.lines.filter((l) => l.lineIndex === index);
       const primary = atIndex.find((l) => l.lang === primaryLang) ?? atIndex[0];
       if (primary) out.push(primary.text);
-      for (const other of atIndex.filter((l) => l !== primary)) out.push(`| ${other.text}`);
+      for (const other of atIndex.filter((l) => l !== primary)) {
+        out.push(needTags ? `|${other.lang} ${other.text}` : `| ${other.text}`);
+      }
     }
     out.push('');
   }

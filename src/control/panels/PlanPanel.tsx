@@ -19,7 +19,7 @@ import {
   moveItem, newItemId,
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
-import { LANG_LABELS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
+import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import {
@@ -2282,7 +2282,7 @@ export function PlanPanel({
                 늘 한국어만 나갔다. 규칙(lib/lang-select.ts)은 찬양 탭과 공유한다.
                 **순서가 뜻을 갖는다** — 앞에 있는 언어가 화면 위로 간다.
               */}
-              <label title="누른 순서대로 위에서 아래로 놓입니다">표시 언어 (최대 2)</label>
+              <label title="누른 순서대로 위에서 아래로 놓입니다">표시 언어 (최대 {MAX_LANGS})</label>
               <span className="candidates">
                 {SELECTABLE_LANGS.map((lang) => {
                   const active = current.langs.includes(lang);

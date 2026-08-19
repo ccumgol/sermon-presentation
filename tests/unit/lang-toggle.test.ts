@@ -28,16 +28,20 @@ describe('켜고 끄기', () => {
   });
 });
 
-describe('최대 2개', () => {
-  it('둘이 찬 상태에서 새 언어를 누르면 첫 번째를 남기고 갈아 끼운다', () => {
-    // 위에 있던 언어를 지키는 것이 뜻이 통한다 — 주 언어는 그대로, 아래만 바꾼다
-    expect(toggleLang(['ko', 'en'], 'zh')).toEqual(['ko', 'zh']);
-    expect(toggleLang(['en', 'ko'], 'ja')).toEqual(['en', 'ja']);
+describe('최대 3개 — 성경의 주 역본 + 보조 2개와 같다', () => {
+  it('둘이 찬 상태에서는 뒤에 붙는다', () => {
+    expect(toggleLang(['ko', 'en'], 'zh')).toEqual(['ko', 'en', 'zh']);
   });
 
-  it('세 개가 되는 일은 없다', () => {
-    const next = toggleLang(toggleLang(['ko', 'en'], 'zh'), 'ja');
-    expect(next).toHaveLength(2);
+  it('셋이 찬 상태에서 새 언어를 누르면 첫 번째를 남기고 갈아 끼운다', () => {
+    // 위에 있던 언어를 지키는 것이 뜻이 통한다 — 주 언어는 그대로, 아래만 바꾼다
+    expect(toggleLang(['ko', 'en', 'zh'], 'ja')).toEqual(['ko', 'ja']);
+  });
+
+  it('넷이 되는 일은 없다 — 3언어 × 여러 줄이면 화면이 넘친다', () => {
+    let langs = toggleLang(['ko', 'en'], 'zh');
+    langs = toggleLang(langs, 'ja');
+    expect(langs.length).toBeLessThanOrEqual(3);
   });
 });
 

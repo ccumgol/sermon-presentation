@@ -5,6 +5,7 @@
  * 실제 찬송가 데이터는 건드리지 않는다.
  */
 
+import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -189,9 +190,16 @@ describe('슬라이드 묶음', () => {
     expect(body.data!.deck.labels).toEqual(['후렴']);
   });
 
-  it('3개 이상 언어를 요청해도 2개로 자른다', async () => {
+  it(`${MAX_LANGS}개를 넘게 요청하면 ${MAX_LANGS}개로 자른다`, async () => {
+    const { body } = await get<{ langs: string[] }>(
+      `/api/songs/${hymnId}/deck?langs=ko,en,zh,ja`,
+    );
+    expect(body.data!.langs).toHaveLength(MAX_LANGS);
+  });
+
+  it('3개 언어를 요청하면 3개가 그대로 온다', async () => {
     const { body } = await get<{ langs: string[] }>(`/api/songs/${hymnId}/deck?langs=ko,en,zh`);
-    expect(body.data!.langs).toHaveLength(2);
+    expect(body.data!.langs).toEqual(['ko', 'en', 'zh']);
   });
 
   it('덱 라벨에 섹션 안 순서를 표시한다', async () => {

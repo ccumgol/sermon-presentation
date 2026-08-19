@@ -5,6 +5,7 @@
  * 내용을 잃지 않는지**가 핵심이다.
  */
 
+import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -116,7 +117,7 @@ describe('예배 순서 CRUD', () => {
     expect(body.data!.plan.items[0]!.type).toBe('song');
   });
 
-  it('언어를 2개로 자른다', async () => {
+  it(`언어를 ${MAX_LANGS}개로 자른다 — 성경의 주 역본 + 보조 2개와 같다`, async () => {
     const created = (await send<PlanResponse>('POST', '/api/plans', {
       name: '언어 제한',
       items: [{ type: 'song', songId: 1, songTitle: '찬송', langs: ['ko', 'en', 'zh', 'ja'] }],
@@ -124,7 +125,9 @@ describe('예배 순서 CRUD', () => {
     createdPlanIds.push(created.id);
 
     const item = created.items[0] as Extract<CueItem, { type: 'song' }>;
-    expect(item.langs).toHaveLength(2);
+    // 상한을 숫자로 박지 않는다 — 한 곳(lib/lang-select.ts)만 고치면 되게
+    expect(item.langs).toHaveLength(MAX_LANGS);
+    expect(item.langs).toEqual(['ko', 'en', 'zh']);
   });
 
   it('복제하면 항목 id 가 새로 발급된다', async () => {
