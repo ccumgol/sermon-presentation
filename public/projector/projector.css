@@ -1,0 +1,217 @@
+/*
+ * 프로젝터 화면 — `output.css` 위에 덧칠만 한다.
+ *
+ * ## 왜 덧칠로 되는가
+ *
+ * 서버가 보내는 `style:patch` 는 CSS 변수를 `<html>` 의 **인라인 스타일**에 꽂는다.
+ * 인라인은 보통 무엇도 이기지만, **CSS 변수는 상속으로 결정된다** — 값을 읽는 쪽
+ * (`.line-primary`)에서 가장 가까운 조상의 선언이 이긴다. `body` 는 `html` 보다
+ * 가까우므로, 여기서 `body.projector { --primary-color: … }` 라고 쓰면 서버 패치를
+ * 가린다. `!important` 도, 자바스크립트로 인라인을 지우는 짓도 필요 없다.
+ * 서버와 화면이 **싸우지 않고** 각자 제 일을 한다.
+ *
+ * ## 색은 두 개의 토큰으로 정한다
+ *
+ * `--proj-bg` / `--proj-fg` 를 뒤집으면 반전이다. 필터(`filter: invert`)를 쓰지 않은
+ * 이유는 그것이 **색상까지 뒤집기** 때문이다 — 회중용 노란 글씨가 파랗게 변한다.
+ */
+
+body.projector {
+  /* ── 검은 바탕 (기본) ─────────────────────────────────── */
+  --proj-bg: #000000;
+  --proj-fg: #ffffff;
+  /*
+   * 둘째 언어·회중 줄의 색. 누가 읽을 차례인지 구분해야 하므로 첫째 줄과 달라야 한다
+   * (교독문 인도자/회중, 한/영 병기 찬양).
+   */
+  --proj-fg2: #ffe08a;
+
+  /* 조작자가 막대에서 정한다. 1 = 템플릿 크기 그대로 */
+  --proj-zoom: 1;
+
+  background: var(--proj-bg);
+  /* 프로젝터는 마우스가 보이면 벽에 커서가 비친다. 막대가 숨으면 커서도 숨긴다 */
+  cursor: none;
+}
+
+/* 반전 — 흰 바탕. 어두운 예배당이 아니라 불을 켠 방에서 쓸 때 읽기 쉽다 */
+body.projector.inverted {
+  --proj-bg: #ffffff;
+  --proj-fg: #111111;
+  /* 노란색은 흰 바탕에서 읽히지 않는다. 같은 계열의 짙은 색으로 바꾼다 */
+  --proj-fg2: #8a4b00;
+}
+
+body.projector.bar-shown {
+  cursor: default;
+}
+
+/*
+ * 배경 그림·동영상을 쓰지 않는다.
+ *
+ * 프로젝터는 선명하지 않다 — 그것이 이 화면이 있는 이유다. 사진 위의 글씨는
+ * 회중석에서 읽히지 않는다. 항목이 배경을 지정해도(교독문·찬양) 여기서는 무시한다.
+ */
+body.projector #backdrop {
+  display: none !important;
+}
+
+/*
+ * ── 글자 ────────────────────────────────────────────────
+ *
+ * 크기·굵기·색만 덮는다. 배치(anchor·여백·줄 간격)와 줄 묶는 규칙은 서버가 보내는
+ * '전체 — 성경·찬송 겸용' 템플릿을 그대로 따른다.
+ */
+body.projector {
+  --primary-color: var(--proj-fg);
+  --secondary-color: var(--proj-fg2);
+  --reference-color: var(--proj-fg);
+  --versenum-color: var(--proj-fg2);
+
+  /*
+   * 두껍게. 프로젝터는 대비가 낮아 얇은 획이 뭉개진다 (사용자 요청 2026-08-20:
+   * "글자도 크게, 두껍게"). 템플릿의 굵기(700/400)보다 한 단계씩 올린다.
+   */
+  --primary-weight: 800;
+  --secondary-weight: 600;
+
+  /*
+   * 테두리·그림자를 끈다. 투명 송출에서 카메라 영상과 글자를 떼어 놓기 위한 장치인데,
+   * 단색 바탕에서는 획을 흐리게 만들 뿐이다. 반전했을 때는 검은 테두리가 검은 글자를
+   * 뭉개 놓는다.
+   */
+  --primary-stroke: none;
+  --secondary-stroke: none;
+  --reference-stroke: none;
+  --primary-shadow: none;
+  --secondary-shadow: none;
+  --reference-shadow: none;
+}
+
+/*
+ * 글자 크기 배수.
+ *
+ * `output.css` 의 규칙을 그대로 베끼고 `* var(--proj-zoom)` 만 덧붙인다.
+ * 변수를 곱하는 자리가 `font-size` 안이라 변수 재정의로는 끼워 넣을 수 없다.
+ * `--item-scale`(교독문·전례문의 항목별 크기)을 **빼앗지 않는다** — 둘을 곱한다.
+ */
+body.projector .line-primary {
+  font-size: calc(var(--primary-size) * var(--item-scale, 1) * var(--proj-zoom));
+}
+/*
+ * 둘째 줄은 **너무 작아지지 않게 바닥을 받친다.**
+ *
+ * '전체' 템플릿의 둘째 줄은 42px 이다 (첫 줄 96px 의 0.44배). 그 크기는 OBS 에서
+ * *둘째 역본*을 곁들일 때를 생각한 값인데, 프로젝터에서는 둘째 줄이 곁가지가 아니다 —
+ * **한/영 병기 찬양의 영어 가사**이고, 교독문의 **회중 줄**이다. 대비가 낮은 벽에
+ * 42px 로 비치면 회중이 읽을 수 없다.
+ *
+ * `max()` 로 받치므로 템플릿이 이미 큰 값을 주면 그것을 쓴다 — 템플릿을 덮지 않고
+ * 아래로만 막는다.
+ */
+body.projector .line-secondary {
+  font-size: max(
+    calc(var(--secondary-size) * var(--item-scale, 1) * var(--proj-zoom)),
+    calc(var(--primary-size) * 0.72 * var(--item-scale, 1) * var(--proj-zoom))
+  );
+}
+
+/*
+ * 교독문의 회중 줄만은 **인도자 줄과 같은 크기**로 둔다.
+ *
+ * 교독문 전용 템플릿이 그렇게 만들어져 있다 ("인도자와 같은 크기 — 색으로만 구분한다").
+ * 번갈아 읽는 글에서 한쪽이 작으면 자기 차례가 덜 중요해 보인다.
+ */
+body.projector .line-secondary.reading-people {
+  font-size: calc(var(--primary-size) * var(--item-scale, 1) * var(--proj-zoom));
+}
+
+/*
+ * ── 조작 막대 ───────────────────────────────────────────
+ *
+ * 요청: 평소에는 보이지 않고, 마우스를 올릴 때만. `hidden` 을 붙였다 떼는 방식이라
+ * 숨어 있을 때는 클릭도 먹지 않는다 (`display: none`).
+ */
+.bar {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 0 0 12px 12px;
+
+  /* 어느 바탕에서도 읽히도록 막대만은 늘 어둡게 둔다 */
+  background: rgba(20, 20, 22, 0.92);
+  color: #f2f2f4;
+  font: 500 15px/1 system-ui, -apple-system, sans-serif;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+
+.bar[hidden] {
+  display: none;
+}
+
+.bar button {
+  min-width: 38px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.bar button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.bar button:active {
+  transform: translateY(1px);
+}
+
+#zoom-value {
+  min-width: 52px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-sep {
+  width: 1px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.bar .warn {
+  color: #ffd24a;
+  font-size: 13px;
+}
+
+.bar .warn[hidden] {
+  display: none;
+}
+
+/* 처음 열었을 때 한 번 보여 주는 안내 — 막대를 찾을 방법을 알려 준다 */
+#hint {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(20, 20, 22, 0.86);
+  color: #d8d8dc;
+  font: 400 14px/1.4 system-ui, -apple-system, sans-serif;
+  transition: opacity 0.6s ease;
+}
+
+#hint[hidden] {
+  display: none;
+}

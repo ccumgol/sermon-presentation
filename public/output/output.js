@@ -14,8 +14,20 @@
   var LOADED_AT = Date.now();
 
   var params = new URLSearchParams(location.search);
+
+  /*
+   * 이 파일은 프로젝터 화면(`/projector/`)도 그대로 쓴다 — 렌더러를 복제하지 않기
+   * 위한 의도적 재사용이다. 그 화면은 layer 이름이 'projector' 여야 한다:
+   * 서버가 그 layer 에만 '전체' 템플릿을 보내고, 'OBS 연결됨' 집계에서 빼기 때문이다.
+   *
+   * 쿼리(`?layer=`)에 맡기지 않고 **경로에서 정한다.** 사용자가 주소를 손으로 치거나
+   * 즐겨찾기에 넣을 때 파라미터가 빠지면 프로젝터 창이 OBS 화면으로 집계되고
+   * '옛 판이니 새로고침하라' 경고가 엉뚱하게 뜬다.
+   */
+  var pathLayer = location.pathname.indexOf('/projector') === 0 ? 'projector' : 'main';
+
   var opts = {
-    layer: params.get('layer') || 'main',
+    layer: params.get('layer') || pathLayer,
     preview: params.get('preview') === '1',
     debug: params.get('debug') === '1',
     demo: params.get('demo') === '1',

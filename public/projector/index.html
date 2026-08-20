@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>프로젝터 — Sermon Presentation</title>
+    <!--
+      프로젝터 화면.
+
+      ## 출력 페이지의 렌더러를 그대로 쓴다
+
+      아래 DOM 은 `public/output/index.html` 과 **같은 id** 를 쓰고, 같은 CSS 와 같은
+      스크립트를 불러온다. 성경·찬양·교독문·전례문 렌더러가 1044줄이라, 복제하면 두 곳이
+      갈라지고 한쪽만 고친 것을 예배 중에 알게 된다. `projector.css`/`projector.js` 는
+      그 위에 **덧칠만** 한다 (색 반전·글자 크기·막대 숨김).
+      이 규칙은 `tests/unit/projector-page.test.ts` 가 파일을 읽어 지킨다.
+
+      ## 출력 페이지와 다른 점
+
+      - OBS 를 거치지 않는다 → 투명 배경이 필요 없다. **불투명한 바탕**을 칠한다.
+      - 활성 템플릿을 따르지 않는다 → 서버가 이 화면(layer=projector)에만
+        '전체 — 성경·찬송 겸용' 을 보낸다. OBS 가 '하단 두 줄'일 때도 벽에는 큰 글씨.
+      - 배경 그림을 쓰지 않는다 → 프로젝터는 선명하지 않다. 사진 위의 글씨는 읽히지 않는다.
+
+      의존성 0 원칙은 그대로다 — 예배 중 이 화면이 죽으면 대안이 없다.
+    -->
+    <link rel="stylesheet" href="/output/output.css" />
+    <link rel="stylesheet" href="/projector/projector.css" />
+  </head>
+  <body class="projector">
+    <!-- 배경 그림 자리. 프로젝터에서는 CSS 로 숨긴다 (위 설명 참고) -->
+    <div id="backdrop" class="backdrop" aria-hidden="true"></div>
+
+    <main id="stage" class="stage">
+      <div id="slide" class="slide" data-empty="true">
+        <div id="heading" class="heading" hidden></div>
+        <div id="blocks" class="blocks"></div>
+        <div id="reference" class="reference" hidden></div>
+        <div id="credit" class="credit" hidden></div>
+      </div>
+    </main>
+
+    <!--
+      조작 막대. 평소에는 **보이지 않는다** (hidden 으로 시작).
+      마우스를 움직이면 나타나고, 2.5초 동안 가만히 두면 사라진다 — 영상 재생기와 같은
+      방식이다. 마우스를 움직여야 나오는 것을 모르면 찾을 수 없으므로, 창을 처음 열었을
+      때는 잠깐 보여 준다 (projector.js).
+    -->
+    <div id="bar" class="bar" hidden>
+      <button type="button" id="zoom-out" title="글자 작게 (−)">−</button>
+      <span id="zoom-value">100%</span>
+      <button type="button" id="zoom-in" title="글자 크게 (+)">+</button>
+
+      <span class="bar-sep" aria-hidden="true"></span>
+
+      <button type="button" id="invert" title="글자색과 배경색을 뒤집는다 (I)">반전</button>
+      <button type="button" id="full" title="전체 화면 — 브라우저 주소줄까지 사라진다 (F)">
+        전체 화면
+      </button>
+
+      <!-- autoFit 을 껐으므로 넘칠 때는 사람이 알아야 한다 -->
+      <span id="overflow" class="warn" hidden>⚠ 글이 화면을 넘칩니다 — − 를 누르세요</span>
+    </div>
+
+    <!--
+      처음 열었을 때만 보이는 안내. 6초 뒤 사라진다.
+      이것이 없으면 검은 화면만 뜨고, 마우스를 움직여야 조작이 나오는 것을 알 수 없다.
+    -->
+    <p id="hint">마우스를 움직이면 조작 막대가 나옵니다 · <b>F</b> 전체 화면 · <b>+ −</b> 글자 크기 · <b>I</b> 색 반전</p>
+
+    <script src="/output/output.js"></script>
+    <script src="/projector/projector.js"></script>
+  </body>
+</html>

@@ -897,7 +897,7 @@ export type ServerMsg =
    * 접속 수가 바뀔 때 컨트롤 패널에 알린다 (폴링 대신 푸시).
    * `stage` 는 강사 모니터 — OBS 로 나가는 `output` 과 섞지 않는다.
    */
-  | { t: 'connections'; payload: { control: number; output: number; stage: number } }
+  | { t: 'connections'; payload: { control: number; output: number; stage: number; projector: number } }
   | { t: 'template'; payload: Template }
   | { t: 'style:patch'; payload: Record<string, string> }
   /** 출력 페이지에서 올라온 오류를 컨트롤 패널에 알린다 */

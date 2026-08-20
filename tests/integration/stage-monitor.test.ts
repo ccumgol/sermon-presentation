@@ -95,11 +95,19 @@ describe('서버가 강사 모니터를 따로 다룬다', () => {
   });
 
   it('옛 판 경고는 OBS 출력에만 보낸다', () => {
-    // 강사 모니터는 우리가 띄우므로 새로고침 안내가 필요 없다
+    /*
+     * 강사 모니터는 우리가 띄우는 창이므로 'OBS 브라우저 소스를 새로고침하라' 안내가
+     * 필요 없다 (F5 로 된다).
+     *
+     * 예전에는 이 자리에서 `STAGE_LAYER` 라는 이름이 보이는지 봤다. 프로젝터 화면이
+     * 생기면서 제외 대상이 셋(강사 모니터·프로젝터·미리보기)이 되어 `NOT_OBS` 집합으로
+     * 묶였으므로, **이름 대신 뜻**을 확인한다 — 그 집합이 강사 모니터를 담고 있는지.
+     */
     const guard = ws.slice(ws.indexOf('isOutputStale(msg.loadedAt'), ws.indexOf('broadcast({ t: \'output:stale\''));
-    expect(ws.slice(ws.indexOf("client.role === 'output' &&"), ws.indexOf('isOutputStale(msg.loadedAt'))).toContain(
-      'STAGE_LAYER',
-    );
     expect(guard.length).toBeGreaterThan(0);
+
+    const condition = ws.slice(ws.indexOf("client.role === 'output' &&"), ws.indexOf('isOutputStale(msg.loadedAt'));
+    expect(condition).toContain('NOT_OBS');
+    expect(ws).toMatch(/NOT_OBS\s*=\s*new Set\(\[STAGE_LAYER/);
   });
 });

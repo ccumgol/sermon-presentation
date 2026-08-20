@@ -15,6 +15,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 
 import { isAllowedOrigin, parseAllowedOrigins } from '../lib/origin-check.ts';
 
+import { PROJECTOR_LAYER, PROJECTOR_TEMPLATE_ID, projectorTemplate } from '../lib/projector-view.ts';
 import { templateToCssVars } from '../lib/template-css.ts';
 import type { ClientMsg, ClientRole, Deck, LiveState, ServerMsg, Template } from '../shared/types.ts';
 import { getTemplateOrDefault } from './db/templates.ts';
@@ -62,6 +63,15 @@ export function createWsHub(server: Server, log: Logger): WsHub {
   /** 강사 모니터(`/stage`)가 쓰는 layer 이름 */
   const STAGE_LAYER = 'stage';
 
+  /**
+   * OBS 로 나가지 **않는** 화면들.
+   *
+   * 강사 모니터·프로젝터·미리보기 iframe 은 브라우저 창이다. 'OBS 연결됨' 집계에
+   * 섞으면 표시가 거짓이 되고, '옛 판이니 브라우저 소스를 새로고침하라' 경고도
+   * 엉뚱한 곳을 가리킨다 (그 창은 F5 로 새로고침하면 된다).
+   */
+  const NOT_OBS = new Set([STAGE_LAYER, PROJECTOR_LAYER, 'preview']);
+
   function send(socket: WebSocket, msg: ServerMsg): void {
     if (socket.readyState !== WebSocket.OPEN) return;
     try {
@@ -97,19 +107,21 @@ export function createWsHub(server: Server, log: Logger): WsHub {
     }
   }
 
-  function counts(): { control: number; output: number; stage: number } {
+  function counts(): { control: number; output: number; stage: number; projector: number } {
     let control = 0;
     let output = 0;
     let stage = 0;
+    let projector = 0;
     for (const client of clients.values()) {
       if (client.role === 'control') control++;
-      // 강사 모니터는 OBS 로 나가는 화면이 아니다. 따로 센다 —
+      // 강사 모니터·프로젝터는 OBS 로 나가는 화면이 아니다. 따로 센다 —
       // 여기에 섞으면 'OBS 연결됨' 표시가 거짓이 된다.
       else if (client.layer === STAGE_LAYER) stage++;
+      else if (client.layer === PROJECTOR_LAYER) projector++;
       // 컨트롤 패널 안의 미리보기 iframe 도 실제 송출 화면이 아니다
       else if (client.layer !== 'preview') output++;
     }
-    return { control, output, stage };
+    return { control, output, stage, projector };
   }
 
   /**
@@ -121,8 +133,24 @@ export function createWsHub(server: Server, log: Logger): WsHub {
     send(socket, { t: 'style:patch', payload: templateToCssVars(template) });
   }
 
+  /**
+   * 이 화면이 받아야 하는 템플릿.
+   *
+   * 프로젝터는 **활성 템플릿을 따르지 않는다.** OBS 가 '하단 두 줄'(카메라 위)일 때
+   * 프로젝터는 '전체'(큰 글씨)여야 하고, 둘은 동시에 필요하다. 하나를 모두에게
+   * 보내면 둘 중 하나가 망가진다 (사용자 요청 2026-08-20: 프로젝터가 선명하지 않아
+   * 크고 두꺼워야 한다).
+   *
+   * `getTemplateOrDefault` 를 거치므로 사용자가 '전체' 프리셋을 고치면 따라간다 —
+   * 눈에 보이지 않는 별도 설정을 만들지 않는다.
+   */
+  function templateFor(client: Client, active: Template): Template {
+    if (client.layer !== PROJECTOR_LAYER) return active;
+    return projectorTemplate(getTemplateOrDefault(PROJECTOR_TEMPLATE_ID));
+  }
+
   function broadcastTemplate(template: Template): void {
-    for (const client of clients.values()) sendTemplate(client.socket, template);
+    for (const client of clients.values()) sendTemplate(client.socket, templateFor(client, template));
   }
 
   /**
@@ -161,7 +189,10 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         client.layer = msg.layer ?? 'main';
         send(client.socket, { t: 'state', payload: state.getState() });
         // 접속 즉시 템플릿까지 보내야 새로고침 후 스타일이 그대로 복구된다
-        sendTemplate(client.socket, getTemplateOrDefault(state.getState().templateId));
+        sendTemplate(
+          client.socket,
+          templateFor(client, getTemplateOrDefault(state.getState().templateId)),
+        );
         if (wantsDeck(client)) send(client.socket, { t: 'deck', payload: state.getDeck() });
         log.info(`WS 연결: ${client.role}${client.role === 'output' ? ` (layer=${client.layer})` : ''}`);
         // 역할이 정해진 뒤에 알려야 집계가 맞는다
@@ -171,8 +202,7 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         // 미리보기 iframe 은 컨트롤 패널과 함께 새로 뜨므로 대상이 아니다.
         if (
           client.role === 'output' &&
-          client.layer !== 'preview' &&
-          client.layer !== STAGE_LAYER &&
+          !NOT_OBS.has(client.layer) &&
           isOutputStale(msg.loadedAt, outputBuildMs())
         ) {
           log.warn(`출력 페이지가 옛 판입니다 (layer=${client.layer}) — OBS 브라우저 소스를 새로고침하세요`);
@@ -228,11 +258,20 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         break;
       }
 
-      case 'style:set':
-        // 편집 중 실시간 미리보기용 — 저장하지 않고 화면에만 반영한다.
-        // 저장은 컨트롤 패널이 PUT /api/templates/:id 로 한다.
-        broadcast({ t: 'style:patch', payload: toCssPatch(msg.patch) });
+      case 'style:set': {
+        /*
+         * 편집 중 실시간 미리보기용 — 저장하지 않고 화면에만 반영한다.
+         * 저장은 컨트롤 패널이 PUT /api/templates/:id 로 한다.
+         *
+         * **프로젝터는 뺀다.** 프로젝터는 활성 템플릿을 따르지 않으므로, 다른 템플릿을
+         * 편집하는 중에 프로젝터 글씨가 따라 흔들리면 예배 중에 벽에 비친 글이 춤춘다.
+         */
+        const patch = { t: 'style:patch', payload: toCssPatch(msg.patch) } as const;
+        for (const c of clients.values()) {
+          if (c.layer !== PROJECTOR_LAYER) send(c.socket, patch);
+        }
         break;
+      }
 
       case 'measure:report':
         // Phase 3 자동 분할에서 사용한다. 지금은 받아만 둔다.

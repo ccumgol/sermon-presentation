@@ -173,6 +173,16 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
    */
   app.get('/stage/', async (_request, reply) => reply.sendFile('stage/index.html'));
   app.get('/stage', async (_request, reply) => reply.redirect('/stage/'));
+
+  /**
+   * 프로젝터 화면. 강사 모니터처럼 **우리가 직접 띄우는 창**이지만, 보여 주는 것은
+   * 회중용 내용이다 — TV 가 아니라 프로젝터로 띄울 때 쓴다 (2026-08-20 사용자).
+   *
+   * 출력 페이지의 렌더러를 그대로 쓴다. `public/projector/index.html` 이
+   * `/output/output.js` 를 불러오므로, 여기서 따로 줄 것이 없다.
+   */
+  app.get('/projector/', async (_request, reply) => reply.sendFile('projector/index.html'));
+  app.get('/projector', async (_request, reply) => reply.redirect('/projector/'));
   app.get('/app/', async (_request, reply) => reply.sendFile('app/index.html'));
 
   // 파비콘 요청으로 로그가 지저분해지지 않게 조용히 넘긴다
