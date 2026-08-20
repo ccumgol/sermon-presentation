@@ -22,19 +22,92 @@ import { getConnection } from './app.ts';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS responsive_readings (
-  number     INTEGER PRIMARY KEY,
+  book       TEXT NOT NULL,   -- 'hymn_old'(통일찬송가용) | 'hymn_new'(새찬송가용)
+  number     INTEGER NOT NULL,
   title      TEXT NOT NULL,
   lines      TEXT NOT NULL,   -- JSON: string[]
   source     TEXT NOT NULL,   -- 어느 파일에서 왔는지 (다시 가져올 범위를 잡는 데 쓴다)
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (book, number)
 );
 `;
 
+/**
+ * 교독문이 어느 찬송가의 것인지.
+ *
+ * 두 찬송가의 교독문은 **번호가 같아도 다른 글**이다 (통일 76편 · 새 137편).
+ * 그래서 번호만으로는 열쇠가 될 수 없고 `(book, number)` 가 열쇠다.
+ *
+ * 이름은 곡집 id 와 같은 것을 쓴다 — 사용자가 이미 '새/통' 으로 곡집을 구분하고 있어
+ * 같은 낱말이 같은 뜻이어야 한다.
+ */
+export const READING_BOOKS = ['hymn_old', 'hymn_new'] as const;
+export type ReadingBook = (typeof READING_BOOKS)[number];
+
+/** 화면에 보이는 이름 (사용자 표현) */
+export const READING_BOOK_LABELS: Readonly<Record<ReadingBook, string>> = {
+  hymn_old: '통일찬송가용',
+  hymn_new: '새찬송가용',
+};
+
+export const DEFAULT_READING_BOOK: ReadingBook = 'hymn_old';
+
+export function isReadingBook(value: unknown): value is ReadingBook {
+  return typeof value === 'string' && (READING_BOOKS as readonly string[]).includes(value);
+}
+
+/**
+ * 옛 스키마(번호가 PK, 찬송가 구분 없음)를 새 스키마로 옮긴다.
+ *
+ * 있던 것은 **모두 통일찬송가용**이다 — 새찬송가 교독문을 넣을 길이 없었으므로
+ * 그것 말고 들어 있을 수 있는 것이 없다. SQLite 는 PK 를 바꿀 수 없어 표를 다시 만든다.
+ *
+ * 여러 번 불러도 안전하다 (`book` 열이 이미 있으면 아무것도 하지 않는다).
+ */
+function migrateToBookKey(): number {
+  const conn = getConnection();
+
+  const exists = conn
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'responsive_readings'")
+    .get() as { name: string } | undefined;
+  if (!exists) return 0;
+
+  const columns = conn.prepare('PRAGMA table_info(responsive_readings)').all() as unknown as Array<{
+    name: string;
+  }>;
+  if (columns.some((column) => column.name === 'book')) return 0;
+
+  const before = (
+    conn.prepare('SELECT count(*) AS c FROM responsive_readings').get() as unknown as { c: number }
+  ).c;
+
+  conn.exec('BEGIN');
+  try {
+    conn.exec('ALTER TABLE responsive_readings RENAME TO responsive_readings_old');
+    conn.exec(SCHEMA);
+    conn
+      .prepare(
+        `INSERT INTO responsive_readings (book, number, title, lines, source, updated_at)
+         SELECT ?, number, title, lines, source, updated_at FROM responsive_readings_old`,
+      )
+      .run(DEFAULT_READING_BOOK);
+    conn.exec('DROP TABLE responsive_readings_old');
+    conn.exec('COMMIT');
+  } catch (err) {
+    conn.exec('ROLLBACK');
+    throw err;
+  }
+
+  return before;
+}
+
 export function initReadingStore(): void {
   getConnection().exec(SCHEMA);
+  migrateToBookKey();
 }
 
 interface Row {
+  book: string;
   number: number;
   title: string;
   lines: string;
@@ -59,25 +132,42 @@ function toReading(row: Row): ResponsiveReading {
   return { number: row.number, title: row.title, lines };
 }
 
-export function listReadings(): ResponsiveReading[] {
+export function listReadings(book: ReadingBook = DEFAULT_READING_BOOK): ResponsiveReading[] {
   const rows = getConnection()
-    .prepare('SELECT number, title, lines, source FROM responsive_readings ORDER BY number')
-    .all() as unknown as Row[];
+    .prepare('SELECT book, number, title, lines, source FROM responsive_readings WHERE book = ? ORDER BY number')
+    .all(book) as unknown as Row[];
   return rows.map(toReading);
 }
 
-export function getReading(number: number): ResponsiveReading | undefined {
+/** 어느 찬송가에 몇 편이 들어 있는지 — 고르는 화면이 빈 쪽을 흐리게 하는 데 쓴다 */
+export function countByBook(): Record<ReadingBook, number> {
+  const rows = getConnection()
+    .prepare('SELECT book, count(*) AS c FROM responsive_readings GROUP BY book')
+    .all() as unknown as Array<{ book: string; c: number }>;
+
+  const out: Record<ReadingBook, number> = { hymn_old: 0, hymn_new: 0 };
+  for (const row of rows) if (isReadingBook(row.book)) out[row.book] = row.c;
+  return out;
+}
+
+export function getReading(
+  number: number,
+  book: ReadingBook = DEFAULT_READING_BOOK,
+): ResponsiveReading | undefined {
   if (!Number.isInteger(number)) return undefined;
   const row = getConnection()
-    .prepare('SELECT number, title, lines, source FROM responsive_readings WHERE number = ?')
-    .get(number) as unknown as Row | undefined;
+    .prepare('SELECT book, number, title, lines, source FROM responsive_readings WHERE book = ? AND number = ?')
+    .get(book, number) as unknown as Row | undefined;
   return row ? toReading(row) : undefined;
 }
 
-export function countReadings(): number {
-  const row = getConnection()
-    .prepare('SELECT count(*) AS c FROM responsive_readings')
-    .get() as unknown as { c: number };
+export function countReadings(book?: ReadingBook): number {
+  const conn = getConnection();
+  const row = (
+    book === undefined
+      ? conn.prepare('SELECT count(*) AS c FROM responsive_readings').get()
+      : conn.prepare('SELECT count(*) AS c FROM responsive_readings WHERE book = ?').get(book)
+  ) as unknown as { c: number };
   return row.c;
 }
 
@@ -88,13 +178,17 @@ export function countReadings(): number {
  * 번호 단위로 갱신한다. 파일에서 빠진 번호는 그대로 남는다 — 지우는 것은
  * `replaceAll` 이 명시적으로 한다.
  */
-export function upsertReadings(readings: readonly ResponsiveReading[], source: string): number {
+export function upsertReadings(
+  readings: readonly ResponsiveReading[],
+  source: string,
+  book: ReadingBook = DEFAULT_READING_BOOK,
+): number {
   const conn = getConnection();
   const now = new Date().toISOString();
   const statement = conn.prepare(
-    `INSERT INTO responsive_readings (number, title, lines, source, updated_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(number) DO UPDATE SET
+    `INSERT INTO responsive_readings (book, number, title, lines, source, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(book, number) DO UPDATE SET
        title = excluded.title, lines = excluded.lines,
        source = excluded.source, updated_at = excluded.updated_at`,
   );
@@ -102,7 +196,7 @@ export function upsertReadings(readings: readonly ResponsiveReading[], source: s
   conn.exec('BEGIN');
   try {
     for (const reading of readings) {
-      statement.run(reading.number, reading.title, JSON.stringify(reading.lines), source, now);
+      statement.run(book, reading.number, reading.title, JSON.stringify(reading.lines), source, now);
     }
     conn.exec('COMMIT');
   } catch (err) {

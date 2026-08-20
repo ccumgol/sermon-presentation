@@ -47,7 +47,13 @@ export function itemTitle(item: CueItem): string | undefined {
 
     case 'reading': {
       const title = item.readingTitle?.trim();
-      // 쉼표로 잇는다 — 목록의 '15. 시편 51편' 과 달리 화면에서는 한 문장처럼 읽힌다
+      /*
+       * 쉼표로 잇는다 — 목록의 '15. 시편 51편' 과 달리 화면에서는 한 문장처럼 읽힌다.
+       *
+       * **어느 찬송가인지는 적지 않는다.** 회중에게는 뜻이 없다 — 그날 쓰는 것이 무엇인지
+       * 이미 알고 있고, '새 교독문 15' 라고 나가면 무슨 말인지 오히려 헷갈린다.
+       * 판본을 적지 않는 것(주기도문)과 같은 이유다.
+       */
       return title ? `교독문 ${item.readingNumber}, ${title}` : `교독문 ${item.readingNumber}`;
     }
 

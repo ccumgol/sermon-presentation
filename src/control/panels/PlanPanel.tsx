@@ -32,7 +32,10 @@ import {
   type SongEntry,
   type SlidePayload, type Template, type Translation,
 } from '../../../shared/types.ts';
-import { api, ApiError, type BackgroundFile, type ReadingSummary } from '../api.ts';
+import {
+  api, ApiError, READING_BOOK_LABELS,
+  type BackgroundFile, type ReadingBook, type ReadingSummary,
+} from '../api.ts';
 import { isComposing } from '../ime.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE,
@@ -471,6 +474,15 @@ export function PlanPanel({
 
   /** 교독문 검색 결과 — 입력에 따라 좁혀진다 */
   const [readingHits, setReadingHits] = useState<ReadingSummary[]>([]);
+  /**
+   * 어느 찬송가의 교독문을 고르는지.
+   *
+   * 두 찬송가의 교독문은 번호가 같아도 다른 글이다 (통일 76편 · 새 137편).
+   * 기본은 통일 — 지금까지 들어 있던 것이 그것이라 손이 기억하는 번호가 통일 것이다.
+   */
+  const [readingBook, setReadingBook] = useState<ReadingBook>('hymn_old');
+  /** 두 찬송가에 각각 몇 편이 있는지 — 빈 쪽을 흐리게 한다 */
+  const [readingCounts, setReadingCounts] = useState<Record<ReadingBook, number> | null>(null);
   const [readingTotal, setReadingTotal] = useState<number | null>(null);
 
   /** `data/backgrounds/` 파일 목록 — 그림·동영상 항목이 여기서 고른다 */
@@ -817,7 +829,7 @@ export function PlanPanel({
 
       if (item.type === 'reading') {
         try {
-          const reading = await api.reading(item.readingNumber);
+          const reading = await api.reading(item.readingNumber, item.readingBook);
           if (reading.slides.length === 0) {
             return { slides: [], labels: [], error: '본문이 비어 있습니다' };
           }
@@ -1138,11 +1150,12 @@ export function PlanPanel({
     if (addKind !== 'reading') return;
     let cancelled = false;
     void api
-      .readings(addInput.trim() || undefined)
+      .readings(addInput.trim() || undefined, readingBook)
       .then((result) => {
         if (cancelled) return;
         setReadingHits(result.items.slice(0, 40));
         setReadingTotal(result.total);
+        setReadingCounts(result.counts);
       })
       .catch(() => {
         if (cancelled) return;
@@ -1152,7 +1165,7 @@ export function PlanPanel({
     return () => {
       cancelled = true;
     };
-  }, [addKind, addInput]);
+  }, [addKind, addInput, readingBook]);
 
   /**
    * 배경 폴더 파일 목록. 템플릿 탭에서 올린 것을 여기서도 골라야 하므로
@@ -1380,6 +1393,8 @@ export function PlanPanel({
     insertItem({
       id: newItemId(),
       type: 'reading',
+      // 통일찬송가용은 담지 않는다 — 없는 것이 곧 통일이다 (옛 순서표와 같은 뜻)
+      ...(readingBook === 'hymn_new' ? { readingBook: 'hymn_new' as const } : {}),
       readingNumber: hit.number,
       readingTitle: hit.title,
       ...(plan?.defaults?.readingBackground ? { background: plan.defaults.readingBackground } : {}),
@@ -2276,11 +2291,40 @@ export function PlanPanel({
 
               {addKind === 'reading' && (
                 <>
+                  {/*
+                    두 찬송가의 교독문은 **번호가 같아도 다른 글**이다 (통일 76편 · 새 137편).
+                    그래서 번호를 치기 전에 어느 쪽인지 먼저 골라야 한다.
+                  */}
+                  <div className="row detail-controls">
+                    <label>교독문</label>
+                    <span className="candidates">
+                      {(['hymn_old', 'hymn_new'] as const).map((book) => {
+                        const count = readingCounts?.[book];
+                        return (
+                          <button
+                            key={book}
+                            type="button"
+                            className={readingBook === book ? 'primary' : undefined}
+                            onClick={() => setReadingBook(book)}
+                            title={count === 0 ? '아직 가져오지 않았습니다' : undefined}
+                          >
+                            {READING_BOOK_LABELS[book]}
+                            {count !== undefined && ` ${count}편`}
+                          </button>
+                        );
+                      })}
+                    </span>
+                  </div>
+
                   {readingTotal === 0 && (
                     <p className="hintline error">
-                      교독문이 없습니다. 터미널에서{' '}
-                      <code>node scripts/import-responsive.ts --apply</code> 를 실행해
-                      <code>~/Desktop/Data/교독문_개역개정.txt</code> 를 가져오세요.
+                      {READING_BOOK_LABELS[readingBook]} 교독문이 없습니다. 터미널에서{' '}
+                      <code>
+                        {readingBook === 'hymn_new'
+                          ? 'node scripts/import-kyodoc.ts --apply'
+                          : 'node scripts/import-responsive.ts --apply'}
+                      </code>{' '}
+                      를 실행해 가져오세요.
                     </p>
                   )}
                   {readingHits.length > 0 && (
@@ -2535,6 +2579,16 @@ export function PlanPanel({
 
               return (
                 <div className="row detail-controls">
+                  {/*
+                    어느 찬송가의 교독문인지 **보여만 준다.** 여기서 바꾸면 같은 번호의
+                    다른 글이 되어 내용이 통째로 달라진다 — 그럴 때는 항목을 다시 넣는 편이
+                    무엇을 고르는지 눈으로 보여 안전하다.
+                  */}
+                  <label>교독문</label>
+                  <span className="muted">
+                    {READING_BOOK_LABELS[reading.readingBook ?? 'hymn_old']} · {reading.readingNumber}번
+                  </span>
+
                   <label>배경</label>
                   <BackgroundSelect
                     value={reading.background}

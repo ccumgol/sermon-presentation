@@ -21,6 +21,19 @@ export interface ServerInfo {
   connections: { control: number; output: number };
 }
 
+/**
+ * 교독문이 어느 찬송가의 것인지.
+ *
+ * `server/db/readings.ts` 가 원본이지만 클라이언트가 서버를 import 할 수 없어 여기에
+ * 적는다. 값이 둘뿐이고 좀처럼 바뀌지 않는다.
+ */
+export type ReadingBook = 'hymn_old' | 'hymn_new';
+
+export const READING_BOOK_LABELS: Readonly<Record<ReadingBook, string>> = {
+  hymn_old: '통일찬송가용',
+  hymn_new: '새찬송가용',
+};
+
 /** 교독문 목록의 한 줄 — 본문 줄은 담지 않는다 (고르는 데 필요 없다) */
 export interface ReadingSummary {
   number: number;
@@ -179,14 +192,26 @@ export const api = {
       'POST', '/api/backup/import', { bundle, mode },
     ),
 
-  readings: (q?: string) =>
-    get<{ total: number; items: ReadingSummary[] }>(
-      '/api/readings' + (q ? `?q=${encodeURIComponent(q)}` : ''),
-    ),
-  reading: (number: number) =>
-    get<{ number: number; title: string; lines: string[]; slides: Array<{ leader: string; people?: string }> }>(
-      `/api/readings/${number}`,
-    ),
+  readings: (q?: string, book?: ReadingBook) => {
+    const query = new URLSearchParams();
+    if (q) query.set('q', q);
+    if (book) query.set('book', book);
+    return get<{
+      book: ReadingBook;
+      /** 두 찬송가에 각각 몇 편이 있는지 */
+      counts: Record<ReadingBook, number>;
+      total: number;
+      items: ReadingSummary[];
+    }>('/api/readings' + (query.size > 0 ? `?${query}` : ''));
+  },
+  reading: (number: number, book?: ReadingBook) =>
+    get<{
+      number: number;
+      title: string;
+      book: ReadingBook;
+      lines: string[];
+      slides: Array<{ leader: string; people?: string }>;
+    }>(`/api/readings/${number}` + (book ? `?book=${book}` : '')),
 
   backgrounds: () =>
     get<{

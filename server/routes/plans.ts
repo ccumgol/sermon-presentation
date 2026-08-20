@@ -287,6 +287,8 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         items.push({
           id,
           type: 'reading',
+          // 없으면 담지 않는다 — 없는 것이 곧 '통일찬송가용' 이다 (옛 순서표 호환)
+          ...(reading.readingBook === 'hymn_new' ? { readingBook: 'hymn_new' as const } : {}),
           readingNumber: reading.readingNumber,
           // 제목은 표시용이다. DB 에 없어도 순서표에 무엇이었는지 남는다 —
           // 가져오기를 안 한 PC 로 순서표를 옮겼을 때 번호만 남으면 알 수 없다.

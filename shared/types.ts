@@ -637,7 +637,15 @@ export type CueItem =
   | {
       id: string;
       type: 'reading';
-      /** 교독문 번호 (1~76) */
+      /**
+       * 어느 찬송가의 교독문인지. **없으면 통일찬송가용**(`hymn_old`).
+       *
+       * 두 찬송가의 교독문은 번호가 같아도 다른 글이다 (통일 76편 · 새 137편).
+       * 없을 때 통일로 보는 이유: 새찬송가 교독문을 넣을 길이 생긴 것은 나중이라
+       * 이미 저장된 순서표는 모두 통일 것을 가리킨다.
+       */
+      readingBook?: 'hymn_old' | 'hymn_new';
+      /** 교독문 번호 (통일 1~76 · 새 1~137) */
       readingNumber: number;
       /** 표시용 — DB 에 없어도 순서표에 무엇이었는지 남는다 */
       readingTitle?: string;

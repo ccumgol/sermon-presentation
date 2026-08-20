@@ -26,9 +26,11 @@ export async function registerReadingRoutes(app: FastifyInstance): Promise<void>
    * 목록 — 고를 때 쓴다. **본문 줄은 보내지 않는다.**
    * 76편 × 12줄이면 목록 한 번에 70KB 가 넘고, 고르는 데는 번호·제목·화면 수만 필요하다.
    */
-  app.get<{ Querystring: { q?: string } }>('/api/readings', async (request) => {
+  app.get<{ Querystring: { q?: string; book?: string } }>('/api/readings', async (request) => {
     const query = (request.query?.q ?? '').trim();
-    const all = store.listReadings();
+    // 어느 찬송가의 교독문인지. 없으면 통일찬송가용 — 옛 클라이언트가 그것을 기대한다
+    const book = store.isReadingBook(request.query?.book) ? request.query.book : store.DEFAULT_READING_BOOK;
+    const all = store.listReadings(book);
 
     /*
      * 숫자만 쳤으면 **본문은 보지 않는다.**
@@ -58,6 +60,9 @@ export async function registerReadingRoutes(app: FastifyInstance): Promise<void>
       : filtered;
 
     return ok({
+      book,
+      /** 두 찬송가에 각각 몇 편이 있는지 — 고르는 화면이 빈 쪽을 흐리게 한다 */
+      counts: store.countByBook(),
       total: all.length,
       items: sorted.map((reading) => ({
         number: reading.number,
@@ -69,14 +74,25 @@ export async function registerReadingRoutes(app: FastifyInstance): Promise<void>
   });
 
   /** 한 편 — 줄과 화면 묶음을 함께 준다 (컨트롤 패널이 다시 계산하지 않게) */
-  app.get<{ Params: { number: string } }>('/api/readings/:number', async (request, reply) => {
-    const number = Number(request.params.number);
-    const reading = store.getReading(number);
-    if (!reading) {
-      return reply
-        .code(404)
-        .send(fail(`교독문 ${request.params.number}번이 없습니다. 가져오기를 먼저 하세요.`));
-    }
-    return ok({ ...reading, slides: readingSlides(reading.lines) });
-  });
+  app.get<{ Params: { number: string }; Querystring: { book?: string } }>(
+    '/api/readings/:number',
+    async (request, reply) => {
+      const number = Number(request.params.number);
+      const book = store.isReadingBook(request.query?.book)
+        ? request.query.book
+        : store.DEFAULT_READING_BOOK;
+      const reading = store.getReading(number, book);
+      if (!reading) {
+        return reply
+          .code(404)
+          .send(
+            fail(
+              `${store.READING_BOOK_LABELS[book]} 교독문 ${request.params.number}번이 없습니다. ` +
+                '가져오기를 먼저 하세요.',
+            ),
+          );
+      }
+      return ok({ ...reading, book, slides: readingSlides(reading.lines) });
+    },
+  );
 }

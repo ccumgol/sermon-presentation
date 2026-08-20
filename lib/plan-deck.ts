@@ -40,10 +40,13 @@ export function describeItem(item: CueItem): string {
       return item.content.split(/\r?\n/)[0]?.slice(0, 24) ?? '텍스트';
     case 'liturgy':
       return findLiturgy(item.textId)?.title ?? '본문';
-    case 'reading':
+    case 'reading': {
+      // 새찬송가용만 밝힌다 — 통일이 기본이라 늘 적으면 줄이 길어진다
+      const book = item.readingBook === 'hymn_new' ? '새 ' : '';
       return item.readingTitle
-        ? `교독문 ${item.readingNumber}. ${item.readingTitle}`
-        : `교독문 ${item.readingNumber}번`;
+        ? `${book}교독문 ${item.readingNumber}. ${item.readingTitle}`
+        : `${book}교독문 ${item.readingNumber}번`;
+    }
     case 'divider':
       return item.label;
     case 'blank':
