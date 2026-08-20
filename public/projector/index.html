@@ -24,6 +24,20 @@
 
       의존성 0 원칙은 그대로다 — 예배 중 이 화면이 죽으면 대안이 없다.
     -->
+    <!--
+      '앱으로 설치' 를 위한 매니페스트.
+
+      팝업 창에는 크롬이 **출처 표시줄**(127.0.0.1:7777/projector/)을 남긴다 — 편집은
+      안 되지만 보인다. 웹페이지가 그것을 지울 방법은 없다. 설치판은 애초에 주소줄이
+      없는 창으로 열리고, `display: fullscreen` 이라 처음부터 전체 화면으로 뜬다.
+      (매주 쓰는 화면이라면 이쪽이 F 를 누르는 것보다 편하다.)
+    -->
+    <link rel="manifest" href="/projector/manifest.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <!-- iPad 를 프로젝터에 물릴 때: 홈 화면에 추가하면 주소줄이 사라진다 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
     <link rel="stylesheet" href="/output/output.css" />
     <link rel="stylesheet" href="/projector/projector.css" />
   </head>
@@ -63,10 +77,18 @@
     </div>
 
     <!--
-      처음 열었을 때만 보이는 안내. 6초 뒤 사라진다.
-      이것이 없으면 검은 화면만 뜨고, 마우스를 움직여야 조작이 나오는 것을 알 수 없다.
+      안내. **전체 화면이 아닐 때만** 막대와 함께 나오고 함께 숨는다.
+
+      상시 표시하지 않는 이유는 프로젝터 번인이다. 전체 화면이 되면 할 말이 없으므로
+      사라진다 (projector.js 의 showBar/syncFullLabel).
+
+      맨 앞에 클릭을 둔 것은, 주소줄을 없애는 방법을 **찾을 수 있게** 하기 위해서다 —
+      `F` 를 눌러야 하는 것을 모르면 방법이 없다는 것을 사용자가 알려 주었다.
     -->
-    <p id="hint">마우스를 움직이면 조작 막대가 나옵니다 · <b>F</b> 전체 화면 · <b>+ −</b> 글자 크기 · <b>I</b> 색 반전</p>
+    <p id="hint">
+      <b>화면을 클릭하면 전체 화면</b>이 됩니다 (주소줄·제목줄이 사라집니다) ·
+      <b>+ −</b> 글자 크기 · <b>I</b> 색 반전 · <b>Esc</b> 창으로
+    </p>
 
     <script src="/output/output.js"></script>
     <script src="/projector/projector.js"></script>

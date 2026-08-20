@@ -67,6 +67,54 @@ describe('요청대로 지운 것들', () => {
   });
 });
 
+describe('주소줄을 없애는 길이 열려 있다', () => {
+  /*
+   * 사용자가 스크린샷으로 제목줄·출처줄을 표시하며 물었다 (2026-08-20).
+   * 웹페이지가 브라우저 크롬을 지울 방법은 없다 — 전체 화면과 '앱으로 설치' 뿐이다.
+   * 그 두 길이 **찾을 수 있게** 열려 있는지 고정한다.
+   */
+  it('화면을 클릭하면 전체 화면으로 들어간다 — F 를 몰라도 된다', () => {
+    expect(PROJECTOR_JS).toContain("document.addEventListener('click'");
+    expect(PROJECTOR_JS).toContain('enterFull');
+  });
+
+  it('막대를 누른 클릭으로는 들어가지 않는다 — 조작이 전체 화면을 부르면 안 된다', () => {
+    expect(PROJECTOR_JS).toContain('el.bar.contains(event.target)');
+  });
+
+  it('클릭으로 나가지는 않는다 — 예배 중 실수로 창이 드러나면 안 된다', () => {
+    const handler = PROJECTOR_JS.slice(PROJECTOR_JS.indexOf("document.addEventListener('click'"));
+    expect(handler.slice(0, handler.indexOf('});'))).not.toContain('exitFullscreen');
+  });
+
+  it('전체 화면 선택을 기억한다 — 매주 F 를 찾지 않아도 된다', () => {
+    expect(PROJECTOR_JS).toContain('sermon.projector.fullscreen');
+  });
+
+  it('마우스 이동으로는 자동 전체화면을 시도하지 않는다 — 브라우저가 거절한다', () => {
+    // autoFullOnce 는 click·keydown 에만 걸려 있어야 한다
+    const auto = PROJECTOR_JS.split('autoFullOnce()');
+    expect(auto.length).toBeGreaterThan(2);
+    expect(PROJECTOR_JS).not.toMatch(/mousemove['"]?\s*,\s*autoFullOnce/);
+  });
+
+  it("'앱으로 설치' 매니페스트를 걸어 둔다 — 설치판은 주소줄이 없다", () => {
+    expect(PAGE).toContain('rel="manifest"');
+    const manifest = JSON.parse(read('public/projector/manifest.webmanifest'));
+    expect(manifest.display_override).toContain('fullscreen');
+    expect(manifest.start_url).toBe('/projector/');
+    // 크롬이 설치를 제안하려면 192·512 아이콘이 있어야 한다
+    expect(manifest.icons.map((i: { sizes: string }) => i.sizes).sort()).toEqual(['192x192', '512x512']);
+  });
+
+  it('아이콘 파일이 실제로 있고 PNG 다', () => {
+    for (const size of [192, 512]) {
+      const buf = readFileSync(path.join(ROOT, `public/projector/icon-${size}.png`));
+      expect(buf.subarray(1, 4).toString('ascii'), `icon-${size}.png 가 PNG 가 아니다`).toBe('PNG');
+    }
+  });
+});
+
 describe('막대에 있어야 하는 것', () => {
   it('글자 크기 +/- · 반전 · 전체 화면', () => {
     for (const id of ['zoom-out', 'zoom-in', 'invert', 'full']) {

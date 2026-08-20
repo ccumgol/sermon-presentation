@@ -33,6 +33,14 @@
   // ── 저장 ─────────────────────────────────────────────────────
   var ZOOM_KEY = 'sermon.projector.zoom';
   var INVERT_KEY = 'sermon.projector.invert';
+  /*
+   * '전체 화면으로 쓰고 있었다' 를 기억한다.
+   *
+   * 브라우저는 **사용자 동작 없이는** 전체 화면으로 들어가지 못한다 (규칙이고, 우회할
+   * 방법이 없다). 그래서 자동으로 켜 줄 수는 없지만, 다음에 열었을 때 **첫 클릭이나
+   * 첫 키 입력**에 얹어 줄 수는 있다 — 매주 F 를 찾아 누르지 않아도 된다.
+   */
+  var FULL_KEY = 'sermon.projector.fullscreen';
 
   /** localStorage 는 없거나 막혀 있을 수 있다. 그때도 화면은 떠야 한다 */
   function save(key, value) {
@@ -116,6 +124,8 @@
 
   function showBar() {
     if (el.bar) el.bar.hidden = false;
+    // 아직 전체 화면이 아니면 방법을 함께 알려 준다 (막대와 같이 나오고 같이 숨는다)
+    if (el.hint) el.hint.hidden = isFull();
     el.body.classList.add('bar-shown');
     checkOverflow();
     if (hideTimer) clearTimeout(hideTimer);
@@ -130,6 +140,7 @@
       return;
     }
     if (el.bar) el.bar.hidden = true;
+    if (el.hint) el.hint.hidden = true;
     el.body.classList.remove('bar-shown');
   }
 
@@ -154,21 +165,58 @@
    * 전체 화면은 사용자의 클릭·키 입력에서만 시작할 수 있다 (브라우저 규칙).
    * 그래서 창을 열자마자 저절로 되지는 않는다 — 아래 안내가 그것을 알린다.
    */
-  function toggleFull() {
+  /** 지금 전체 화면인가 */
+  function isFull() {
+    return !!document.fullscreenElement;
+  }
+
+  function enterFull() {
+    if (isFull()) return;
     try {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        document.documentElement.requestFullscreen();
-      }
+      var promise = document.documentElement.requestFullscreen();
+      // 거절되면(사용자 동작이 아니었다) 조용히 넘긴다. 콘솔 오류만 남지 않게 한다
+      if (promise && typeof promise.catch === 'function') promise.catch(function () {});
     } catch (err) {
       /* 막혀 있으면 그냥 창 모드로 쓴다. 화면은 정상이다 */
     }
   }
 
+  function toggleFull() {
+    if (isFull()) {
+      try {
+        document.exitFullscreen();
+      } catch (err) {
+        /* 이미 나와 있다 */
+      }
+      // 사람이 **직접** 나갔으면 다음에도 창 모드로 여는 것이 뜻에 맞다
+      save(FULL_KEY, '0');
+      return;
+    }
+    save(FULL_KEY, '1');
+    enterFull();
+  }
+
+  /*
+   * 지난번에 전체 화면으로 쓰고 있었다면, **첫 동작**에 얹어 들어간다.
+   *
+   * 마우스 이동은 세지 않는다 — 브라우저가 그것을 '사용자 동작' 으로 인정하지 않아
+   * 거절되고, 거절된 뒤에는 다시 시도할 기회를 잃는다. 클릭과 키 입력만 센다.
+   */
+  var pendingAutoFull = load(FULL_KEY) === '1';
+
+  function autoFullOnce() {
+    if (!pendingAutoFull) return;
+    pendingAutoFull = false;
+    enterFull();
+  }
+
   function syncFullLabel() {
-    if (!el.full) return;
-    el.full.textContent = document.fullscreenElement ? '전체 화면 해제' : '전체 화면';
+    if (el.full) el.full.textContent = isFull() ? '전체 화면 해제' : '전체 화면';
+    /*
+     * 안내는 **전체 화면이 아닐 때만** 뜻이 있다. 다 됐는데도 계속 띄우면 프로젝터에
+     * 같은 자리가 오래 비쳐 번인 위험이 있다.
+     */
+    if (el.hint) el.hint.hidden = isFull();
   }
 
   document.addEventListener('fullscreenchange', function () {
@@ -195,8 +243,32 @@
   }
   if (el.full) el.full.addEventListener('click', toggleFull);
 
+  /*
+   * **화면을 클릭하면 전체 화면.**
+   *
+   * `F` 를 눌러야 하는 것을 모르면 주소줄을 없앨 방법을 찾을 수 없다 (사용자가 실제로
+   * 스크린샷으로 물어봤다, 2026-08-20). 클릭이 가장 찾기 쉬운 동작이다.
+   *
+   * 나가는 것은 여기에 얹지 않는다 — 예배 중 실수로 클릭했을 때 벽에 브라우저 창이
+   * 드러나면 안 된다. 나가려면 막대의 버튼이나 `F`·`Esc` 를 쓴다.
+   */
+  document.addEventListener('click', function (event) {
+    // 막대를 누른 것은 조작이다. 그 클릭으로 전체 화면에 들어가지 않는다 —
+    // 단, 지난번에 전체 화면이었다면 그 동작에 얹어 들어간다
+    if (el.bar && el.bar.contains(event.target)) {
+      autoFullOnce();
+      return;
+    }
+    if (isFull()) return;
+    pendingAutoFull = false;
+    save(FULL_KEY, '1');
+    enterFull();
+  });
+
   window.addEventListener('keydown', function (event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    // 지난번에 전체 화면이었다면 아무 키에서든 들어간다 (아래 처리보다 먼저)
+    autoFullOnce();
     var key = event.key;
     if (key === '+' || key === '=') applyZoom(zoom + ZOOM_STEP, true);
     else if (key === '-' || key === '_') applyZoom(zoom - ZOOM_STEP, true);
@@ -226,16 +298,11 @@
   /*
    * 처음 열었을 때 막대를 잠깐 보여 준다. 이것이 없으면 **아무것도 없는 검은 화면**이
    * 뜨고, 마우스를 움직여야 조작이 나오는 것을 알 방법이 없다.
+   *
+   * 안내는 `showBar`/`hideBar` 가 막대와 함께 다룬다 (전체 화면이 아닐 때만).
+   * 상시 표시하지 않는 이유는 프로젝터 번인이다.
    */
   showBar();
-  if (el.hint) {
-    setTimeout(function () {
-      el.hint.style.opacity = '0';
-      setTimeout(function () {
-        el.hint.hidden = true;
-      }, 700);
-    }, 6000);
-  }
 
   // 새 슬라이드가 그려지면 넘침 여부가 바뀐다. 렌더러를 고치지 않고 화면을 지켜본다 —
   // 예배 중에 도는 코드에 손을 대는 것보다 이쪽이 안전하다.
