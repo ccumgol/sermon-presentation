@@ -33,7 +33,12 @@ export interface PlanDeckResult {
 export function describeItem(item: CueItem): string {
   switch (item.type) {
     case 'bible':
-      return item.ref;
+      /*
+       * 인용구는 참조 뒤에 본문을 붙인다 — `창 1:1 태초에 하나님이 천지를 창조하시니라`.
+       * 절이 낱개로 흩어져 있으면 참조만 보고는 무슨 절인지 알 수 없다 (사용자 요청).
+       * `preview` 는 항목이 담고 있는 짧은 라벨이다 (lib/verse-quotes.ts 참고).
+       */
+      return item.quote && item.preview ? `${item.ref} ${item.preview}` : item.ref;
     case 'song':
       return item.songTitle;
     case 'text':
@@ -166,6 +171,16 @@ export function itemsInGroup(items: readonly CueItem[], dividerId: string): CueI
  * (그래서 한 번 클릭으로 바로 송출한다).
  */
 export function isExpandable(item: CueItem): boolean {
+  /*
+   * **인용구는 빼놓는다.** 절 하나 = 화면 하나이므로 펼칠 것이 없다.
+   *
+   * 펼칠 수 있게 두면 한 번 눌러 펼치고 그 안의 한 장을 또 눌러야 화면에 나간다.
+   * '타이틀 없이 바로 나오면 좋겠다' 는 요청과 반대다 (2026-08-20).
+   * 펼치기에서 빠지면 그 줄이 곧 슬라이드가 되어 **한 번 클릭으로 송출**된다 —
+   * 광고·순서 표시와 같은 취급이고, 설교 중 인용에 맞는 동작이다.
+   */
+  if (item.type === 'bible' && item.quote) return false;
+
   return (
     item.type === 'bible' || item.type === 'song' || item.type === 'liturgy' || item.type === 'reading'
   );

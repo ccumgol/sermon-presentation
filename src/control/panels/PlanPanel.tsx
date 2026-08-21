@@ -21,6 +21,7 @@ import {
 } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { itemTitle } from '../../../lib/item-title.ts';
+import { verseQuotes } from '../../../lib/verse-quotes.ts';
 import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
@@ -87,7 +88,7 @@ const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hin
   { kind: 'reading', icon: '🔁', label: '교독문', hint: '번호나 제목 · 인도자와 회중이 한 화면에' },
   { kind: 'order', icon: '📋', label: '순서 표시', hint: '대표기도 · 설교 제목(둘째 줄에 설교자)' },
   { kind: 'notice', icon: '📝', label: '광고', hint: '여러 줄로 쓰면 그대로 나갑니다' },
-  { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 잠깐 띄울 내용' },
+  { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 띄울 성경 절 — 창 1:1-6 을 넣으면 낱개 6줄이 됩니다' },
   { kind: 'blank', icon: '⬛', label: '공백', hint: '화면을 비웁니다' },
   { kind: 'divider', icon: '▾', label: '구분', hint: '예배 부름 · 찬양 · 말씀 …' },
 ];
@@ -325,10 +326,13 @@ function today(): string {
 
 function itemIcon(item: CueItem): string {
   if (item.type === 'text') {
+    // 옛 순서표에 남아 있는 자유 글자 인용구. 지금은 만들 수 없다 (아래 참고)
     if (item.variant === 'quote') return '💬';
     if (item.variant === 'order') return '📋';
     return '📝';
   }
+  // 인용구는 성경 항목이지만 목록에서 본문 낭독과 구별돼야 한다
+  if (item.type === 'bible' && item.quote) return '💬';
   return ITEM_ICONS[item.type];
 }
 
@@ -726,7 +730,15 @@ export function PlanPanel({
     }
   }
 
-  function patchItems(next: CueItem[]): void {
+  /**
+   * 항목 목록을 바꾼다.
+   *
+   * 함수도 받는다. **비동기 작업이 끝난 뒤**에 고칠 때는 반드시 함수를 넘겨야 한다 —
+   * 배열을 넘기면 그 배열이 만들어진 시점(옛 렌더)의 값이라, 그 사이에 사람이 한
+   * 다른 편집을 조용히 덮어쓴다. 실제로 역본을 바꾼 직후 미리보기를 다시 읽는
+   * 경로에서 역본 변경이 되돌아갔다.
+   */
+  function patchItems(next: CueItem[] | ((prev: CueItem[]) => CueItem[])): void {
     setItems(next);
     setDirty(true);
   }
@@ -926,8 +938,17 @@ export function PlanPanel({
       // 사람이 무언가를 송출하면 예배가 시작된 것이다 — 자동 진행을 끈다
       setAuto(null);
 
-      // 인용구를 띄우기 전 화면을 기억한다
-      if (item.type === 'text' && item.variant === 'quote' && liveSlide) {
+      /*
+       * 인용구를 띄우기 전 화면을 기억한다 — `↩ 직전으로` 가 여기로 돌아온다.
+       *
+       * 두 가지를 다 본다: 새 인용구(성경 절)와, 옛 순서표에 남아 있는 자유 글자
+       * 인용구. 광고와 인용구의 **유일한 실제 차이**가 이 동작이므로, 기능이 바뀌어도
+       * 잃지 않는다 ('설교 중 잠깐 띄울 내용' 이라는 뜻 그대로다).
+       */
+      const isQuote =
+        (item.type === 'bible' && item.quote === true) ||
+        (item.type === 'text' && item.variant === 'quote');
+      if (isQuote && liveSlide) {
         setBefore({ slide: liveSlide, label: liveLabel ?? '' });
       }
 
@@ -1264,9 +1285,12 @@ export function PlanPanel({
     return () => clearTimeout(timer);
   }, [addKind, addInput]);
 
+  /** 참조를 입력받는 종류 — 성경(본문 낭독)과 인용구(절 낱개) */
+  const wantsRef = addKind === 'bible' || addKind === 'quote';
+
   // 성경 참조 확인 (디바운스) — 맞는 본문인지 추가하기 전에 보여 준다
   useEffect(() => {
-    if (addKind !== 'bible' || addInput.trim().length === 0) {
+    if (!wantsRef || addInput.trim().length === 0) {
       setParseOk(null);
       return;
     }
@@ -1277,7 +1301,7 @@ export function PlanPanel({
         .catch(() => setParseOk(null));
     }, 200);
     return () => clearTimeout(timer);
-  }, [addKind, addInput]);
+  }, [wantsRef, addInput]);
 
   /** 새 항목을 커서 **다음**에 넣는다 — 순서를 짜는 자연스러운 방향 */
   /**
@@ -1301,6 +1325,103 @@ export function PlanPanel({
     setParseOk(null);
   }
 
+  /**
+   * 여러 항목을 **한 번에** 넣는다 (인용구가 절마다 하나씩 만든다).
+   *
+   * `insertItem` 을 여러 번 부르면 안 된다 — `items` 는 이 렌더의 값이라, 두 번째
+   * 호출이 첫 번째를 덮어써 마지막 하나만 남는다. 한 번의 patchItems 로 넣는다.
+   */
+  function insertItems(list: readonly CueItem[]): void {
+    if (list.length === 0) return;
+
+    // 넣을 자리는 **사람이 보고 있는 자리** 기준이다
+    const at = insertIndexFor(rows, cursor, items.length);
+
+    /*
+     * 넣는 것은 함수형으로 한다. 이 함수는 본문을 가져온 **뒤**에 불리므로, 그 사이에
+     * 사람이 한 편집(줄 삭제 등)을 배열째로 덮어쓸 수 있다. 자리는 어긋나도 되지만
+     * 항목이 사라지면 안 된다.
+     */
+    patchItems((prev) => {
+      const safeAt = Math.min(at, prev.length);
+      return [...prev.slice(0, safeAt), ...list, ...prev.slice(safeAt)];
+    });
+
+    // 커서는 **마지막으로 넣은 것**에 둔다 — 이어서 다음 순서를 넣는 자연스러운 자리.
+    // 위 갱신을 아직 못 봤으므로 지금 값으로 어림한다 (어긋나도 커서 자리일 뿐이다)
+    const last = list[list.length - 1]!;
+    const guess = [...items.slice(0, at), ...list, ...items.slice(at)];
+    const nextRows = buildPlanRows(guess, expandedId, preview?.slides.length ?? 0);
+    const rowIndex = nextRows.findIndex((row) => row.kind !== 'slide' && row.itemId === last.id);
+    setCursor(rowIndex >= 0 ? rowIndex : Math.max(nextRows.length - 1, 0));
+
+    setAddInput('');
+    setSongHits([]);
+    setParseOk(null);
+  }
+
+  /**
+   * 인용구 — 참조를 **절 단위 낱개 항목**으로 넣는다.
+   *
+   * `창 1:1-6` → `창 1:1` … `창 1:6` 여섯 항목. 묶는 머리 줄을 만들지 않는다
+   * (사용자 요청 2026-08-20: '카테고리가 아닌 개별 슬라이드로').
+   *
+   * 본문을 한 번만 조회한다. 그 응답에서 절 목록을 얻어 참조와 목록용 미리보기를
+   * 함께 만든다 — 절마다 조회하면 여섯 번 왕복한다.
+   */
+  async function addQuote(ref: string): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      // 주 역본 하나만 넘긴다 — 여러 역본을 넘기면 같은 절이 역본 수만큼 온다
+      const result = await api.passage(ref, [addPrimary], 'verse');
+      const verses = result.passage?.blocks[0]?.verses ?? [];
+      const quotes = verseQuotes(verses);
+      if (quotes.length === 0) {
+        setError(result.parse.ok ? '그 참조에 해당하는 본문이 없습니다' : result.parse.message);
+        return;
+      }
+      insertItems(
+        quotes.map((quote) => ({
+          id: newItemId(),
+          type: 'bible' as const,
+          ref: quote.ref,
+          primary: addPrimary,
+          secondary: addSecondary,
+          // 한 절이므로 나눌 것이 없다. 그래도 명시해 둔다 (기본값이 바뀌어도 한 장이다)
+          paging: 'verse',
+          quote: true as const,
+          ...(quote.preview.length > 0 ? { preview: quote.preview } : {}),
+        })),
+      );
+      setNotice(`인용구 ${quotes.length}개를 넣었습니다 — ${ref}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '본문을 가져오지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 인용구의 목록 미리보기를 새 역본으로 다시 읽는다.
+   *
+   * 실패하면 **아무것도 하지 않는다** — 미리보기는 라벨일 뿐이고, 없으면 참조만
+   * 보인다. 화면에 나가는 본문은 언제나 DB 에서 다시 읽으므로 영향이 없다.
+   */
+  async function refreshQuotePreview(itemId: string, ref: string, translationId: string): Promise<void> {
+    try {
+      const result = await api.passage(ref, [translationId], 'verse');
+      const quote = verseQuotes(result.passage?.blocks[0]?.verses ?? [])[0];
+      if (!quote || quote.preview.length === 0) return;
+      // 함수형으로 고친다 — 이 사이에 사람이 한 편집(방금 바꾼 역본!)을 덮어쓰지 않게
+      patchItems((prev) =>
+        prev.map((i) => (i.id === itemId && i.type === 'bible' ? { ...i, preview: quote.preview } : i)),
+      );
+    } catch {
+      /* 라벨을 못 채운 것뿐이다. 참조만 보인다 */
+    }
+  }
+
   function addFromInput(): void {
     const text = addInput.trim();
 
@@ -1322,11 +1443,16 @@ export function PlanPanel({
       });
       return;
     }
+    if (addKind === 'quote') {
+      if (parseOk && !parseOk.ok) return; // 참조가 틀리면 넣지 않는다
+      void addQuote(text);
+      return;
+    }
     if (addKind === 'divider') {
       insertItem({ id: newItemId(), type: 'divider', label: text });
       return;
     }
-    if (addKind === 'notice' || addKind === 'quote' || addKind === 'order') {
+    if (addKind === 'notice' || addKind === 'order') {
       // 앞뒤 공백만 떼고 가운데 줄바꿈은 그대로 둔다 (여러 줄 광고를 한 항목으로)
       addText(text, addKind);
       return;
@@ -1359,8 +1485,14 @@ export function PlanPanel({
     addRef.current?.focus();
   }, [addKind]);
 
-  /** 광고·인용구·순서 표시는 저장 구조가 같고 variant 만 다르다 */
-  function addText(content: string, kind: 'notice' | 'quote' | 'order'): void {
+  /**
+   * 광고·순서 표시는 저장 구조가 같고 variant 만 다르다.
+   *
+   * 인용구는 여기서 빠졌다 — 2026-08-20 에 자유 글자에서 **성경 절**로 바뀌었다
+   * (광고와 기능이 겹쳤다). `addQuote` 를 쓴다. 옛 순서표에 남아 있는 자유 글자
+   * 인용구는 광고처럼 그대로 나가므로 손대지 않는다.
+   */
+  function addText(content: string, kind: 'notice' | 'order'): void {
     if (content.trim().length === 0) return;
     insertItem({
       id: newItemId(),
@@ -1604,7 +1736,7 @@ export function PlanPanel({
 
   const kindHint = ADD_KINDS.find((option) => option.kind === addKind)?.hint ?? '';
   // 순서 표시도 여러 줄이다 — '설교 제목' 아래 줄에 설교자를 넣는다
-  const isMultiline = addKind === 'notice' || addKind === 'quote' || addKind === 'order';
+  const isMultiline = addKind === 'notice' || addKind === 'order';
 
   return (
     <div className="plan-panel">
@@ -2227,7 +2359,7 @@ export function PlanPanel({
                 />
               )}
 
-              {addKind === 'bible' && (
+              {wantsRef && (
                 <div className="row detail-controls translation-pick">
                   <label>역본</label>
                   <select
@@ -2274,8 +2406,11 @@ export function PlanPanel({
                 </div>
               )}
 
-              {addKind === 'bible' && parseOk && (
-                <p className={`hintline ${parseOk.ok ? 'ok' : 'error'}`}>{parseOk.text}</p>
+              {wantsRef && parseOk && (
+                <p className={`hintline ${parseOk.ok ? 'ok' : 'error'}`}>
+                  {parseOk.text}
+                  {addKind === 'quote' && parseOk.ok && ' — 절마다 낱개 항목이 됩니다'}
+                </p>
               )}
               {isMultiline && <p className="hintline muted">Enter 로 추가 · Shift+Enter 줄바꿈</p>}
 
@@ -2621,10 +2756,21 @@ export function PlanPanel({
                   patchItems(
                     items.map((i) =>
                       i.id === current.id && i.type === 'bible'
-                        ? { ...i, primary: next, secondary: i.secondary.filter((id) => id !== next) }
+                        ? {
+                            ...i,
+                            primary: next,
+                            secondary: i.secondary.filter((id) => id !== next),
+                            /*
+                             * 인용구의 목록 미리보기는 **옛 역본의 글**이 된다. 지운다 —
+                             * 틀린 글자를 보여 주는 것보다 참조만 보이는 편이 낫다.
+                             * 곧바로 새 역본으로 다시 채운다 (아래).
+                             */
+                            ...(i.quote ? { preview: undefined } : {}),
+                          }
                         : i,
                     ),
                   );
+                  if (current.quote) void refreshQuotePreview(current.id, current.ref, next);
                 }}
                 title="주 역본"
               >

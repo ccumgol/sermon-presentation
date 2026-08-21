@@ -33,6 +33,16 @@ import type { CueItem } from '../shared/types.ts';
 export function itemTitle(item: CueItem): string | undefined {
   switch (item.type) {
     case 'bible': {
+      /*
+       * **인용구는 제목을 띄우지 않는다.**
+       *
+       * '타이틀 없이 바로 창 1:1 … 이 나오면 좋겠다' 가 요청이었다 (2026-08-20).
+       * 설교 중 한 절을 잠깐 띄우는 것인데 앞에 참조 한 장이 먼저 나가면, 두 번
+       * 넘겨야 본문이 보이고 흐름이 끊긴다.
+       *
+       * 절 참조 자체는 필요하면 슬라이드 안에 나온다 (템플릿·항목의 '참조 표기').
+       */
+      if (item.quote) return undefined;
       const ref = item.ref.trim();
       return ref.length > 0 ? ref : undefined;
     }
