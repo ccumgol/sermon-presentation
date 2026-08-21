@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sermon Presentation — 기능 매뉴얼</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens — 이 앱의 색 (src/control/styles.css) ─────────────── */
+    :root {
+      --color-paper:       #f2f4f7;
+      --color-paper-2:     #eaeef3;
+      --color-ink:         #131720;
+      --color-muted:       #515b6b;
+      --color-soft:        #737d8c;
+      --color-rule:        rgba(19,23,32,0.12);
+      --color-rule-solid:  #b3bcca;
+      --color-accent:      #1f6feb;
+      --color-accent-tint: rgba(31,111,235,0.08);
+      --color-link:        #067647;
+      --font-sans:   'Geist', system-ui, sans-serif;
+      --font-serif:  'Instrument Serif', 'Times New Roman', serif;
+      --font-mono:   'Geist Mono', ui-monospace, Menlo, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      min-height: 100vh;
+      padding: 3rem 2rem;
+      color: var(--color-ink);
+    }
+
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    .header { margin-bottom: 2.5rem; }
+
+    .header-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.75rem, 3vw + 1rem, 2.5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: var(--color-muted);
+      max-width: 60ch;
+    }
+
+    .diagram-container {
+      background: transparent;
+      border: none;
+      padding: 0;
+      overflow-x: auto;
+    }
+
+    svg { width: 100%; min-width: 900px; display: block; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 0.95fr;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #ffffff;
+      border-radius: 6px;
+      border: 1px solid var(--color-rule);
+      padding: 1.25rem;
+    }
+
+    .card .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--color-soft);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.875rem;
+      padding-bottom: 0.875rem;
+      border-bottom: 1px solid rgba(19,23,32,0.08);
+    }
+
+    .card-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .card-dot.ink    { background: var(--color-ink); }
+    .card-dot.muted  { background: var(--color-muted); }
+    .card-dot.coral  { background: var(--color-accent); }
+    .card-dot.link   { background: var(--color-link); }
+
+    .card h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-ink);
+      letter-spacing: -0.005em;
+    }
+
+    .card ul { list-style: none; color: var(--color-muted); font-size: 0.8125rem; line-height: 1.6; }
+
+    .card li { margin-bottom: 0.3rem; padding-left: 0.875rem; position: relative; }
+
+    .card li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: rgba(19,23,32,0.25);
+      font-size: 0.75rem;
+    }
+
+    .card li b { color: var(--color-ink); font-weight: 600; }
+
+    .card code {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-ink);
+    }
+
+    .footer {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(19,23,32,0.10);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      color: var(--color-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <p class="header-eyebrow">Architecture · 2026-08-21</p>
+      <h1>Sermon Presentation — 기능 매뉴얼</h1>
+      <p class="subtitle">
+        읽기 전용 원본이 앱 데이터베이스가 되고, 컨트롤 패널에서 <b>예배 순서</b>를 짜고,
+        한 번 올리면 <b>라이브 상태</b>가 네 화면에 동시에 뿌린다.
+      </p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img"
+           aria-labelledby="feature-map-title feature-map-desc">
+        <title id="feature-map-title">Sermon Presentation 기능 구조</title>
+        <desc id="feature-map-desc">읽기 전용 원본 자료가 앱 데이터베이스로 빌드되고, 컨트롤 패널의 여섯 탭에서 아홉 가지 항목으로 예배 순서를 만들며, 템플릿이 모양을 정한다. '예배용으로 올리기'를 누르면 라이브 상태가 OBS 송출·강사 모니터·프로젝터 세 화면에 같은 내용을 동시에 보낸다.</desc>
+
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#515b6b"/>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#1f6feb"/>
+          </marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#067647"/>
+          </marker>
+        </defs>
+
+        <!-- ── 배경 ─────────────────────────────────────────────── -->
+        <rect width="100%" height="100%" fill="#f2f4f7"/>
+
+        <!-- ── 구역 (노드·화살표보다 먼저 그린다) ──────────────────── -->
+        <rect x="24" y="156" width="232" height="340" rx="8"
+              fill="rgba(19,23,32,0.02)" stroke="rgba(19,23,32,0.10)" stroke-width="0.8"/>
+        <rect x="120" y="160" width="40" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="140" y="169" fill="rgba(19,23,32,0.40)" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">자료</text>
+
+        <rect x="324" y="108" width="232" height="436" rx="8"
+              fill="rgba(19,23,32,0.02)" stroke="rgba(19,23,32,0.10)" stroke-width="0.8"/>
+        <rect x="396" y="112" width="88" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="440" y="121" fill="rgba(19,23,32,0.40)" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">준비 · 조작</text>
+
+        <rect x="984" y="108" width="232" height="436" rx="8"
+              fill="rgba(19,23,32,0.02)" stroke="rgba(19,23,32,0.10)" stroke-width="0.8"/>
+        <rect x="1080" y="112" width="40" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="1100" y="121" fill="rgba(19,23,32,0.40)" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">표시</text>
+
+        <!-- ── 화살표 (박스보다 먼저 그려 뒤에 놓인다) ──────────────── -->
+
+        <!-- A1  원본 → DB -->
+        <line x1="140" y1="284" x2="140" y2="380" stroke="#515b6b" stroke-width="1.2"
+              marker-end="url(#arrow)"/>
+        <rect x="148" y="324" width="80" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="188" y="333" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">빌드 · 반입</text>
+
+        <!-- A2  DB → 컨트롤 패널 -->
+        <path d="M 240,428 H 280 Q 288,428 288,420 V 196 Q 288,188 296,188 H 340"
+              fill="none" stroke="#515b6b" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="244" y="300" width="36" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="262" y="309" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">조회</text>
+
+        <!-- A3  컨트롤 패널 → 예배 순서 -->
+        <line x1="440" y1="236" x2="440" y2="284" stroke="#515b6b" stroke-width="1.2"
+              marker-end="url(#arrow)"/>
+        <rect x="448" y="252" width="68" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="482" y="261" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">항목 추가</text>
+
+        <!-- A4  예배 순서 → 라이브 상태 (중심 흐름) -->
+        <line x1="540" y1="316" x2="700" y2="316" stroke="#515b6b" stroke-width="1.2"
+              marker-end="url(#arrow)"/>
+        <rect x="556" y="296" width="124" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="618" y="305" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">예배용으로 올리기</text>
+
+        <!-- A5  템플릿 → 라이브 상태 -->
+        <path d="M 540,476 H 612 Q 620,476 620,468 V 356 Q 620,348 628,348 H 700"
+              fill="none" stroke="#515b6b" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="628" y="404" width="112" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="684" y="413" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">배치 · 글자 · 배경</text>
+
+        <!-- A6  라이브 상태 → OBS -->
+        <path d="M 900,308 H 940 Q 948,308 948,300 V 196 Q 948,188 956,188 H 1000"
+              fill="none" stroke="#515b6b" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- A7  라이브 상태 → 강사 모니터 -->
+        <line x1="900" y1="332" x2="1000" y2="332" stroke="#515b6b" stroke-width="1.2"
+              marker-end="url(#arrow)"/>
+        <rect x="920" y="312" width="56" height="12" rx="2" fill="#f2f4f7"/>
+        <text x="948" y="321" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">동시에</text>
+
+        <!-- A8  라이브 상태 → 프로젝터 -->
+        <path d="M 900,356 H 940 Q 948,356 948,364 V 468 Q 948,476 956,476 H 1000"
+              fill="none" stroke="#515b6b" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- ── 노드 ─────────────────────────────────────────────── -->
+
+        <!-- N1  원본 자료 (외부 · 읽기 전용) -->
+        <rect x="40" y="188" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="40" y="188" width="200" height="96" rx="6"
+              fill="rgba(19,23,32,0.03)" stroke="rgba(19,23,32,0.30)" stroke-width="1"/>
+        <rect x="52" y="196" width="40" height="12" rx="2" fill="transparent"
+              stroke="rgba(19,23,32,0.30)" stroke-width="0.8"/>
+        <text x="72" y="205" fill="#515b6b" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DATA</text>
+        <text x="140" y="236" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">원본 자료</text>
+        <text x="140" y="256" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">~/Desktop/Data</text>
+        <text x="140" y="274" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">읽기 전용</text>
+
+        <!-- N2  앱 데이터베이스 (저장소) -->
+        <rect x="40" y="380" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="40" y="380" width="200" height="96" rx="6"
+              fill="rgba(19,23,32,0.05)" stroke="#515b6b" stroke-width="1"/>
+        <rect x="52" y="388" width="28" height="12" rx="2" fill="transparent"
+              stroke="rgba(81,91,107,0.40)" stroke-width="0.8"/>
+        <text x="66" y="397" fill="#515b6b" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+        <text x="140" y="428" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">앱 데이터베이스</text>
+        <text x="140" y="448" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">bible · songs · app</text>
+        <text x="140" y="466" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">12 역본 · 찬양 · 순서</text>
+
+        <!-- N3  컨트롤 패널 -->
+        <rect x="340" y="140" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="340" y="140" width="200" height="96" rx="6"
+              fill="#ffffff" stroke="#131720" stroke-width="1"/>
+        <rect x="352" y="148" width="28" height="12" rx="2" fill="transparent"
+              stroke="rgba(19,23,32,0.40)" stroke-width="0.8"/>
+        <text x="366" y="157" fill="#131720" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">UI</text>
+        <text x="440" y="188" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">컨트롤 패널</text>
+        <text x="440" y="208" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">탭 6개 · 미리보기</text>
+        <text x="440" y="226" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">태블릿에서도 조작</text>
+
+        <!-- N4  예배 순서 (중심) -->
+        <rect x="340" y="284" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="340" y="284" width="200" height="96" rx="6"
+              fill="rgba(31,111,235,0.08)" stroke="#1f6feb" stroke-width="1"/>
+        <rect x="352" y="292" width="40" height="12" rx="2" fill="transparent"
+              stroke="rgba(31,111,235,0.40)" stroke-width="0.8"/>
+        <text x="372" y="301" fill="#1f6feb" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PLAN</text>
+        <text x="440" y="332" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">예배 순서</text>
+        <text x="440" y="352" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">항목 9종 · 구분</text>
+        <text x="440" y="370" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">유형 저장 · 자동 진행</text>
+
+        <!-- N5  템플릿 -->
+        <rect x="340" y="428" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="340" y="428" width="200" height="96" rx="6"
+              fill="#ffffff" stroke="#131720" stroke-width="1"/>
+        <rect x="352" y="436" width="44" height="12" rx="2" fill="transparent"
+              stroke="rgba(19,23,32,0.40)" stroke-width="0.8"/>
+        <text x="374" y="445" fill="#131720" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STYLE</text>
+        <text x="440" y="476" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">템플릿</text>
+        <text x="440" y="496" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">프리셋 8개</text>
+        <text x="440" y="514" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">항목마다 따로 지정</text>
+
+        <!-- N6  라이브 상태 (중심) -->
+        <rect x="700" y="284" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="700" y="284" width="200" height="96" rx="6"
+              fill="rgba(31,111,235,0.08)" stroke="#1f6feb" stroke-width="1"/>
+        <rect x="712" y="292" width="36" height="12" rx="2" fill="transparent"
+              stroke="rgba(31,111,235,0.40)" stroke-width="0.8"/>
+        <text x="730" y="301" fill="#1f6feb" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HUB</text>
+        <text x="800" y="332" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">라이브 상태</text>
+        <text x="800" y="352" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">WebSocket · 7777</text>
+        <text x="800" y="370" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">끊겨도 화면은 유지</text>
+
+        <!-- N7  OBS 송출 -->
+        <rect x="1000" y="140" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="1000" y="140" width="200" height="96" rx="6"
+              fill="#ffffff" stroke="#131720" stroke-width="1"/>
+        <rect x="1012" y="148" width="36" height="12" rx="2" fill="transparent"
+              stroke="rgba(19,23,32,0.40)" stroke-width="0.8"/>
+        <text x="1030" y="157" fill="#131720" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">OBS</text>
+        <text x="1100" y="188" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">OBS 송출</text>
+        <text x="1100" y="208" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">투명 배경 1920×1080</text>
+        <text x="1100" y="226" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">회중 · 카메라 위에</text>
+
+        <!-- N8  강사 모니터 -->
+        <rect x="1000" y="284" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="1000" y="284" width="200" height="96" rx="6"
+              fill="#ffffff" stroke="#131720" stroke-width="1"/>
+        <rect x="1012" y="292" width="44" height="12" rx="2" fill="transparent"
+              stroke="rgba(19,23,32,0.40)" stroke-width="0.8"/>
+        <text x="1034" y="301" fill="#131720" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STAGE</text>
+        <text x="1100" y="332" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">강사 모니터</text>
+        <text x="1100" y="352" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">지금 · 다음 · 시계</text>
+        <text x="1100" y="370" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">강사 · 찬양팀</text>
+
+        <!-- N9  프로젝터 -->
+        <rect x="1000" y="428" width="200" height="96" rx="6" fill="#f2f4f7"/>
+        <rect x="1000" y="428" width="200" height="96" rx="6"
+              fill="#ffffff" stroke="#131720" stroke-width="1"/>
+        <rect x="1012" y="436" width="40" height="12" rx="2" fill="transparent"
+              stroke="rgba(19,23,32,0.40)" stroke-width="0.8"/>
+        <text x="1032" y="445" fill="#131720" font-size="8"
+              font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PROJ</text>
+        <text x="1100" y="476" fill="#131720" font-size="16" font-weight="600"
+              font-family="'Geist', sans-serif" text-anchor="middle">프로젝터</text>
+        <text x="1100" y="496" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">전체 화면 · 큰 글씨</text>
+        <text x="1100" y="514" fill="#737d8c" font-size="12"
+              font-family="'Geist Mono', monospace" text-anchor="middle">'전체' 고정 · 반전</text>
+
+        <!-- ── 범례 (가로 띠) ────────────────────────────────────── -->
+        <line x1="40" y1="588" x2="1240" y2="588" stroke="rgba(19,23,32,0.10)" stroke-width="0.8"/>
+        <text x="40" y="604" fill="#515b6b" font-size="8"
+              font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+
+        <rect x="140" y="596" width="12" height="12" rx="2"
+              fill="rgba(31,111,235,0.08)" stroke="#1f6feb" stroke-width="1"/>
+        <text x="160" y="604" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace">중심</text>
+
+        <rect x="300" y="596" width="12" height="12" rx="2"
+              fill="#ffffff" stroke="#131720" stroke-width="1"/>
+        <text x="320" y="604" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace">기능 블록</text>
+
+        <rect x="460" y="596" width="12" height="12" rx="2"
+              fill="rgba(19,23,32,0.05)" stroke="#515b6b" stroke-width="1"/>
+        <text x="480" y="604" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace">저장소</text>
+
+        <rect x="620" y="596" width="12" height="12" rx="2"
+              fill="rgba(19,23,32,0.03)" stroke="rgba(19,23,32,0.30)" stroke-width="1"/>
+        <text x="640" y="604" fill="#515b6b" font-size="12"
+              font-family="'Geist Mono', monospace">읽기 전용 원본</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">CONTROL PANEL</p>
+        <div class="card-header">
+          <span class="card-dot ink"></span>
+          <h3>탭 6개 — 어디서 무엇을 하나</h3>
+        </div>
+        <ul>
+          <li><b>예배 순서</b> — 순서를 짜고 진행한다. 가장 많이 쓰는 한 열</li>
+          <li><b>성경</b> — 참조로 본문을 찾아 미리 확인한다 (역본 12종)</li>
+          <li><b>찬양</b> — 곡·가사·언어를 관리한다. 곡집 반입</li>
+          <li><b>검토</b> — 가사가 의심스러운 곡을 사람이 승인한다</li>
+          <li><b>템플릿</b> — 배치·글자·배경 프리셋을 고친다</li>
+          <li><b>설정</b> — OBS 주소, 폰트 설치, 데이터 이전, 프로젝터 안내</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">PLAN ITEMS</p>
+        <div class="card-header">
+          <span class="card-dot coral"></span>
+          <h3>항목 9종 — 순서에 담는 것</h3>
+        </div>
+        <ul>
+          <li>📖 <b>성경</b> — 주 역본 + 보조 2 · 절/자동 나눔</li>
+          <li>🎵 <b>찬양</b> — 표시 언어 최대 3 (한/영 병기)</li>
+          <li>🙏 <b>주기도문·사도신경</b> — 판본 2종</li>
+          <li>🔁 <b>교독문</b> — 통일찬송가용 76편 / 새찬송가용 137편</li>
+          <li>📋 <b>순서 표시</b> — 대표기도·설교 제목 (글자 리듬)</li>
+          <li>📝 <b>광고</b> — 여러 줄 그대로</li>
+          <li>💬 <b>인용구</b> — 설교 중 띄울 성경 절, <b>낱개로</b></li>
+          <li>⬛ <b>공백</b> · ▾ <b>구분</b> — 비우기 · 그룹 머리글</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">OUTPUT</p>
+        <div class="card-header">
+          <span class="card-dot muted"></span>
+          <h3>화면마다 다른 일을 한다</h3>
+        </div>
+        <ul>
+          <li><b>OBS</b> — 회중용. 투명 배경으로 카메라 위에 얹는다</li>
+          <li><b>강사 모니터</b> — 조작자용 정보. 지금·다음·남은 장수</li>
+          <li><b>프로젝터</b> — 회중용. <b>OBS 와 동시에 다른 배치</b>로 크게</li>
+          <li><b>미리보기</b> — 컨트롤 패널 안. 송출 전에 확인한다</li>
+          <li>OBS 연결 수에는 <b>OBS 만</b> 센다 — 나머지는 우리가 띄운 창</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>SERMON PRESENTATION · 기능 매뉴얼</span>
+      <span>1280 × 720 · 16:9</span>
+    </div>
+
+  </div>
+</body>
+</html>

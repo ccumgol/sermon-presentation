@@ -4,7 +4,48 @@
 > 문제 해결은 [TROUBLESHOOTING](TROUBLESHOOTING.md),
 > 설계 판단의 배경은 [PLAN.md](../PLAN.md) 와 `docs/plan-service-tab*.md` 를 보세요.
 >
-> 최종 갱신 2026-08-20
+> 최종 갱신 2026-08-21
+
+---
+
+## 2026-08-21 — 기능 매뉴얼(그림) · 문서 실측 대조
+
+**요청**: diagram-design 스킬로 현재 프로젝트의 기능 매뉴얼을 그래프로.
+
+### 그림 한 장
+
+[docs/feature-map.html](feature-map.html) — 1280×720(16:9) 한 장. 왼쪽에서 오른쪽으로
+**자료**(읽기 전용 원본 → 앱 DB) → **준비·조작**(컨트롤 패널 → 예배 순서 → 템플릿) →
+**표시**(OBS·강사 모니터·프로젝터). 가운데 **라이브 상태**가 허브다.
+
+노드 상한(9개) 때문에 그림에 못 담은 것 — 탭 6개, 항목 9종, 화면 4개가 각각 하는 일 —
+은 그림 아래 카드 3장에 넣었다.
+
+### 색은 이 앱의 것을 쓴다
+
+스킨을 `src/control/styles.css` 에서 그대로 가져왔다 (`--bg` → paper, `--fg` → ink,
+`--accent` → accent, `--ok` → link). 다크 값도 앱의 `prefers-color-scheme` 블록에서
+가져왔으므로 두 스킨 모두 앱의 색이다. `~/.diagram-design/profiles/sermon-presentation.md`
+로 저장하고 `.diagram-design` 마커를 뒀으니, 다음 다이어그램도 같은 색으로 나온다.
+
+**앱의 '송출 중' 빨강 `#d42a1f` 은 일부러 뺐다.** 제품에서 가장 큰 소리를 내는 색이고
+'지금 회중에게 나가고 있다' 는 뜻으로 아껴 둔 것이라, 다이어그램 강조에 쓰면 뜻이 묽어진다.
+
+### 문서를 실측으로 대조했다
+
+그림을 그리려고 기능을 세다가 문서가 뒤처진 것을 찾았다.
+
+| 낡은 곳 | 실제 |
+|---|---|
+| README `lib/` 목록 | **15개가 빠져 있었다** (projector-view·verse-quotes·kyodoc-parser 등) |
+| README `server/db`·`routes` | db 2개(readings·snapshot)·routes 2개(readings·backgrounds) 누락 |
+| README `scripts/` | **7개 누락** (import-kyodoc·remove-text-quotes·make-projector-icons 등) |
+| README `public/` | stage·projector 누락 |
+| README 프리셋 수 | '9종' → **8종**. 설명도 '사본이 만들어진다' → '덮어쓰고 되돌릴 수 있다' 로 |
+| PLAN.md 프리셋 수 | '7종' → **8종** |
+| README 기능 목록 | 교독문 두 벌·인용구·프로젝터가 없었다 |
+
+숫자를 손으로 세지 않고 파일 목록과 대조하는 스크립트로 확인했다.
 
 ---
 

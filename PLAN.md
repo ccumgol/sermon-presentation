@@ -20,7 +20,7 @@
 
 ### 1.2 범위에 포함
 
-- 성경 본문 검색·송출 (10개 역본, 원어 포함)
+- 성경 본문 검색·송출 (12개 역본, 원어 포함)
 - 찬양 가사 등록·관리·다국어 송출
 - 템플릿(스타일 프리셋) 시스템
 - 예배 순서(큐/플레이리스트) 관리
@@ -121,7 +121,7 @@
 **원본 스키마 (Phase 1에서 실측)** — 예상과 달리 **두 종류**였다:
 
 ```sql
--- 안드로이드 성경앱 스키마 (10개 역본)
+-- 안드로이드 성경앱 스키마 (10개 역본 — ESV 와 현대인의성경(JSON) 은 형식이 다르다)
 bible(_id, version, bibleCode, Jang, Jul, ThemeCd, Cont)
   -- bibleCode: 1=창세기 … 66=요한계시록, Jang=장, Jul=절, Cont=본문
 volume_name(_id, version, bible, bibleCode, end, name, abbr)
@@ -841,7 +841,9 @@ sermon-presentation/
 
 ### ✅ Phase 3 — 템플릿 시스템 (완료)
 - `lib/template-css.ts` — Template → CSS 변수. 순수 함수라 서버·패널·출력이 같은 결과를 낸다
-- `lib/template-presets.ts` — 내장 프리셋 7종. **id 를 음수로** 두어 사용자 템플릿과 절대 충돌하지 않는다
+- `lib/template-presets.ts` — 내장 프리셋 **8종**(2026-08-19 에 9종에서 정리). **id 를 음수로** 두어
+  사용자 템플릿과 절대 충돌하지 않는다. 프리셋을 고치면 사본이 아니라 **그 위에 덮어쓴 값**이
+  DB 에 남고, '원본으로 되돌리기' 로 언제든 돌아간다
 - `server/db/templates.ts` + `routes/templates.ts` — CRUD·복제. 프리셋은 DB 에 넣지 않고 코드가 유일한 출처
 - `lib/paginator.ts` — **실측 기반 자동 분할**. 측정 함수를 주입받는 순수 로직
 - `src/control/hooks/useMeasure.ts` — 1920×1080 숨긴 iframe 으로 실측

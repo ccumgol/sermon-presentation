@@ -5,11 +5,16 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 - 성경 12개 역본 내장 (한국어 7종 · 영어 3종 · 헬라어 · 히브리어)
 - 동일 본문의 다역본 동시 표시
 - 찬양 가사 2개 언어 동시 표시 (줄 단위 페어링)
+- **교독문 두 벌** — 통일찬송가용 76편 / 새찬송가용 137편 (번호가 같아도 다른 글)
+- **인용구** — 설교 중 띄울 성경 절을 낱개 항목으로 (타이틀 없이 바로)
 - 위치·글자 크기·색상·외곽선을 템플릿으로 지정, **배경 투명 송출**
 - **강사 모니터** (`/stage`) — 지금·다음 화면과 시각을 강단 모니터에 따로 띄운다
+- **프로젝터** (`/projector`) — OBS 와 **동시에 다른 배치**로 벽에 크게. 주소줄 없는 전체 화면
 
 | 문서 | 내용 |
 |------|------|
+| [docs/feature-map.html](docs/feature-map.html) | **기능 매뉴얼 (그림 한 장)** — 자료 → 준비 → 네 화면. 브라우저로 엽니다 |
+| [docs/diagram-design-profile.md](docs/diagram-design-profile.md) | 위 그림에 쓴 색(이 앱의 UI 색). 새 PC 에서 그릴 때 홈 폴더로 한 번 복사 |
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | **탭별 사용법·기능·단축키** — 예배를 진행하는 사람이 보는 문서 |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | **문제 해결** — 증상 → 원인 → 조치 (실제로 겪은 것만) |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 변경 이력 |
@@ -181,9 +186,9 @@ SBL Hebrew 등)가 설치돼 있으면 그것을 쓰고, 없으면 Times New Rom
 이미 저장한 템플릿 사본에 옛 체인이 남아 있으면 앱을 켤 때 자동으로 올립니다.
 직접 고르신 폰트는 문자열이 다르므로 건드리지 않습니다.
 
-내장 프리셋 9종(설교본문 단일·이중역본, 좌우 분할 원어 대조, 찬양 이중언어·단일·전체화면,
-로우서드, 순서 표시 명조 리듬, 공백)은 **수정되지 않습니다**. 값을 바꿔 저장하면 프리셋은 그대로 두고
-사본이 만들어집니다.
+내장 프리셋 8종(하단·전체·좌우 — 셋 다 성경·찬송 겸용 · 로우서드 · 순서 표시 · 교독문 ·
+전례문 · 공백)은 **덮어써도 원본이 남습니다**. 값을 바꿔 저장하면 그 프리셋 위에 '고친 값'이
+얹히고, **원본으로 되돌리기**로 언제든 돌아갑니다 (사본이 늘어나지 않습니다).
 
 **화면 넘김**은 기본이 **'1절씩'** 입니다. 설교 본문은 한 절씩 짚어 가며 읽는 경우가
 많아, 화살표 한 번에 한 절씩 넘어가는 편이 예측 가능합니다.
@@ -222,40 +227,67 @@ sermon-presentation/
 │   ├── slide-builder.ts     본문 → 슬라이드 (다역본 절 정렬)
 │   ├── paginator.ts         실측 기반 자동 분할
 │   ├── lyrics-parser.ts     가사 파서 · 후렴 검출 · 자동 줄나눔
+│   ├── lyrics-merge.ts      번역 가사 합치기 (다른 언어를 지우지 않는다)
+│   ├── lyrics-grid.ts       언어별 비교 격자 (줄 구조 대조)
 │   ├── meter-align.ts       절 간 운율 정렬 (공통 행 구조 찾기)
 │   ├── songbook-import.ts   곡집 일괄 가져오기 텍스트 파서
 │   ├── song-slides.ts       찬양 섹션 → 슬라이드 (2언어 페어링)
+│   ├── praise-parser.ts     원본 곡집(찬양) 어댑터
+│   ├── responsive-parser.ts 교독문 파서 (인도자/회중 한 화면)
+│   ├── kyodoc-parser.ts     새찬송가 교독문 원본 어댑터 (NEW_KYODOC)
+│   ├── liturgy-texts.ts     주기도문·사도신경 본문 + 판본
+│   ├── verse-quotes.ts      인용구 — 성경 절 낱개 + 참조를 본문 앞에
 │   ├── plan-deck.ts         예배 순서 → 평평한 덱 + 항목 경계
+│   ├── item-title.ts        항목 제목 슬라이드 (회중이 읽는 한 줄)
+│   ├── item-display.ts      항목별 표시 3단계 (템플릿 따름·켬·끔)
+│   ├── order-rhythm.ts      순서 표시 제목의 글자 리듬
+│   ├── lang-select.ts       표시 언어 고르기 (최대 3)
+│   ├── lang-folder.ts       번역 가사 폴더 반입 경로 규칙
 │   ├── template-css.ts      Template → CSS 변수
-│   ├── template-presets.ts  내장 프리셋 9종 + 언어별 폰트 체인
-│   └── font-chain.ts        폰트 체인 파싱 (실제 사용 폰트 판정)
+│   ├── template-presets.ts  내장 프리셋 8종 + 언어별 폰트 체인
+│   ├── projector-view.ts    프로젝터 전용 템플릿 ('전체' 고정 · autoFit 끔)
+│   ├── korean-fonts.ts      한글 폰트 체인의 단일 출처
+│   ├── font-chain.ts        폰트 체인 파싱 (실제 사용 폰트 판정)
+│   └── origin-check.ts      WebSocket Origin 검사
 ├── server/
 │   ├── paths.ts             모든 경로의 단일 출처 (Electron 대비)
 │   ├── config.ts            전역 상수
 │   ├── app.ts               Fastify 앱 구성 (테스트에서 주입 가능)
 │   ├── index.ts             실행 진입점 — 포트 탐색·종료 처리
 │   ├── state.ts             송출 상태 저장소 (revision·디스크 영속)
-│   ├── ws.ts                WebSocket 허브
-│   ├── db/                  bible.ts · app.ts · templates.ts · songs.ts · songbooks.ts · plans.ts
-│   └── routes/              bible.ts · templates.ts · songs.ts · songbooks.ts · plans.ts · backup.ts
+│   ├── ws.ts                WebSocket 허브 — layer 별로 다른 템플릿을 보낸다
+│   ├── output-build.ts      출력 페이지가 옛 판인지 판정 (새로고침 안내)
+│   ├── db/                  bible · app · templates · songs · songbooks · plans
+│   │                        · readings(교독문 두 벌) · snapshot(백업 스냅샷)
+│   └── routes/              bible · templates · songs · songbooks · plans
+│                            · readings · backgrounds · backup
 ├── src/control/             컨트롤 패널 (React, Vite로 public/app/ 에 빌드)
 ├── public/
 │   ├── index.html           패널 미빌드 시 안내 페이지
 │   ├── app/                 컨트롤 패널 빌드 산출물 (git 제외)
-│   └── output/              OBS 출력 페이지 — 의존성 0
+│   ├── output/              OBS 출력 페이지 — 의존성 0
+│   ├── stage/               강사 모니터 — 의존성 0
+│   └── projector/           프로젝터 — output/ 의 렌더러를 그대로 쓴다
 ├── scripts/
 │   ├── bible-sources.ts     역본별 소스·정제 규칙 선언
 │   ├── source-reader.ts     SQLite 2종 + JSON 읽기 (빌드·검증 공용)
 │   ├── build-bible-db.ts    통합 DB 빌드
 │   ├── verify-bible-db.ts   무결성 검증
 │   ├── import-hymns.ts      찬송가 가져오기
+│   ├── import-praise.ts     복음성가 곡집 가져오기
+│   ├── import-responsive.ts 통일찬송가 교독문 가져오기 (txt)
+│   ├── import-kyodoc.ts     새찬송가 교독문 가져오기 (sqlite)
+│   ├── import-lyrics-lang.ts     번역 가사 폴더 반입
 │   ├── merge-chorus.ts      후렴 → 각 절 뒤로 병합 (미리보기 기본)
 │   ├── realign-lyrics.ts    가사 줄나눔 재정렬 (미리보기 기본)
+│   ├── migrate-template-ids.ts   템플릿 id 이관·사본 정리
+│   ├── remove-text-quotes.ts     옛 자유 글자 인용구 정리
+│   ├── make-projector-icons.ts   프로젝터 앱 아이콘 생성 (node:zlib)
 │   ├── check-praise-folder.ts    찬양 자료 폴더 점검 (읽기 전용)
 │   └── measure-meter-ranking.ts  순위 규칙 비교 측정 (쓰지 않음)
 ├── tests/
-│   ├── unit/                파서 · 슬라이드 빌더 · 상태 저장소
-│   └── integration/         DB 조회 · 검색 · REST 라우트
+│   ├── unit/                파서 · 슬라이드 빌더 · 상태 저장소 · 출력 페이지 규칙
+│   └── integration/         DB 조회 · 검색 · REST 라우트 · 항목 저장 왕복
 └── data/                    생성물 (git 제외)
 ```
 
