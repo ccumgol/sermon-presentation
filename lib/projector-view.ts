@@ -47,6 +47,21 @@ export function projectorTemplate(base: Template): Template {
       ...base.behavior,
       // 1 = 줄이지 않는다. 값이 1 미만이면 조작자의 + 를 되돌려 깎는다
       autoFitMinScale: 1,
+      /*
+       * 순서 표시 제목의 **글자 리듬을 끈다** — 모든 글자가 첫 글자와 같은 크기다
+       * (사용자 요청 2026-08-20).
+       *
+       * 리듬은 붓글씨처럼 보이게 글자마다 크기·높낮이를 흔드는 것인데, 대비가 낮은
+       * 프로젝터에서는 작아진 글자가 먼저 뭉개진다. 크고 고른 글씨가 읽힌다.
+       *
+       * '전체' 프리셋에 지금 리듬 설정이 없어 이미 0 이지만(`clampRhythm(undefined)`),
+       * **명시한다** — 나중에 그 템플릿에 리듬을 넣어도 프로젝터는 고르게 남는다.
+       *
+       * 사람이 손으로 맞춘 글자별 조정은 항목에 담겨 있어 템플릿으로 막을 수 없다.
+       * 그것은 `projector.css` 가 막는다 (`.rhythm-char`).
+       */
+      titleRhythm: 0,
+      titleRhythmY: 0,
     },
   };
 }

@@ -6,6 +6,7 @@
  */
 
 import { MAX_LANGS } from '../../lib/lang-select.ts';
+import { PREVIEW_MAX } from '../../lib/verse-quotes.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { safeBackgroundName } from './backgrounds.ts';
@@ -164,6 +165,21 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           primary: typeof bible.primary === 'string' ? bible.primary : 'nkrv',
           secondary: Array.isArray(bible.secondary) ? bible.secondary.filter((s) => typeof s === 'string') : [],
           ...(typeof bible.paging === 'string' ? { paging: bible.paging } : {}),
+          /*
+           * 인용구 표시. **`true` 만 받는다** — 'yes' 같은 값이 박히면 판정이 흐려진다.
+           *
+           * 이것이 빠지면 저장할 때 인용구가 **평범한 성경 항목으로 되돌아간다**
+           * (참조 제목 + 절 번호). 실제로 그렇게 됐다 — 사용자가 '템플릿 업데이트' 를
+           * 누르니 인용구가 전부 성경으로 바뀌었다 (2026-08-20 지적).
+           */
+          ...(bible.quote === true ? { quote: true as const } : {}),
+          /*
+           * 목록 줄 미리보기. **인용구일 때만** 담는다 — 본문 낭독에는 쓰이지 않으므로
+           * 남겨 두면 뜻 없는 값이 순서표에 박힌다. 길이는 잘라 담는다(라벨이다).
+           */
+          ...(bible.quote === true && typeof bible.preview === 'string' && bible.preview.trim().length > 0
+            ? { preview: bible.preview.trim().slice(0, PREVIEW_MAX + 1) }
+            : {}),
           ...(() => {
             const display = readItemDisplay(fields.display);
             return display ? { display } : {};

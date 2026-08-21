@@ -115,6 +115,23 @@ describe('주소줄을 없애는 길이 열려 있다', () => {
   });
 });
 
+describe('순서 표시 제목이 고른 크기로 나간다', () => {
+  /*
+   * 자동 리듬은 서버 템플릿에서 끈다(`projector-view.test.ts`). 하지만 사람이 손으로
+   * 맞춘 글자별 조정은 렌더러가 **인라인**으로 박으므로 CSS 로만 막을 수 있다.
+   * 실제로 사용자 순서표의 '찬양과경배' 가 그랬다 (2026-08-20).
+   */
+  const CSS = read('public/projector/projector.css');
+
+  it('글자별 인라인 크기를 첫 글자 크기로 되돌린다', () => {
+    expect(CSS).toMatch(/body\.projector \.rhythm-char\s*{[^}]*font-size:\s*1em\s*!important/);
+  });
+
+  it('높낮이 흔들림도 되돌린다', () => {
+    expect(CSS).toMatch(/body\.projector \.rhythm-char\s*{[^}]*transform:\s*none\s*!important/);
+  });
+});
+
 describe('막대에 있어야 하는 것', () => {
   it('글자 크기 +/- · 반전 · 전체 화면', () => {
     for (const id of ['zoom-out', 'zoom-in', 'invert', 'full']) {

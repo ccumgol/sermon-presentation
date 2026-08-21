@@ -29,6 +29,19 @@ describe('프로젝터용으로 고치는 것', () => {
     expect(view.behavior.autoFitMinScale).toBe(1);
   });
 
+  it('순서 표시 글자 리듬을 끈다 — 프로젝터는 작아진 글자가 먼저 뭉개진다', () => {
+    const view = projectorTemplate(FULL!);
+    expect(view.behavior.titleRhythm).toBe(0);
+    expect(view.behavior.titleRhythmY).toBe(0);
+  });
+
+  it('바탕 템플릿에 리듬이 있어도 끈다 — 명시하는 이유', () => {
+    const withRhythm = { ...FULL!, behavior: { ...FULL!.behavior, titleRhythm: 0.3, titleRhythmY: 0.25 } };
+    const view = projectorTemplate(withRhythm);
+    expect(view.behavior.titleRhythm).toBe(0);
+    expect(view.behavior.titleRhythmY).toBe(0);
+  });
+
   it('바탕 프리셋을 바꾸지 않는다 (불변)', () => {
     const before = JSON.stringify(FULL);
     projectorTemplate(FULL!);
