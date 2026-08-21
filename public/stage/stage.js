@@ -140,8 +140,20 @@
         // 주 역본만 보여 준다 — 강사는 다역본을 다 읽지 않는다
         var block = slide.blocks && slide.blocks[0];
         if (!block) break;
+        /*
+         * 절 번호는 **항목이 끄면 끈다.**
+         *
+         * 인용구는 참조를 본문 앞에 붙여 보내므로(`고전 1:3 하나님 우리…`) 절 번호를
+         * 또 붙이면 `3 고전 1:3 하나님…` 이 된다. 예전에는 여기서 늘 붙였고, 그래서
+         * 네 화면이 서로 다른 글을 보였다 (사용자 지적 2026-08-20).
+         *
+         * 출력 페이지와 같은 규칙을 여기에도 적는다 — 이 파일은 **의존성 0** 이라
+         * 바깥 모듈을 불러올 수 없다 (그 원칙을 지키는 검사가 이 주석의 낱말까지 본다).
+         * 두 곳이 갈라지지 않게 `tests/unit/quote-consistency.test.ts` 가 묶어 둔다.
+         */
+        var nums = !(slide.display && slide.display.verseNumbers === false);
         block.verses.forEach(function (verse) {
-          node.appendChild(line(verse.verse + ' ' + verse.text));
+          node.appendChild(line(nums ? verse.verse + ' ' + verse.text : verse.text));
         });
         if (slide.reference) {
           var ref = line(slide.reference, 'ref');

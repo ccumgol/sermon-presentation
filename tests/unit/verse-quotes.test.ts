@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest';
 
 import { itemTitle } from '../../lib/item-title.ts';
 import { describeItem, isExpandable } from '../../lib/plan-deck.ts';
-import { PREVIEW_MAX, verseQuotes } from '../../lib/verse-quotes.ts';
-import type { Verse } from '../../shared/types.ts';
+import { PREVIEW_MAX, quoteSlides, verseQuotes } from '../../lib/verse-quotes.ts';
+import type { SlidePayload, Verse } from '../../shared/types.ts';
 
 const GEN = (verse: number, text: string): Verse => ({ book: 1, chapter: 1, verse, text });
 
@@ -124,5 +124,93 @@ describe('인용구 항목의 성격', () => {
 
   it('본문 낭독 항목의 줄은 그대로 참조다', () => {
     expect(describeItem(passage)).toBe('창 1:1-6');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 네 화면이 같은 글을 보이게 한다
+// ─────────────────────────────────────────────────────────────
+
+describe('인용구 슬라이드 — 참조를 본문 앞에 붙인다', () => {
+  const slide = (): SlidePayload => ({
+    kind: 'bible',
+    reference: '고린도전서 1:3',
+    blocks: [
+      {
+        translationId: 'nkrv',
+        translationName: '개역개정',
+        lang: 'ko',
+        direction: 'ltr',
+        verses: [{ book: 46, chapter: 1, verse: 3, text: '하나님 우리 아버지와' }],
+      },
+    ],
+  });
+
+  it('주 역본 첫 절 앞에 참조가 붙는다', () => {
+    const [out] = quoteSlides([slide()], '고전 1:3');
+    expect(out?.kind === 'bible' && out.blocks[0]?.verses[0]?.text).toBe(
+      '고전 1:3 하나님 우리 아버지와',
+    );
+  });
+
+  it('별도 참조 줄을 없앤다 — 같은 것이 두 번 나가면 안 된다', () => {
+    const [out] = quoteSlides([slide()], '고전 1:3');
+    expect(out?.kind === 'bible' && out.reference).toBe('');
+  });
+
+  it('절 번호를 끈다 — 참조에 이미 절이 있다', () => {
+    const [out] = quoteSlides([slide()], '고전 1:3');
+    expect(out?.kind === 'bible' && out.display?.verseNumbers).toBe(false);
+    expect(out?.kind === 'bible' && out.display?.reference).toBe(false);
+  });
+
+  it('보조 역본에는 붙이지 않는다 — 참조가 두 번 보인다', () => {
+    const two = slide();
+    if (two.kind !== 'bible') throw new Error('bible 이어야 한다');
+    two.blocks.push({
+      translationId: 'niv',
+      translationName: 'NIV',
+      lang: 'en',
+      direction: 'ltr',
+      verses: [{ book: 46, chapter: 1, verse: 3, text: 'Grace and peace to you' }],
+    });
+    const [out] = quoteSlides([two], '고전 1:3');
+    if (out?.kind !== 'bible') throw new Error('bible 이어야 한다');
+    expect(out.blocks[0]?.verses[0]?.text).toBe('고전 1:3 하나님 우리 아버지와');
+    expect(out.blocks[1]?.verses[0]?.text).toBe('Grace and peace to you');
+  });
+
+  it("항목이 참조를 '끔' 으로 두면 붙이지 않는다", () => {
+    const [out] = quoteSlides([slide()], '고전 1:3', false);
+    if (out?.kind !== 'bible') throw new Error('bible 이어야 한다');
+    expect(out.blocks[0]?.verses[0]?.text).toBe('하나님 우리 아버지와');
+    expect(out.reference).toBe('');
+    expect(out.display?.verseNumbers).toBe(false);
+  });
+
+  it('항목이 정한 다른 표시 설정은 그대로 둔다', () => {
+    const s = slide();
+    if (s.kind !== 'bible') throw new Error('bible 이어야 한다');
+    s.display = { headings: true };
+    const [out] = quoteSlides([s], '고전 1:3');
+    expect(out?.kind === 'bible' && out.display?.headings).toBe(true);
+  });
+
+  it('성경 본문 낭독 슬라이드는 건드리지 않는다 (이 함수를 부르지 않는다)', () => {
+    // 안전망 — 다른 종류가 섞여 들어와도 그대로 돌려준다
+    const text: SlidePayload = { kind: 'text', lines: ['광고'] };
+    expect(quoteSlides([text], '고전 1:3')).toEqual([text]);
+  });
+
+  it('참조가 비어 있으면 붙이지 않는다', () => {
+    const [out] = quoteSlides([slide()], '  ');
+    expect(out?.kind === 'bible' && out.blocks[0]?.verses[0]?.text).toBe('하나님 우리 아버지와');
+  });
+
+  it('원본 슬라이드를 바꾸지 않는다 (불변)', () => {
+    const s = slide();
+    const before = JSON.stringify(s);
+    quoteSlides([s], '고전 1:3');
+    expect(JSON.stringify(s)).toBe(before);
   });
 });

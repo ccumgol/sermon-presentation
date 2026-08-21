@@ -23,7 +23,7 @@
 
 import { getBook } from './books.ts';
 import { formatRanges } from './reference-parser.ts';
-import type { Verse } from '../shared/types.ts';
+import type { SlidePayload, Verse } from '../shared/types.ts';
 
 /** 목록 한 줄에 들어갈 만큼. 넘으면 잘라서 … 를 붙인다 */
 export const PREVIEW_MAX = 44;
@@ -73,4 +73,77 @@ function verseRef(verse: Verse): string {
     ],
     'abbr',
   );
+}
+
+/**
+ * 인용구 슬라이드 — **참조를 본문 앞에 붙인다.**
+ *
+ * ## 왜 글자로 붙이는가
+ *
+ * 같은 절이 네 화면에서 서로 다르게 나왔다 (사용자 지적 2026-08-20).
+ *
+ * | 화면 | 그때 나온 것 |
+ * |---|---|
+ * | 관리자 목록 | `고전 1:3 하나님 우리 아버지와…` |
+ * | OBS | `고전 1:3` ⏎ `3 하나님 우리 아버지와…` |
+ * | 강사 모니터 | `3 하나님 우리 아버지와…` ⏎ `고전 1:3` |
+ * | 프로젝터 | `하나님 우리 아버지와…` |
+ *
+ * 네 화면이 **서로 다른 렌더러**를 쓰고 참조·절 번호 규칙이 제각각이기 때문이다.
+ * 참조를 별개 요소로 두는 한 세 렌더러를 각각 고쳐야 하고, 프로젝터는 '전체' 템플릿이
+ * 참조를 끄므로 예외가 또 필요하다. 규칙이 넷이면 넷은 다시 어긋난다.
+ *
+ * 그래서 **참조를 본문 글자에 넣는다.** 네 화면이 그것을 '본문' 으로 받으므로
+ * 어긋날 자리가 구조적으로 없어진다.
+ *
+ * ## 원본을 고치는 것이 아니다
+ *
+ * DB 는 손대지 않는다. 화면에 보낼 **사본**을 만든다 (이 함수는 불변이다).
+ * 목록 줄과 글자까지 같게 하려고 접두사로 **항목의 `ref`** 를 쓴다 —
+ * 서버가 주는 `slide.reference` 는 정식 이름(`고린도전서 1:3`)이라 목록과 달라진다.
+ *
+ * ## 본문 낭독(📖 성경)은 이 함수를 타지 않는다
+ *
+ * 부르는 쪽이 `item.quote` 일 때만 부른다. 성경 항목의 동작은 조금도 바뀌지 않는다.
+ */
+export function quoteSlides(
+  slides: readonly SlidePayload[],
+  ref: string,
+  /** 항목이 참조를 '끔' 으로 두면 붙이지 않는다 (그 토글이 여기서도 뜻을 갖는다) */
+  showReference = true,
+): SlidePayload[] {
+  const prefix = ref.trim();
+  const attach = showReference && prefix.length > 0;
+
+  return slides.map((slide) => {
+    if (slide.kind !== 'bible') return slide;
+
+    return {
+      ...slide,
+      // 별도 참조 줄을 없앤다 — 붙였는데 아래에도 나오면 같은 것이 두 번 나간다.
+      // 강사 모니터는 `slide.reference` 가 있으면 무조건 한 줄 더 그린다.
+      reference: '',
+      display: {
+        ...slide.display,
+        /*
+         * 절 번호를 끈다. `고전 1:3` 에 이미 절이 들어 있어 `3` 은 군더더기다
+         * (OBS 에서 `고전 1:3 3 하나님…` 이 된다).
+         */
+        verseNumbers: false,
+        // 참조는 글자로 들어갔다. 렌더러가 또 그리지 않게 한다
+        reference: false,
+      },
+      blocks: slide.blocks.map((block, index) =>
+        // **주 역본에만** 붙인다. 보조 역본에도 붙이면 참조가 두 번 보인다
+        index !== 0 || !attach || block.verses.length === 0
+          ? block
+          : {
+              ...block,
+              verses: block.verses.map((verse, at) =>
+                at === 0 ? { ...verse, text: `${prefix} ${verse.text}` } : verse,
+              ),
+            },
+      ),
+    };
+  });
 }

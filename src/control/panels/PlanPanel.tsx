@@ -21,7 +21,7 @@ import {
 } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { itemTitle } from '../../../lib/item-title.ts';
-import { verseQuotes } from '../../../lib/verse-quotes.ts';
+import { quoteSlides, verseQuotes } from '../../../lib/verse-quotes.ts';
 import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
@@ -771,18 +771,31 @@ export function PlanPanel({
                   : slide,
               );
 
+        /*
+         * 인용구는 **참조를 본문 앞에 붙인다** — `고전 1:3 하나님 우리 아버지와…`.
+         *
+         * 네 화면(관리자 목록·OBS·강사 모니터·프로젝터)이 서로 다른 렌더러를 쓰는데,
+         * 참조를 별개 요소로 두면 규칙이 넷이 되어 다시 어긋난다 (사용자 지적
+         * 2026-08-20). 글자로 넣으면 네 화면이 그것을 '본문' 으로 받아 저절로 같아진다.
+         *
+         * 접두사는 **항목의 `ref`** 다 — 목록 줄(`describeItem`)과 글자까지 같아진다.
+         * 본문 낭독(성경 항목)은 `item.quote` 가 없어 이 길로 오지 않는다.
+         */
+        const finish = (slides: SlidePayload[]): SlidePayload[] =>
+          item.quote ? quoteSlides(withDisplay(slides), item.ref, item.display?.reference !== false) : withDisplay(slides);
+
         if ((item.paging ?? 'verse') === 'auto') {
           const paginated = await paginateByMeasure(passage.passage, (slide) =>
             measurer.measure(slide, template ?? undefined),
           );
           if (paginated.slides.length > 0) {
             return {
-              slides: withDisplay(paginated.slides),
+              slides: finish(paginated.slides),
               labels: paginated.slides.map((_, i) => `${i + 1}`),
             };
           }
         }
-        return { slides: withDisplay(passage.deck.slides), labels: passage.deck.labels };
+        return { slides: finish(passage.deck.slides), labels: passage.deck.labels };
       }
 
       if (item.type === 'song') {
