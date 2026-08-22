@@ -20,6 +20,9 @@ data/
 # Vite 빌드 산출물 (컨트롤 패널)
 public/app/
 
+# 테스트 커버리지 리포트 (vitest --coverage 생성물)
+coverage/
+
 # 테스트용 임시 데이터
 .test-data/
 
