@@ -79,3 +79,55 @@ describe('parseAllowedOrigins', () => {
     expect(parseAllowedOrigins(' , ')).toEqual([]);
   });
 });
+
+/**
+ * R-1 (검토 2026-08-22) — Origin 을 Host 와 비교하는 것만으로는 부족하다.
+ *
+ * **Host 도 접속하는 쪽이 정하는 값**이라, 둘을 서로 맞춰 보내면 통과했다.
+ * 실제 공격은 DNS 리바인딩 — 공격자가 `evil.test` 를 7777 포트로 서비스하다가
+ * DNS 를 127.0.0.1 로 바꾸면, 오퍼레이터가 그 주소를 한 번 여는 것으로 끝난다.
+ *
+ * 그래서 Host 가 **우리가 실제로 서비스할 수 있는 주소**인지도 본다.
+ */
+describe('Host 위조 (DNS 리바인딩)', () => {
+  it('Origin 과 Host 를 맞춰 보낸 외부 도메인을 막는다', () => {
+    expect(isAllowedOrigin('http://evil.test:7777', 'evil.test:7777')).toBe(false);
+    expect(isAllowedOrigin('https://church.example:7777', 'church.example:7777')).toBe(false);
+  });
+
+  it('공인 IP 도 막는다', () => {
+    expect(isAllowedOrigin('http://203.0.113.5:7777', '203.0.113.5:7777')).toBe(false);
+  });
+
+  it('허용 목록에 넣으면 통과한다 (리버스 프록시)', () => {
+    expect(
+      isAllowedOrigin('https://church.example:7777', 'church.example:7777', [
+        'https://church.example:7777',
+      ]),
+    ).toBe(true);
+  });
+});
+
+describe('태블릿 접속 경로는 끊기지 않는다', () => {
+  it('사설 IPv4 로 붙는 태블릿을 허용한다', () => {
+    for (const host of ['192.168.1.190:7777', '10.0.0.5:7777', '172.20.1.9:7777']) {
+      expect(isAllowedOrigin(`http://${host}`, host)).toBe(true);
+    }
+  });
+
+  it('사설 범위가 아닌 172.32.x 는 막는다', () => {
+    expect(isAllowedOrigin('http://172.32.0.1:7777', '172.32.0.1:7777')).toBe(false);
+  });
+
+  it('mDNS 이름(.local)을 허용한다 — 맥이 이 이름으로도 열린다', () => {
+    expect(isAllowedOrigin('http://macbook.local:7777', 'macbook.local:7777')).toBe(true);
+  });
+
+  it('.local 을 흉내낸 외부 도메인은 막는다', () => {
+    expect(isAllowedOrigin('http://evil.local.example:7777', 'evil.local.example:7777')).toBe(false);
+  });
+
+  it('IPv6 루프백을 허용한다', () => {
+    expect(isAllowedOrigin('http://[::1]:7777', '[::1]:7777')).toBe(true);
+  });
+});

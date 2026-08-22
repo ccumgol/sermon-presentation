@@ -54,7 +54,12 @@ export function createWsHub(server: Server, log: Logger): WsHub {
     path: '/ws',
     verifyClient: ({ origin, req }: { origin?: string; req: IncomingMessage }) => {
       if (isAllowedOrigin(origin, req.headers.host, allowedOrigins)) return true;
-      log.warn(`WS 접속 거부 — 허용되지 않은 Origin: ${origin}`);
+      // 정당한 접속인데 막혔을 때 무엇을 해야 하는지 로그가 말해 준다.
+      // 이 경고 없이는 '태블릿이 안 붙는다' 를 예배 직전에 진단할 수 없다.
+      log.warn(
+        `WS 접속 거부 — Origin ${origin} / Host ${req.headers.host}. ` +
+          '정당한 접속이면 SERMON_ALLOWED_ORIGINS 에 그 Origin 을 넣으세요.',
+      );
       return false;
     },
   });
