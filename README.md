@@ -71,7 +71,29 @@ npm run bible:build
 npm run bible:verify
 ```
 
-서버를 실행합니다. 컨트롤 패널을 빌드한 뒤 기동합니다.
+### 매주 쓰는 방법 — 한 줄
+
+```bash
+./start.sh
+```
+
+컨트롤 패널을 빌드하고, 서버를 띄우고, **브라우저까지 열어 줍니다.**
+터미널 어디서나 `presentation` 으로 부를 수 있습니다(`~/.zshrc` 의 alias).
+
+이미 서버가 떠 있으면 **두 번째 서버를 몰래 띄우지 않고 먼저 묻습니다** — 그대로 쓸지,
+껐다 새로 시작할지. (옛 프로세스가 구버전 코드로 응답하는 함정을 막습니다 —
+[문제 해결 2.7](docs/TROUBLESHOOTING.md))
+
+| 부르는 법 | 하는 일 |
+|---|---|
+| `presentation` · `./start.sh` | 이 PC 안에서만 (기본·권장) |
+| `presentation lan` · `./start.sh lan` | 태블릿으로도 조작 — **인증 없음, 주의** |
+| `PORT=7800 ./start.sh` | 포트를 직접 준다 |
+| `OPEN_BROWSER=0 ./start.sh` | 브라우저를 열지 않는다 |
+
+종료는 `Ctrl+C` 입니다.
+
+### 직접 실행 (스크립트를 쓰지 않을 때)
 
 ```bash
 npm start
@@ -143,6 +165,8 @@ npm run dev
 
 | 명령 | 설명 |
 |------|------|
+| `./start.sh` (`presentation`) | **빌드 + 서버 + 브라우저를 한 번에** · 이미 떠 있으면 물어본다 |
+| `./start.sh lan` (`presentation lan`) | 위와 같고 태블릿에도 연다 — **인증 없음, 주의** |
 | `npm start` | 컨트롤 패널 빌드 + 서버 실행 (이 PC 안에서만) |
 | `npm run start:lan` | 태블릿 등 LAN 에 열어 실행 — **인증 없음, 주의** |
 | `npm run serve` | 빌드 없이 서버만 실행 |

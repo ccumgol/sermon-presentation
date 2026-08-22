@@ -91,7 +91,8 @@ npx tsc --noEmit && npx vitest run && npx vite build
 
 셋 다 통과해야 완료다. 커밋 메시지와 보고에 **무엇으로 확인했는지** 적는다.
 
-**사용자 서버(7777)를 건드리지 않고 확인하려면 격리 서버를 띄운다.** 포트를 직접 준다.
+**`./start.sh`(사용자의 `presentation` 명령)를 Agent 가 실행하지 않는다.** 그것은 사용자
+데이터로 7777 을 잡고 브라우저를 연다. **검증은 격리 서버로 한다** — 포트를 직접 준다.
 
 ```bash
 SCRATCH=/tmp/verify && mkdir -p $SCRATCH/backgrounds
