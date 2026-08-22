@@ -20,6 +20,12 @@ import { initSongsDb, countSongs } from './db/songs.ts';
 import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
 import { ensureDataDirs, paths } from './paths.ts';
+import {
+  SESSION_COOKIE, isAuthExemptPath, isLoopbackAddress, isTrustedAddress, parseTrustedIps,
+  readCookie, wantsHtml,
+} from '../lib/lan-auth.ts';
+import { verifySession } from './auth.ts';
+import { registerLoginRoutes } from './routes/login.ts';
 import { registerBibleRoutes } from './routes/bible.ts';
 import { registerBackgroundRoutes } from './routes/backgrounds.ts';
 import { registerBackupRoutes } from './routes/backup.ts';
@@ -89,6 +95,32 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   }
 
   const stateRestored = initState();
+
+  /**
+   * ── 접속 암호 (보안 감사 권고 4) ─────────────────────────────
+   *
+   * **이 PC 에서 온 요청은 그대로 통과시키고 LAN 요청만 암호를 묻는다.**
+   * 안전 때문이 아니라 예배가 멈추지 않게 하기 위한 구분이다 — OBS 브라우저 소스는
+   * 암호를 입력할 수 없고, 오퍼레이터의 패널도 예배 직전에 암호를 물으면 안 된다.
+   * 자세한 근거는 `lib/lan-auth.ts` 머리말.
+   *
+   * LAN 이 닫혀 있으면(기본) 모든 요청이 루프백이라 이 훅은 아무 일도 하지 않는다.
+   */
+  const trustedIps = parseTrustedIps(process.env.SERMON_TRUSTED_IPS);
+  app.addHook('onRequest', async (request, reply) => {
+    if (isLoopbackAddress(request.ip)) return;
+    if (isTrustedAddress(request.ip, trustedIps)) return;
+    if (isAuthExemptPath(request.url)) return;
+    if (verifySession(readCookie(request.headers.cookie, SESSION_COOKIE))) return;
+
+    // 사람이 보는 화면이면 로그인으로 보낸다. API·WS 에 HTML 을 주면 안 된다.
+    if (wantsHtml(request.headers.accept)) {
+      return reply.redirect(`/login?next=${encodeURIComponent(request.url)}`, 302);
+    }
+    return reply
+      .code(401)
+      .send({ success: false, data: null, error: '접속 암호가 필요합니다. /login 에서 넣으세요.' });
+  });
 
   // ── 정적 파일 ────────────────────────────────────────────────
   await app.register(fastifyStatic, {
@@ -214,6 +246,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
     error: null,
   }));
 
+  registerLoginRoutes(app);
   await registerSongRoutes(app);
   await registerSongbookRoutes(app);
   await registerPlanRoutes(app);

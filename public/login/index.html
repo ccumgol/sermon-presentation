@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>접속 암호 — 예배 프레젠테이션</title>
+    <!--
+      의존성 0. 태블릿에서 열리는 유일한 화면이므로 외부 폰트·CDN 을 쓰지 않는다
+      (교회 WiFi 가 느리거나 끊겨도 떠야 한다).
+    -->
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; min-height: 100dvh;
+        display: grid; place-items: center; padding: 24px;
+        font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+        background: #f5f6f8; color: #1a1c1f;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #16181c; color: #e8eaed; }
+        .card { background: #22252a; border-color: #33373d; }
+        input { background: #1a1d21; color: #e8eaed; border-color: #3a3f46; }
+      }
+      .card {
+        width: 100%; max-width: 380px; padding: 28px 24px 24px;
+        background: #fff; border: 1px solid #e3e5e9; border-radius: 14px;
+      }
+      h1 { margin: 0 0 6px; font-size: 20px; }
+      p.sub { margin: 0 0 20px; font-size: 14px; opacity: .65; }
+      label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+      input {
+        width: 100%; padding: 14px; font-size: 17px;      /* 17px 이상이라야 iOS 가 확대하지 않는다 */
+        border: 1px solid #cfd3d9; border-radius: 10px; background: #fff;
+      }
+      button {
+        width: 100%; margin-top: 14px; padding: 14px; font-size: 16px; font-weight: 600;
+        color: #fff; background: #2f6fed; border: 0; border-radius: 10px; cursor: pointer;
+      }
+      button:disabled { opacity: .55; cursor: default; }
+      .msg { margin-top: 14px; font-size: 14px; min-height: 20px; color: #c8372d; }
+      @media (prefers-color-scheme: dark) { .msg { color: #ff8b80; } }
+      .hint { margin: 18px 0 0; font-size: 12px; opacity: .55; }
+    </style>
+  </head>
+  <body>
+    <form class="card" id="form" autocomplete="on">
+      <h1>접속 암호</h1>
+      <p class="sub">이 기기에서 예배 화면을 조작하려면 암호가 필요합니다.</p>
+
+      <label for="pw">암호</label>
+      <!-- 비밀번호 관리자가 저장할 수 있도록 표준 속성을 준다 -->
+      <input
+        id="pw" name="password" type="password" inputmode="text"
+        autocomplete="current-password" autocapitalize="off" autocorrect="off"
+        required autofocus
+      />
+
+      <button type="submit" id="go">들어가기</button>
+      <p class="msg" id="msg" role="alert" aria-live="polite"></p>
+      <p class="hint">암호는 이 PC 에서 <code>npm run password</code> 로 정합니다.</p>
+    </form>
+
+    <script>
+      (function () {
+        'use strict';
+        var form = document.getElementById('form');
+        var pw = document.getElementById('pw');
+        var go = document.getElementById('go');
+        var msg = document.getElementById('msg');
+
+        // 로그인 뒤 돌아갈 곳. 우리 서버 안의 경로만 받는다 —
+        // 외부 주소를 넣어 다른 사이트로 보내는 것(open redirect)을 막는다.
+        function nextPath() {
+          var raw = new URLSearchParams(location.search).get('next') || '/';
+          return raw.charAt(0) === '/' && raw.charAt(1) !== '/' ? raw : '/';
+        }
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          msg.textContent = '';
+          go.disabled = true;
+
+          fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw.value }),
+          })
+            .then(function (res) {
+              return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+            })
+            .then(function (result) {
+              if (result.ok && result.body && result.body.success) {
+                location.replace(nextPath());
+                return;
+              }
+              msg.textContent = (result.body && result.body.error) || '들어갈 수 없습니다.';
+              go.disabled = false;
+              pw.value = '';
+              pw.focus();
+            })
+            .catch(function () {
+              msg.textContent = '서버에 닿지 못했습니다. WiFi 를 확인하세요.';
+              go.disabled = false;
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -14,6 +14,10 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import { isAllowedOrigin, parseAllowedOrigins } from '../lib/origin-check.ts';
+import {
+  SESSION_COOKIE, isLoopbackAddress, isTrustedAddress, parseTrustedIps, readCookie,
+} from '../lib/lan-auth.ts';
+import { verifySession } from './auth.ts';
 
 import { PROJECTOR_LAYER, PROJECTOR_TEMPLATE_ID, projectorTemplate } from '../lib/projector-view.ts';
 import { templateToCssVars } from '../lib/template-css.ts';
@@ -49,10 +53,25 @@ export function createWsHub(server: Server, log: Logger): WsHub {
    * `lib/origin-check.ts` 참고 — Origin 이 없으면 허용(OBS·도구)이고,
    * 있으면 우리 서버가 내보낸 페이지여야 한다.
    */
+  const trustedIps = parseTrustedIps(process.env.SERMON_TRUSTED_IPS);
+
   const wss = new WebSocketServer({
     server,
     path: '/ws',
     verifyClient: ({ origin, req }: { origin?: string; req: IncomingMessage }) => {
+      /*
+       * 접속 암호 (보안 감사 권고 4). HTTP 훅과 같은 규칙이다 — 이 PC 는 통과,
+       * LAN 은 쿠키를 본다. WS 에는 로그인 화면을 보여 줄 수 없으므로 거부만 한다.
+       * 태블릿은 페이지를 열 때 이미 로그인했으니 쿠키를 들고 온다.
+       */
+      const address = req.socket.remoteAddress;
+      if (!isLoopbackAddress(address) && !isTrustedAddress(address, trustedIps)) {
+        if (!verifySession(readCookie(req.headers.cookie, SESSION_COOKIE))) {
+          log.warn(`WS 접속 거부 — 접속 암호가 없습니다 (${address ?? '주소 불명'})`);
+          return false;
+        }
+      }
+
       if (isAllowedOrigin(origin, req.headers.host, allowedOrigins)) return true;
       // 정당한 접속인데 막혔을 때 무엇을 해야 하는지 로그가 말해 준다.
       // 이 경고 없이는 '태블릿이 안 붙는다' 를 예배 직전에 진단할 수 없다.

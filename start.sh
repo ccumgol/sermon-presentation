@@ -3,7 +3,7 @@
 #
 # 사용법:
 #   ./start.sh              이 PC 안에서만 (기본 · 권장)
-#   ./start.sh lan          태블릿으로도 조작 (⚠ 인증이 없다 — 아래 참고)
+#   ./start.sh lan          태블릿으로도 조작 (접속 암호를 넣어야 한다)
 #   PORT=7800 ./start.sh    포트를 직접 준다
 #   OPEN_BROWSER=0 ./start.sh   브라우저를 열지 않는다
 #
@@ -16,16 +16,6 @@ cd "$(dirname "$0")"
 PORT="${PORT:-7777}"
 BASE="http://localhost:${PORT}"
 
-# ── 태블릿 모드 ─────────────────────────────────────────────────────
-# 기본은 이 PC 안에서만 연다. 이 앱에는 인증이 없어서, LAN 에 열면 같은 WiFi 의
-# 누구나 예배 중 화면을 바꿀 수 있다 (docs/SECURITY-AUDIT.md H-1).
-if [ "${1:-}" = "lan" ]; then
-  export SERMON_HOST=0.0.0.0
-  echo "⚠ 태블릿 모드 — 같은 WiFi 의 모든 기기가 조작할 수 있습니다 (인증 없음)."
-  echo "  신뢰할 수 있는 망에서만 쓰고, 예배가 끝나면 Ctrl+C 로 닫으세요."
-  echo
-fi
-
 # ── 준비물 확인 ─────────────────────────────────────────────────────
 if [ ! -d "node_modules" ]; then
   echo "❌ node_modules 가 없습니다. 먼저 아래를 실행하세요:"
@@ -37,6 +27,36 @@ if [ ! -f "data/bible.sqlite" ]; then
   echo "❌ 성경 DB(data/bible.sqlite)가 없습니다. 먼저 아래를 실행하세요:"
   echo "   npm run bible:build"
   exit 1
+fi
+
+# ── 태블릿 모드 ─────────────────────────────────────────────────────
+# 기본은 이 PC 안에서만 연다(감사 H-1). LAN 을 열 때는 **접속 암호가 있어야** 한다 —
+# 없이 열면 같은 WiFi 의 누구나 예배 화면을 바꿀 수 있다 (docs/SECURITY-AUDIT.md 권고 4).
+if [ "${1:-}" = "lan" ]; then
+  export SERMON_HOST=0.0.0.0
+
+  # 암호가 없으면 서버가 뜨기를 거부한다. 예배 직전에 벽을 만나지 않도록 **여기서**
+  # 먼저 잡아 그 자리에서 정하게 한다 (10초면 끝난다).
+  if ! node scripts/set-password.ts --show >/dev/null 2>&1; then
+    echo "태블릿으로 열려면 접속 암호가 필요합니다. 아직 정해지지 않았습니다."
+    printf "지금 정할까요? [Y/n] "
+    read -r ANS || ANS=""
+    case "${ANS}" in
+      [nN] | [nN][oO])
+        echo "  그러면 태블릿으로는 열 수 없습니다. 이 PC 안에서만 쓰려면:  ./start.sh"
+        exit 1
+        ;;
+      *)
+        node scripts/set-password.ts || exit 1
+        echo
+        ;;
+    esac
+  fi
+
+  echo "⚠ 태블릿 모드 — 같은 WiFi 의 기기가 접속할 수 있습니다."
+  echo "  태블릿은 접속 암호를 넣어야 하고, 이 PC 는 묻지 않습니다."
+  echo "  예배가 끝나면 Ctrl+C 로 닫으세요."
+  echo
 fi
 
 # ── 이미 떠 있으면? ─────────────────────────────────────────────────

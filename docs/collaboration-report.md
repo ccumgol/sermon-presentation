@@ -64,7 +64,7 @@
 | 무엇인가 | OBS Studio **브라우저 소스**로 성경 본문·찬양 가사를 송출하는 로컬 앱 |
 | 기술 | Node.js 26(TypeScript 네이티브 실행, 빌드 없음) · Fastify 5 · `node:sqlite` · React 19 + Vite |
 | 기능 완성도 | **실사용 가능**. 성경 12역본, 찬양 1,202곡, 템플릿 9종, 예배 순서(유형·저장·자동 진행·배경), 줄나눔 검토 |
-| 테스트 | **955개 통과** · 52파일 (단위 + 통합, `npx vitest run` 약 6초) |
+| 테스트 | **983개 통과** · 54파일 (단위 + 통합, `npx vitest run` 약 6초) |
 | 문서 | README(설치·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제) + **운영 3종**(2026-08-16 사용자 요청으로 신설) — [USER-GUIDE](USER-GUIDE.md)(탭별 사용법) · [TROUBLESHOOTING](TROUBLESHOOTING.md)(증상별 해결) · [CHANGELOG](CHANGELOG.md)(변경 이력) · [SECURITY-AUDIT](SECURITY-AUDIT.md)(보안 감사, 2026-08-16). analysis·handover·setup-guide 처럼 **겹치는 문서는 여전히 만들지 않습니다** |
 | 저장소 | `github.com/ccumgol/sermon-presentation` (**PRIVATE**) · `main` 직통 |
 | 실행 환경 | **모든 Agent 가 사용자의 같은 맥·같은 `data/` 를 공유** (0.3 참고) |
@@ -112,6 +112,7 @@ npm start               # http://localhost:7777
 | R-4 | `PlanPanel.tsx` 분할 | 🟡 **부분** 3,147 → 2,244줄 | Agent J (2026-08-22) |
 | R-5 | 문서 머리말·테스트 수 갱신 | 🟢 완료 | Agent J (2026-08-22) |
 | Q-1 | 통일찬송가 영어 원제 483곡 | 🟢 완료 | Agent J (2026-08-22) |
+| 권고4 | **태블릿 접속 암호** (감사 8장) | 🟢 완료 | Agent J (2026-08-22) |
 
 **R-4 를 끝내려면 재설계가 필요합니다.** 목록 블록(`plan-single`, 730줄)이 PlanPanel
 스코프 식별자 **81개**를 공유합니다. 프롭 60개짜리 껍데기로 옮기면 줄 수만 줄고 결합은
@@ -324,6 +325,8 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 ### 현재 진행 중
 ```
 (없음 — 다음 요청을 기다리는 중)
+
+직전 작업: 태블릿 접속 암호 (2026-08-22 완료, §3.44).
 
 직전 작업: 문서 구조 정돈 · 검토 R-1~R-5 · 통일찬송가 원제 483곡 (2026-08-22 완료, §3.43).
 

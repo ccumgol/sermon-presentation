@@ -87,7 +87,7 @@ npm run bible:verify
 | 부르는 법 | 하는 일 |
 |---|---|
 | `presentation` · `./start.sh` | 이 PC 안에서만 (기본·권장) |
-| `presentation lan` · `./start.sh lan` | 태블릿으로도 조작 — **인증 없음, 주의** |
+| `presentation lan` · `./start.sh lan` | 태블릿으로도 조작 — **접속 암호를 넣어야 한다** |
 | `PORT=7800 ./start.sh` | 포트를 직접 준다 |
 | `OPEN_BROWSER=0 ./start.sh` | 브라우저를 열지 않는다 |
 
@@ -108,9 +108,27 @@ npm start
 npm run start:lan
 ```
 
-⚠️ 이 앱에는 **인증이 없습니다.** LAN 에 열면 같은 WiFi 의 누구나 예배 중 화면을 바꾸거나
-찬양 가사를 지울 수 있습니다([보안 감사](docs/SECURITY-AUDIT.md)). 신뢰할 수 있는 망에서만
-쓰고 예배가 끝나면 닫으세요.
+**태블릿은 접속 암호를 넣어야 합니다.** 암호가 정해지지 않았으면 서버가 LAN 으로 뜨기를
+거부합니다(`./start.sh lan` 은 그 자리에서 정하게 해 줍니다).
+
+```bash
+npm run password              # 암호를 정한다 (화면에 찍히지 않는다)
+npm run password -- --show    # 정해져 있는지 본다
+npm run password -- --clear   # 없앤다 (그러면 LAN 을 열 수 없다)
+```
+
+| | |
+|---|---|
+| **이 PC** (컨트롤 패널·OBS·강사 모니터·프로젝터) | 암호를 **묻지 않습니다** |
+| **태블릿·다른 기기** | 처음 열 때 한 번 넣고, **30일간 기억**합니다 |
+
+이 PC 를 면제하는 것은 편의가 아니라 필요입니다 — **OBS 브라우저 소스는 암호를 입력할 수
+없습니다.** 다른 PC 의 OBS 처럼 암호를 넣을 수 없는 기기가 LAN 에 있으면 그 주소만
+면제합니다: `SERMON_TRUSTED_IPS=192.168.1.50 ./start.sh lan`
+
+암호를 잊으면 `npm run password` 로 다시 정하면 됩니다(평문으로 저장되지 않습니다).
+다시 정하면 **접속해 있던 기기가 모두 로그아웃**됩니다.
+자세한 내용은 [보안 감사](docs/SECURITY-AUDIT.md).
 
 개발 중에는 패널과 서버를 함께 감시 모드로 돌립니다.
 
@@ -166,9 +184,10 @@ npm run dev
 | 명령 | 설명 |
 |------|------|
 | `./start.sh` (`presentation`) | **빌드 + 서버 + 브라우저를 한 번에** · 이미 떠 있으면 물어본다 |
-| `./start.sh lan` (`presentation lan`) | 위와 같고 태블릿에도 연다 — **인증 없음, 주의** |
+| `./start.sh lan` (`presentation lan`) | 위와 같고 태블릿에도 연다 — 접속 암호 필요 |
+| `npm run password` | 태블릿 접속 암호를 정한다 |
 | `npm start` | 컨트롤 패널 빌드 + 서버 실행 (이 PC 안에서만) |
-| `npm run start:lan` | 태블릿 등 LAN 에 열어 실행 — **인증 없음, 주의** |
+| `npm run start:lan` | 태블릿 등 LAN 에 열어 실행 — 접속 암호 필요 |
 | `npm run serve` | 빌드 없이 서버만 실행 |
 | `npm run dev` | 패널·서버를 함께 감시 모드로 실행 |
 | `npm run app:build` | 컨트롤 패널만 빌드 (`public/app/`) |
