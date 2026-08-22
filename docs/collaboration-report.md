@@ -8,7 +8,7 @@
 > 문제 해결은 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) · 변경 요약은 [CHANGELOG.md](CHANGELOG.md) ·
 > 설계 근거는 [PLAN.md](../PLAN.md) · 데이터 문제는 [KNOWN-DATA-ISSUES.md](KNOWN-DATA-ISSUES.md).
 
-**최근 갱신**: 2026-08-22 · 갱신자: Claude (Agent J, Opus 5) · 기준 커밋: `3be164f`
+**최근 갱신**: 2026-08-22 · 갱신자: Claude (Agent J, Opus 5) · 기준 커밋: `1d8acff`
 
 > 협업 규칙 자체는 다른 프로젝트(translateviewer)에서 옮겨온 것입니다. 2026-08-22 에
 > **규칙은 `CLAUDE.md` 로, 이력은 `work-log.md` 로** 나눴습니다 — 이 문서는 상태만 담습니다.
@@ -64,7 +64,7 @@
 | 무엇인가 | OBS Studio **브라우저 소스**로 성경 본문·찬양 가사를 송출하는 로컬 앱 |
 | 기술 | Node.js 26(TypeScript 네이티브 실행, 빌드 없음) · Fastify 5 · `node:sqlite` · React 19 + Vite |
 | 기능 완성도 | **실사용 가능**. 성경 12역본, 찬양 1,202곡, 템플릿 9종, 예배 순서(유형·저장·자동 진행·배경), 줄나눔 검토 |
-| 테스트 | **931개 통과** · 51파일 (단위 + 통합, `npx vitest run` 약 6초) |
+| 테스트 | **955개 통과** · 52파일 (단위 + 통합, `npx vitest run` 약 6초) |
 | 문서 | README(설치·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제) + **운영 3종**(2026-08-16 사용자 요청으로 신설) — [USER-GUIDE](USER-GUIDE.md)(탭별 사용법) · [TROUBLESHOOTING](TROUBLESHOOTING.md)(증상별 해결) · [CHANGELOG](CHANGELOG.md)(변경 이력) · [SECURITY-AUDIT](SECURITY-AUDIT.md)(보안 감사, 2026-08-16). analysis·handover·setup-guide 처럼 **겹치는 문서는 여전히 만들지 않습니다** |
 | 저장소 | `github.com/ccumgol/sermon-presentation` (**PRIVATE**) · `main` 직통 |
 | 실행 환경 | **모든 Agent 가 사용자의 같은 맥·같은 `data/` 를 공유** (0.3 참고) |
@@ -101,6 +101,26 @@ npm start               # http://localhost:7777
 ---
 
 ## 4. 작업 보드 (Work Board)
+
+### 4.5 검토 조치 (REVIEW-agent-c-2026-08-22)
+
+| # | 항목 | 상태 | 담당 |
+|---|---|---|---|
+| R-1 | Origin 검사에 Host 확인 한 겹 (DNS 리바인딩) | 🟢 완료 | Agent J (2026-08-22) |
+| R-2 | `coverage/` 추적 해제 | 🟢 완료 | Agent J (2026-08-22) |
+| R-3 | `migrate-template-ids` 스냅샷 | 🟢 완료 | Agent J (2026-08-22) |
+| R-4 | `PlanPanel.tsx` 분할 | 🟡 **부분** 3,147 → 2,244줄 | Agent J (2026-08-22) |
+| R-5 | 문서 머리말·테스트 수 갱신 | 🟢 완료 | Agent J (2026-08-22) |
+| Q-1 | 통일찬송가 영어 원제 483곡 | 🟢 완료 | Agent J (2026-08-22) |
+
+**R-4 를 끝내려면 재설계가 필요합니다.** 목록 블록(`plan-single`, 730줄)이 PlanPanel
+스코프 식별자 **81개**를 공유합니다. 프롭 60개짜리 껍데기로 옮기면 줄 수만 줄고 결합은
+그대로입니다. 800줄 아래로 내리는 길은 훅 분리(`usePlanStorage`·`usePlanSend`·
+`usePlanAdd`)이고, 예배를 진행하는 화면이라 기계적으로 밀어붙이지 않았습니다.
+
+**영어 원제(`titleAlt`)는 화면에 안 나옵니다** — API 로는 나갑니다. 찬양 목록·검색에
+보이게 할지 사용자 결정이 필요합니다 (8장 ③).
+
 
 상태: 🔴 미착수 · 🟡 진행중 · 🟢 완료 · ⚪ 보류(의도적)
 
@@ -303,16 +323,11 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
-- [시작 2026-08-22 / Agent J] 문서 구조 정돈 → 이어서 검토 항목 R-1~R-5 · 통일찬송가 원제
-  계획: ① 프로젝트 CLAUDE.md 신설(상시 로드) + AGENTS.md 로 다른 도구도 인식
-        ② 이 문서의 3장(작업 이력 1,641줄)을 docs/work-log.md 로 분리
-        ③ R-1 Origin+Host 검사 · R-2 coverage gitignore · R-3 마이그레이션 스냅샷
-           R-4 PlanPanel 분할 · R-5 문서 수치 갱신 · 통일찬송가 557곡 원제 물려받기
-  다음 단계: ① CLAUDE.md 작성 → ② 3장 분리 → 상호 참조 정리 → 커밋
+(없음 — 다음 요청을 기다리는 중)
 
-직전 작업: 새찬송가 영어 원제 641곡 반입 (2026-08-21 완료, §3.42).
+직전 작업: 문서 구조 정돈 · 검토 R-1~R-5 · 통일찬송가 원제 483곡 (2026-08-22 완료, §3.43).
 
-직전 작업: 새찬송가 영어 원제 641곡 반입 (2026-08-21 완료, §3.42).
+직전 작업: 문서 구조 정돈 · 검토 R-1~R-5 · 통일찬송가 원제 483곡 (2026-08-22 완료, §3.43).
 그 앞: 기능 매뉴얼 그림 + 문서 실측 대조 (§3.41) · 인용구 (§3.38~3.40).
 ```
 
