@@ -23,6 +23,7 @@
     "chorus:merge": "node scripts/merge-chorus.ts",
     "measure:meter": "node scripts/measure-meter-ranking.ts",
     "lyrics:lang": "node scripts/import-lyrics-lang.ts",
+    "titles:borrow": "node scripts/borrow-en-titles.ts",
     "praise:check": "node scripts/check-praise-folder.ts"
   },
   "dependencies": {
