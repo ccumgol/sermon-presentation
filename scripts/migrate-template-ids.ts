@@ -20,6 +20,11 @@
  *
  * 옮길 곳은 세 군데다 — 순서표 항목, 예배 기본 설정, 저장된 송출 상태.
  *
+ * ## 백업
+ *
+ * `--apply` 는 쓰기 전에 `snapshotDatabases()` 로 스냅샷을 뜬다. 뜨지 못하면 던져서
+ * **아무것도 고치지 않고 멈춘다.** 백업 없이 순서표를 고치는 것이 가장 큰 위험이다.
+ *
  * ## 왜 미리보기가 기본인가
  *
  * 순서표를 고치는 작업이다. 잘못 옮기면 예배 중 항목이 엉뚱한 모양으로 나가고,
@@ -39,6 +44,7 @@
  */
 
 import { DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../lib/template-presets.ts';
+import { snapshotDatabases } from '../server/db/snapshot.ts';
 import { getConnection, initAppDb } from '../server/db/app.ts';
 
 /** 옛 id → 새 id. 사용자 사본 3 이 하단 프리셋이 됐다 */
@@ -186,6 +192,12 @@ function main(): void {
     return;
   }
 
+  // 되돌릴 수 없는 작업이다 — 쓰기 전에 스냅샷을 뜬다 (CLAUDE.md '데이터를 바꿀 때').
+  // 실패하면 던진다: 백업 없이 순서표를 고치는 것이 바로 이 규칙이 막으려는 위험이다.
+  const snapshot = snapshotDatabases('before-migrate-template-ids');
+  console.log(`\n스냅샷(${snapshot.stamp}):`);
+  for (const saved of snapshot.files) console.log(`  ${saved}`);
+
   const updateItems = conn.prepare('UPDATE service_plans SET items = ? WHERE id = ?');
   const updateBoth = conn.prepare('UPDATE service_plans SET items = ?, defaults = ? WHERE id = ?');
   const updateDefaults = conn.prepare('UPDATE service_plans SET defaults = ? WHERE id = ?');
@@ -311,6 +323,12 @@ function deleteCopies(apply: boolean, only: readonly number[] | undefined): void
     console.log('미리보기입니다. 실제로 지우려면 --apply 를 붙이세요.');
     return;
   }
+
+  // 되돌릴 수 없는 작업이다 — 쓰기 전에 스냅샷을 뜬다 (CLAUDE.md '데이터를 바꿀 때').
+  // 실패하면 던진다: 백업 없이 순서표를 고치는 것이 바로 이 규칙이 막으려는 위험이다.
+  const snapshot = snapshotDatabases('before-delete-template-copies');
+  console.log(`\n스냅샷(${snapshot.stamp}):`);
+  for (const saved of snapshot.files) console.log(`  ${saved}`);
 
   const remove = conn.prepare('DELETE FROM templates WHERE id = ?');
   conn.exec('BEGIN');
