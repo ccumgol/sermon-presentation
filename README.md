@@ -23,6 +23,7 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) | 원본 데이터의 알려진 문제 |
 | [docs/collaboration-report.md](docs/collaboration-report.md) | 여러 Agent 협업 규칙·작업 보드 |
 | [docs/REVIEW-2026-08-18.md](docs/REVIEW-2026-08-18.md) | **검수 리포트** — 방향성 결정(OBS/standalone·탭 구조·덜어낼 것)과 불안요소 |
+| [docs/REVIEW-external-data-2026-08-21.md](docs/REVIEW-external-data-2026-08-21.md) | **외부 자료 검토** — 공개 성경·찬송가 저장소의 라이선스와 배포용 DB 아이디어 |
 
 저장소: https://github.com/ccumgol/sermon-presentation
 
@@ -278,6 +279,7 @@ sermon-presentation/
 │   ├── import-responsive.ts 통일찬송가 교독문 가져오기 (txt)
 │   ├── import-kyodoc.ts     새찬송가 교독문 가져오기 (sqlite)
 │   ├── import-lyrics-lang.ts     번역 가사 폴더 반입
+│   ├── import-hymn-en-titles.ts  새찬송가 영어 원제 · 통일 번호 반입
 │   ├── merge-chorus.ts      후렴 → 각 절 뒤로 병합 (미리보기 기본)
 │   ├── realign-lyrics.ts    가사 줄나눔 재정렬 (미리보기 기본)
 │   ├── migrate-template-ids.ts   템플릿 id 이관·사본 정리
