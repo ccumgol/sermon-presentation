@@ -13,6 +13,9 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 
 | 문서 | 내용 |
 |------|------|
+| [CLAUDE.md](CLAUDE.md) | **AI Agent 가 지킬 필수 규칙** — 자동으로 읽힙니다 (다른 도구는 `AGENTS.md`, 같은 파일) |
+| [docs/collaboration-report.md](docs/collaboration-report.md) | **협업 상태** — 작업 보드·진행 중 로그. 작업 시작 전 확인 |
+| [docs/work-log.md](docs/work-log.md) | 작업 이력 전체 (판단 근거·검증 방법까지) |
 | [docs/feature-map.html](docs/feature-map.html) | **기능 매뉴얼 (그림 한 장)** — 자료 → 준비 → 네 화면. 브라우저로 엽니다 |
 | [docs/diagram-design-profile.md](docs/diagram-design-profile.md) | 위 그림에 쓴 색(이 앱의 UI 색). 새 PC 에서 그릴 때 홈 폴더로 한 번 복사 |
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | **탭별 사용법·기능·단축키** — 예배를 진행하는 사람이 보는 문서 |

@@ -1,0 +1,142 @@
+# sermon-presentation — Agent 필수 지침
+
+교회 예배용 프레젠테이션 앱. Node 26(빌드 없음) + Fastify + `node:sqlite` + React 19,
+OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 화면이 멈추면 예배가 멈춘다.
+
+**이 파일은 자동으로 읽힌다. 여기 있는 것은 전부 필수다.** 나머지는 필요할 때 찾아본다.
+
+---
+
+## 어느 문서를 언제 읽는가
+
+| 언제 | 무엇을 |
+|---|---|
+| **작업을 시작할 때 (매번)** | [docs/collaboration-report.md](docs/collaboration-report.md) — 작업 보드·진행 중 로그·인계 메모. **여기에 착수 기록을 쓴다** |
+| 화면·기능이 왜 그렇게 생겼는지 알아야 할 때 | [PLAN.md](PLAN.md) (설계 근거) · [docs/USER-GUIDE.md](docs/USER-GUIDE.md) (탭별 사용법) |
+| 무언가 안 될 때 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — 증상 → 원인 → 조치. **먼저 여기를 본다** |
+| 전에 누가 무엇을 했는지 찾을 때 | [docs/work-log.md](docs/work-log.md) (작업 이력 전체) · [docs/CHANGELOG.md](docs/CHANGELOG.md) (요약) |
+| 데이터가 이상할 때 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) — 원본 자료 자체의 문제 목록 |
+| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 남은 항목 |
+| 설치·구조를 알아야 할 때 | [README.md](README.md) |
+
+---
+
+## 착수하기 전에 — 매번, 예외 없이
+
+1. **`docs/collaboration-report.md` 8장에 3줄을 먼저 쓴다.** 코드를 만지기 **전에**.
+   ```
+   - [시작 2026-08-22 / Agent X] 무엇을
+     계획: 어떻게
+     다음 단계: 지금 다음에 할 일
+   ```
+   **작업이 끝난 뒤 쓰는 기록은 남지 않는다** — 사용량 만료·크래시는 예고 없이 온다.
+   30분 넘는 작업은 단계마다 `다음 단계:` 줄만 갱신한다. 마지막 갱신 지점이 중단 지점이다.
+
+2. **`git status --short` 를 본다.** 내 것이 아닌 미커밋 변경이 있으면 다른 Agent 의
+   미완성 작업이다. **임의로 되돌리지 않는다.** 8장 로그를 읽고
+   [8.1 중단된 작업을 이어받는 절차](docs/collaboration-report.md#81-중단된-작업을-이어받는-절차)
+   로 판정한다 — 추측하지 말고 실제 상태를 본다.
+
+3. **보드(4장)에서 그 항목을 `🟡 진행중` 으로 바꾸고 이름·날짜를 적는다.**
+
+---
+
+## 절대 하지 않는 것
+
+- **사용자 데이터를 되돌리기 전에 묻지 않는 것.** `data/songs.sqlite` 에는 사용자가 직접
+  손본 가사가 있고 **git 에 없다.** 되돌릴 방법이 백업뿐이다. 실제로 한 번 지웠다.
+- **`lines_source = 'manual'`(승인) 인 곡을 건드리는 것.** 사람의 작업 표시다.
+  자동 스크립트도, **Agent 도** 손대지 않는다. 곡을 콕 집어 지정할 때만 예외다.
+- **미커밋 변경을 버리는 것** (`git checkout --`, `git stash drop`) — 사용자 승인 후에만.
+- **원본 자료에 쓰는 것.** `~/Desktop/Data/BibleDB`, `~/Desktop/Data/Praise` 는 **읽기 전용**.
+- **7777 서버를 묻지 않고 죽이는 것.** 사용자가 예배 준비 중 띄워 둔 것일 수 있다.
+  검증은 **격리 서버**로 한다 (아래 참고).
+- **이력 재작성** (force push, filter-repo) — 사용자 승인 필요.
+- **백업이 곡 0개인 것을 모르고 넘어가는 것.** 아래 '백업' 참고.
+
+---
+
+## 데이터를 바꿀 때
+
+**미리보기가 기본이고 `--apply` 를 붙여야 실제로 쓴다.** 새 스크립트도 같은 규칙을 따른다.
+
+```bash
+npm run lyrics:realign            # 미리보기 — 아무것도 쓰지 않는다
+npm run lyrics:realign -- --apply # 실제로 쓴다
+```
+
+**쓰기 전에 스냅샷을 뜬다.** 코드에서는 이 함수를 부른다:
+
+```ts
+import { snapshotDatabases } from '../server/db/snapshot.ts';
+const snap = snapshotDatabases('before-무엇');   // 실패하면 던진다 → 작업을 중단해야 한다
+```
+
+> ⚠️ **`cp data/songs.sqlite ...` 한 줄은 백업이 아니다.** 이 DB 는 WAL 모드라서 최근
+> 변경이 `-wal` 에 있다. 한 파일만 복사하면 **곡 0개인 백업**이 된다(실제로 겪었다).
+> `snapshotDatabases()` 는 `VACUUM INTO` 로 일관된 단일 파일을 뜬다 — 이걸 쓴다.
+
+**`--apply` 로 돌리기 전에 사용자에게 알린다.** 사용자는 Agent 가 작업하는 동안에도
+같은 DB 를 편집한다. 백업과 DB 가 다르다고 해서 "내 테스트 흔적" 이라고 단정하지 않는다.
+
+**자기가 만든 변경만 목록으로 관리하고, 정리할 때 그 목록에 있는 것만 되돌린다.**
+
+---
+
+## 검증 — 주장하지 말고 확인한다
+
+```bash
+npx tsc --noEmit && npx vitest run && npx vite build
+```
+
+셋 다 통과해야 완료다. 커밋 메시지와 보고에 **무엇으로 확인했는지** 적는다.
+
+**사용자 서버(7777)를 건드리지 않고 확인하려면 격리 서버를 띄운다.** 포트를 직접 준다.
+
+```bash
+SCRATCH=/tmp/verify && mkdir -p $SCRATCH/backgrounds
+PORT=7810 SERMON_DATA_DIR=$SCRATCH SERMON_BIBLE_DB=$PWD/data/bible.sqlite node server/index.ts
+```
+
+**고친 것에 따라 다시 해야 하는 일이 다르다.**
+
+| 고친 곳 | 서버 재시작 | OBS 새로고침 |
+|---|:---:|:---:|
+| `server/` `lib/` `shared/` | ✅ | — |
+| `src/control/` (패널) | ✅ (빌드 포함) | — |
+| `public/output/` (출력 페이지) | — | ✅ |
+
+---
+
+## 커밋
+
+`main` 직통이다(사용자 결정 — 예배 직전 수정에 병합 단계가 끼면 느려진다).
+대신 **작게 자주** 커밋한다. 형식은 `feat:` `fix:` `docs:` `refactor:` `test:`.
+메시지에 **원인·조치·검증**을 담는다.
+
+```bash
+git diff --name-only origin/main..HEAD   # data/ 나 settings.local.json 이 섞였는지 확인
+```
+
+푸시가 실패하면 `git pull --rebase` 후 재시도한다.
+
+---
+
+## 코드에서 지키는 것
+
+- **화면을 스스로 비우지 않는다.** 서버가 죽어도 출력 페이지는 마지막 내용을 유지한다.
+  모르는 슬라이드 종류를 받으면 이전 화면을 그대로 둔다 — 예배 중 검은 화면을 막는다.
+- **출력 페이지(`public/output/`)는 의존성 0.** React·CDN·외부 폰트를 쓰지 않는다.
+  그래서 일부 로직이 `lib/` 와 의도적으로 중복돼 있다 — 고칠 때 **양쪽을 함께** 고친다.
+- **자동 결과는 제안이다.** 사람이 승인해야 확정된다.
+- **추측 말고 실측.** 폰트 대체·글자 크기·스크롤바 폭까지 브라우저에서 재고 정했다.
+- 파일은 200~400줄이 적당, **최대 800줄**. 함수는 50줄 이하.
+  (`public/output/output.js` 는 의존성 0 때문에 의도적 예외)
+- 기존 데이터를 직접 고치지 않고 새 복사본을 만든다.
+
+---
+
+## 자기 이름
+
+Agent 이름은 **계정 이니셜**을 쓴다 (`Agent C`, `Agent J`). 협업의 취지는
+**사용량 한도 이어달리기** — 여러 계정이 같은 PC·같은 `data/` 를 공유하며 이어서 작업한다.

@@ -687,7 +687,7 @@ DB 는 손대지 않는다. 화면에 보낼 **사본**을 만든다 (`quoteSlid
 
 ## 그 이전 (Phase 0~5, 곡집·가사 정리)
 
-[collaboration-report.md](collaboration-report.md) 3장에 Phase 별로 정리돼 있습니다.
+[work-log.md](work-log.md) 에 Phase 별로 정리돼 있습니다.
 요약하면 — 성경 12역본 342,317절 통합, 찬양 1,202곡, 템플릿 시스템, 예배 순서,
 곡집 다대다 구조, 후렴 병합(586곡), 절 간 운율 정렬, 줄나눔 검토 화면, git 도입.
 
