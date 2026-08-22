@@ -35,7 +35,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { parseHymnEnRows, SUSPECT_NUMBERS } from '../lib/hymn-en-titles.ts';
+import { parseHymnEnRows, RESOLVED_SUSPECTS, SUSPECT_NUMBERS } from '../lib/hymn-en-titles.ts';
 import { findByEntry, getSong, initSongsDb, linkSongs, updateSongMeta } from '../server/db/songs.ts';
 import { snapshotDatabases } from '../server/db/snapshot.ts';
 
@@ -86,17 +86,21 @@ function main(): void {
    * 뺀 항목은 **우리 제목과 나란히** 보여 준다. 출처의 한국어만 보여 주면 무엇이
    * 어긋났는지 알 수 없다 — 두 열을 맞대 봐야 사람이 판단할 수 있다.
    */
+  /*
+   * 어긋난 구간은 **사람이 판정한 표**(`RESOLVED_SUSPECTS`)를 쓴다. 출처의 번호를
+   * 그대로 믿지 않고, 우리 제목을 기준으로 무엇이 맞는지 정해 둔 값이다.
+   * 판정하지 못한 것(출처에 아예 없는 곡)은 비워 두고 알린다.
+   */
   if (skipped.length > 0) {
-    console.log(`\n★ 넣지 않은 것 ${skipped.length}건 — 출처에서 번호가 어긋난 구간입니다.`);
-    console.log(`  우리 제목과 맞대어 보고, 맞는 것만 찬양 탭에서 손으로 넣으세요.\n`);
-    console.log(`  ${'번호'.padEnd(6)}${'우리 제목'.padEnd(24)}${'출처의 한국어'.padEnd(24)}출처의 영어`);
+    console.log(`\n★ 어긋난 구간 ${skipped.length}건 — 우리 제목을 기준으로 판정한 값을 씁니다.\n`);
+    console.log(`  ${'번호'.padEnd(6)}${'우리 제목'.padEnd(22)}${'넣는 영어 원제'.padEnd(34)}근거`);
     for (const s of skipped) {
       const found = pickOne('hymn_new', s.newNumber);
       const ours = found && 'id' in found ? (getSong(found.id)?.title ?? '?') : '?';
-      const flag = ours === s.koreanForReference ? '' : '   ⚠ 한국어가 다릅니다';
-      console.log(
-        `  ${String(s.newNumber).padEnd(6)}${ours.padEnd(24)}${s.koreanForReference.padEnd(24)}${s.english}${flag}`,
-      );
+      const fix = RESOLVED_SUSPECTS.get(s.newNumber);
+      const what = fix ? fix.english : '(넣지 않음)';
+      const why = fix ? fix.basis : '출처에 이 곡이 없습니다 — 짐작해 채우지 않습니다';
+      console.log(`  ${String(s.newNumber).padEnd(6)}${ours.padEnd(22)}${what.padEnd(34)}${why}`);
     }
   }
 
@@ -146,6 +150,26 @@ function main(): void {
     }
   }
 
+  /*
+   * 판정한 어긋난 구간을 계획에 더한다. 여기서도 **이미 적힌 값은 덮지 않는다** —
+   * 사람이 손으로 고친 것이 자동 작업에 지워지면 안 된다.
+   */
+  if (!linksOnly) {
+    for (const [number, fix] of RESOLVED_SUSPECTS) {
+      const found = pickOne('hymn_new', number);
+      if (!found || !('id' in found)) {
+        notes.push(`새 ${number}장: 우리 DB 에서 찾지 못해 판정값을 넣지 못했습니다`);
+        continue;
+      }
+      const song = getSong(found.id);
+      if (!song) continue;
+      const already = song.titleAlt?.trim();
+      if (already && !overwrite) continue;
+      if (already === fix.english) continue;
+      titlePlan.push({ songId: found.id, number, title: song.title, english: fix.english });
+    }
+  }
+
   console.log(`\n바뀔 것`);
   console.log(`  영어 원제를 채울 곡: ${titlePlan.length}곡`);
   console.log(`  새로 이을 새↔통일 연결: ${linkPlan.length}건`);
@@ -186,16 +210,22 @@ function main(): void {
       : `⚠ 다시 읽은 결과가 다릅니다 (${ok}/${titlePlan.length})`,
   );
 
-  // 의심 번호가 정말로 비어 있는지 — 이 스크립트가 지켜야 하는 경계다
-  let leaked = 0;
+  /*
+   * 어긋난 구간의 경계를 검사한다 — 이 스크립트가 지켜야 하는 약속이다.
+   * 판정한 것은 그 값이 들어가 있어야 하고, 판정하지 못한 것은 **비어 있어야** 한다.
+   */
+  const wrong: string[] = [];
   for (const n of SUSPECT_NUMBERS) {
     const found = pickOne('hymn_new', n);
-    if (found && 'id' in found && getSong(found.id)?.titleAlt) leaked += 1;
+    if (!found || !('id' in found)) continue;
+    const got = getSong(found.id)?.titleAlt ?? null;
+    const want = RESOLVED_SUSPECTS.get(n)?.english ?? null;
+    if (got !== want) wrong.push(`새 ${n}장: 넣으려던 값 ${want ?? '(없음)'} · 실제 ${got ?? '(없음)'}`);
   }
   console.log(
-    leaked === 0
-      ? `확인: 어긋난 4곳(${[...SUSPECT_NUMBERS].sort((a, b) => a - b).join('·')})은 비어 있습니다`
-      : `⚠ 어긋난 곳에 값이 들어갔습니다 (${leaked}곡)`,
+    wrong.length === 0
+      ? `확인: 어긋난 구간 — 판정한 ${RESOLVED_SUSPECTS.size}곡은 채워지고, 나머지는 비어 있습니다`
+      : `⚠ 어긋난 구간이 뜻대로 되지 않았습니다:\n  ${wrong.join('\n  ')}`,
   );
 }
 

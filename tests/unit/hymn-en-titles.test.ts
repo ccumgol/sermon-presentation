@@ -11,7 +11,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { cleanEnglishTitle, parseHymnEnRows, SUSPECT_NUMBERS } from '../../lib/hymn-en-titles.ts';
+import {
+  cleanEnglishTitle,
+  parseHymnEnRows,
+  RESOLVED_SUSPECTS,
+  SUSPECT_NUMBERS,
+} from '../../lib/hymn-en-titles.ts';
 
 const TSV = [
   '# 주석은 건너뛴다',
@@ -119,5 +124,35 @@ describe('영어 제목 잡티 떼기', () => {
     expect(cleanEnglishTitle('Amazing Grace! How Sweet the Sound!')).toBe(
       'Amazing Grace! How Sweet the Sound!',
     );
+  });
+});
+
+describe('의심 구간을 사람이 판정한 표', () => {
+  it('631 · 632 · 638 만 판정했다 — 639 는 출처에 없어 비워 둔다', () => {
+    expect([...RESOLVED_SUSPECTS.keys()].sort((a, b) => a - b)).toEqual([631, 632, 638]);
+    expect(RESOLVED_SUSPECTS.has(639)).toBe(false);
+  });
+
+  it('판정한 번호는 모두 의심 목록 안에 있다', () => {
+    for (const n of RESOLVED_SUSPECTS.keys()) expect(SUSPECT_NUMBERS.has(n)).toBe(true);
+  });
+
+  it('판정마다 근거가 적혀 있다 — 왜 이 값인지 나중에 알 수 있어야 한다', () => {
+    for (const [n, v] of RESOLVED_SUSPECTS) {
+      expect(v.english.length, `${n}번 영어 제목이 비었다`).toBeGreaterThan(0);
+      expect(v.basis.length, `${n}번 근거가 비었다`).toBeGreaterThan(10);
+    }
+  });
+
+  it('631·632 는 번호로, 638 은 제목으로 판정했다 (구간이 다르게 밀렸다)', () => {
+    // 두 구간을 뭉쳐 한 규칙으로 풀면 631·632 가 틀린다 — 그 사실을 값으로 고정한다
+    expect(RESOLVED_SUSPECTS.get(631)?.english).toBe('Hear Our Prayer, O Lord');
+    expect(RESOLVED_SUSPECTS.get(638)?.english).toBe('The Lord Bless You and Keep You');
+  });
+
+  it('판정한 값에는 잡티가 없다', () => {
+    for (const [, v] of RESOLVED_SUSPECTS) {
+      expect(cleanEnglishTitle(v.english)).toBe(v.english);
+    }
   });
 });

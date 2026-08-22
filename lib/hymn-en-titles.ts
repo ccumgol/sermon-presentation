@@ -55,6 +55,51 @@ const OLD_MAX = 558;
  */
 export const SUSPECT_NUMBERS: ReadonlySet<number> = new Set([631, 632, 638, 639]);
 
+/**
+ * 의심 구간을 **사람이 판정한 결과** (2026-08-21, 사용자 요청 '우리 제목을 사용해줘').
+ *
+ * 자동 규칙으로 풀 수 없다. **두 구간이 서로 다르게 밀렸기 때문이다.**
+ *
+ * ```
+ * 번호   우리 제목          출처 한국어        출처 영어
+ * 630   진리와 생명 되신 주    진리와 생명 되신 주    Spirit of Truth, of Life, of Power
+ * 631   우리 기도를         진리와 생명 되신 주 ←중복  Hear Our Prayer, O Lord   ← 영어는 번호에 맞다
+ * 632   주여 주여 우리를      우리 기도를         O Lord, O Lord!           ← 영어는 번호에 맞다
+ * 633   나의 하나님 받으소서   나의 하나님 받으소서    Take These Gifts          ← 다시 맞음
+ *
+ * 638   주 너를 지키시고     모든 것이 주께로부터    All Things Come of Thee   ← 두 열이 함께 밀렸다
+ * 639   주 함께 하소서      주 너를 지키시고      The Lord Bless You and Keep You
+ * ```
+ *
+ * 631·632 는 **한국어 열만** 중복되며 밀렸고 영어는 번호에 맞다. 638·639 는 **두 열이
+ * 함께** 밀렸다. 그래서 '제목으로 짝짓기' 를 일괄 적용하면 631·632 가 틀린다.
+ *
+ * 판정 근거를 각 줄에 남긴다 — 나중에 다시 볼 때 '왜 이 값인가' 를 알 수 있어야 한다.
+ *
+ * **새 639 「주 함께 하소서」는 넣지 않는다** — 출처에 그 곡이 아예 빠져 있다.
+ * 없는 것을 짐작해 채우지 않는다.
+ */
+export const RESOLVED_SUSPECTS: ReadonlyMap<number, { english: string; basis: string }> = new Map([
+  [
+    631,
+    {
+      english: 'Hear Our Prayer, O Lord',
+      basis: "출처 631행의 영어. 「우리 기도를」의 정석 영어 응답 (Hear our prayer, O Lord…)",
+    },
+  ],
+  [
+    632,
+    { english: 'O Lord, O Lord!', basis: "출처 632행의 영어. '주여 주여' ↔ 'O Lord, O Lord' 대응" },
+  ],
+  [
+    638,
+    {
+      english: 'The Lord Bless You and Keep You',
+      basis: '출처 639행의 영어(두 열이 함께 밀린 구간). 민수기 6:24 축도와 일치',
+    },
+  ],
+]);
+
 export interface HymnEnRow {
   /** 새찬송가 번호 (1~645) */
   newNumber: number;
