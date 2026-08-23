@@ -54,10 +54,24 @@ export interface BuiltApp {
 }
 
 export function lanHosts(): string[] {
-  const out: string[] = [];
-  for (const addrs of Object.values(networkInterfaces())) {
+  return lanInterfaces().map((entry) => entry.address);
+}
+
+/**
+ * LAN 에서 닿을 수 있는 주소들 — **어느 장치인지 함께 준다.**
+ *
+ * 맥에 Wi-Fi 와 USB 이더넷이 함께 붙어 있으면 주소가 두 개 뜬다. 그때 '어느 것을
+ * 태블릿에 넣어야 하나' 를 알 수 없어 헤맸다(실제로 겪음). 장치 이름을 붙여 두면
+ * 시스템 설정 → 네트워크 와 짝지어 볼 수 있다.
+ *
+ * 장치 이름(en0 등)을 사람이 읽는 이름(Wi-Fi)으로 바꾸려면 macOS 명령을 불러야 하는데,
+ * 예배 중 도는 서버가 기동할 때 외부 프로세스를 띄우는 위험을 만들지 않는다.
+ */
+export function lanInterfaces(): Array<{ address: string; iface: string }> {
+  const out: Array<{ address: string; iface: string }> = [];
+  for (const [iface, addrs] of Object.entries(networkInterfaces())) {
     for (const a of addrs ?? []) {
-      if (a.family === 'IPv4' && !a.internal) out.push(a.address);
+      if (a.family === 'IPv4' && !a.internal) out.push({ address: a.address, iface });
     }
   }
   return out;

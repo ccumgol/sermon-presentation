@@ -4,7 +4,7 @@
  * 실행: npm start (컨트롤 패널을 빌드한 뒤 기동) / npm run serve (빌드 없이)
  */
 
-import { buildApp, lanHosts } from './app.ts';
+import { buildApp, lanInterfaces } from './app.ts';
 import { hasPassword } from './auth.ts';
 import { DEFAULT_PORT, HOST, IS_LAN_OPEN, PORT_SCAN_RANGE } from './config.ts';
 import { closeAppDb } from './db/app.ts';
@@ -83,8 +83,13 @@ app.log.info(`OBS 브라우저 소스: http://localhost:${actualPort}/output/?la
 // 기본을 localhost 로 바꾸면서, 태블릿을 쓰던 사람에게는 '갑자기 안 되는' 상황이
 // 된다. 원인과 여는 방법을 기동 때 바로 보여 주지 않으면 예배 직전에 헤맨다.
 if (IS_LAN_OPEN) {
-  for (const host of lanHosts()) {
-    app.log.info(`태블릿 접속      : http://${host}:${actualPort}/`);
+  const nics = lanInterfaces();
+  for (const nic of nics) {
+    app.log.info(`태블릿 접속      : http://${nic.address}:${actualPort}/   (${nic.iface})`);
+  }
+  if (nics.length > 1) {
+    // 주소가 여러 개면 어느 것을 넣어야 하는지 알 수 없다. 고르는 기준을 알려 준다.
+    app.log.info('주소가 여러 개면 태블릿과 같은 망의 것을 쓰세요 — 태블릿 IP 와 앞 세 자리가 같은 것');
   }
   app.log.info('태블릿은 접속 암호를 넣어야 합니다 (이 PC 는 묻지 않습니다)');
   app.log.warn('예배가 끝나면 닫으세요 (그냥 npm start 로 실행하면 이 PC 안에서만 열립니다)');
