@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
-  LANG_LABELS, MAX_LANGS, orderLangs, SELECTABLE_LANGS, toggleLang as nextLangs,
+  LANG_LABELS, MAX_LANGS, langChoices, orderLangs, toggleLang as nextLangs,
 } from '../../../lib/lang-select.ts';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { LyricsGrid } from '../components/LyricsGrid.tsx';
-import { mergeSecondaryLyrics } from '../../../lib/lyrics-merge.ts';
+import { TranslationPane } from '../components/TranslationPane.tsx';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
@@ -73,12 +73,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   /** 이 탭에서 띄울 때 쓸 프리셋·폰트 — 고르지 않으면 지금 템플릿 그대로 */
   const [outputStyle, setOutputStyle] = useState<OutputStyle>({});
   const [gridLangs, setGridLangs] = useState<LangCode[] | null>(null);
-  /** 붙여 넣을 대상 언어 — 어느 언어를 채우는지 골라야 다른 언어를 지우지 않는다 */
-  const [pasteLang, setPasteLang] = useState<LangCode>('en');
-  /** 붙여 넣은 번역 원문 — 짝을 맞추기 전의 날글 */
-  const [englishPaste, setEnglishPaste] = useState('');
-  /** 마지막 짝 맞추기 결과 — 넘친 줄·모자란 줄을 사람이 보게 한다 */
-  const [mergeReport, setMergeReport] = useState<{ paired: number; replaced: number; dropped: string[]; problems: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -466,7 +460,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
               <div className="field">
                 <label>표시 언어 (최대 {MAX_LANGS})</label>
                 <div className="candidates">
-                  {SELECTABLE_LANGS.map((lang) => {
+                  {langChoices(song.langs).map((lang) => {
                     const has = song.langs.includes(lang);
                     const active = langs.includes(lang);
                     return (
@@ -552,7 +546,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                         편집할 언어
                       </label>
                       <span className="candidates">
-                        {SELECTABLE_LANGS.map((lang) => {
+                        {langChoices(song.langs).map((lang) => {
                           const on = shown.includes(lang);
                           const has = song.langs.includes(lang);
                           return (
@@ -603,79 +597,16 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 />
               </details>
               {/*
-                영어 붙여 넣기 — 손으로 `|` 를 끼우지 않게 한다.
-                4절 × 4줄이면 16번을 정확히 맞춰야 하고, 한 줄만 밀려도 어느 영어가 어느
-                한국어의 번역인지 어긋난 채 저장된다. 화면에서야 드러난다.
-                **저장하지 않는다** — 위 편집 칸을 채워 주고 사람이 보고 누른다.
+                타언어 가사 — 한국어를 옆에 두고 줄 맞춰 적는다.
+                전에는 접힌 칸에서 붙여 넣고 '짝 맞춰 채우기' 를 눌러야 했고, 줄이 맞는지는
+                누른 뒤에야 알 수 있었다. 그래서 4,396곡 중 영어가 들어간 곡이 1곡(2줄)
+                뿐이었다. 지금은 적는 동안 짝지어지고 줄 수가 바로 보인다.
               */}
-              <details className="detail-block">
-                <summary>번역 붙여 넣기</summary>
-                <p className="hintline muted">
-                  고른 언어만 절 순서대로 붙여 넣으세요. 절 사이는 빈 줄로 나눕니다
-                  (<code>[2절]</code> 처럼 라벨을 붙이면 그 절에 들어갑니다).
-                  한국어와 <b>다른 언어는 건드리지 않습니다.</b>
-                </p>
-
-                {/*
-                  대상 언어를 고르게 한다. 전에는 늘 영어로 넣어서, 中文 을 붙이면
-                  English 가 사라졌다 (실측 확인한 데이터 손실).
-                */}
-                <div className="row detail-controls">
-                  <label>넣을 언어</label>
-                  <span className="candidates">
-                    {SELECTABLE_LANGS.filter((lang) => lang !== 'ko').map((lang) => (
-                      <button
-                        key={lang}
-                        type="button"
-                        className={pasteLang === lang ? 'primary' : undefined}
-                        onClick={() => setPasteLang(lang)}
-                      >
-                        {LANG_LABELS[lang] ?? lang}
-                      </button>
-                    ))}
-                  </span>
-                </div>
-                <textarea
-                  className="lyrics-editor"
-                  value={englishPaste}
-                  onChange={(e) => setEnglishPaste(e.target.value)}
-                  spellCheck={false}
-                  rows={10}
-                  aria-label="번역 가사"
-                  placeholder={'1절 첫 줄\n1절 둘째 줄\n\n2절 첫 줄\n2절 둘째 줄'}
-                />
-                <div className="row" style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const merged = mergeSecondaryLyrics(draftLyrics, englishPaste, pasteLang);
-                      setDraftLyrics(merged.text);
-                      setMergeReport(merged);
-                    }}
-                    disabled={englishPaste.trim().length === 0}
-                    title="위 편집 칸에 짝지어 채웁니다. 저장은 따로 누르세요."
-                  >
-                    짝 맞춰 채우기
-                  </button>
-                  <button type="button" onClick={() => { setEnglishPaste(''); setMergeReport(null); }}>
-                    비우기
-                  </button>
-                </div>
-
-                {mergeReport && (
-                  <div className="merge-report">
-                    <p className="hintline">
-                      {mergeReport.paired}줄을 짝지었습니다
-                      {mergeReport.replaced > 0 &&
-                        ` (있던 ${LANG_LABELS[pasteLang] ?? pasteLang} ${mergeReport.replaced}줄은 갈아 끼웠습니다)`}
-                      . 위 칸을 확인하고 <b>가사 저장</b>을 누르세요.
-                    </p>
-                    {mergeReport.problems.map((problem) => (
-                      <p key={problem} className="hintline warn">⚠ {problem}</p>
-                    ))}
-                  </div>
-                )}
-              </details>
+              <TranslationPane
+                text={draftLyrics}
+                onChange={setDraftLyrics}
+                existingLangs={song.langs}
+              />
 
               <div className="row" style={{ marginTop: 10 }}>
                 <button type="button" className="primary" onClick={() => void saveLyrics()} disabled={busy}>
@@ -685,7 +616,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                   type="button"
                   onClick={() => {
                     setDraftLyrics(formatLyrics(song.sections));
-                    setMergeReport(null);
                   }}
                 >
                   되돌리기

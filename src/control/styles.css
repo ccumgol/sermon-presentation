@@ -2323,3 +2323,49 @@ button.link-inline {
 .qr-item figcaption code {
   font-size: 12px;
 }
+
+/* ── 타언어 가사 두 창 ───────────────────────────────────────────────
+   한국어를 왼쪽에 두고 오른쪽에 줄을 맞춰 적는다. 좁은 화면(랩탑 세로)에서는
+   위아래로 접는다 — 두 칸을 억지로 나란히 두면 한 줄에 몇 글자 안 들어간다. */
+.translation-panes { margin-top: 12px; }
+
+.translation-pane {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line, #d6d9de);
+  border-radius: 8px;
+}
+
+.translation-head {
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.translation-head .hintline { margin: 0; }
+
+.translation-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .translation-cols { grid-template-columns: 1fr; }
+}
+
+.translation-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+/* 기준 칸은 만지는 곳이 아니라는 것이 보여야 한다 */
+.translation-col textarea[readonly] {
+  background: var(--bg-sunken, rgba(127, 127, 127, 0.08));
+  color: var(--muted, #6b7280);
+}
+
+.translation-problems { margin: 8px 0 0; padding-left: 18px; }
+.translation-problems li { margin: 2px 0; }

@@ -18,7 +18,14 @@ import type { LangCode } from '../shared/types.ts';
  */
 export const MAX_LANGS = 3;
 
-/** 고를 수 있는 언어와 이름 — 순서가 곧 버튼 순서다 */
+/** 기준 언어 — 다른 언어는 이 언어의 줄에 짝지어 붙는다 */
+export const PRIMARY_LANG: LangCode = 'ko';
+
+/**
+ * 이름표 — **렌더러와 데이터가 아는 전부.**
+ *
+ * UI 에 내보이는 것과 따로 둔다. 여기서 지우면 이미 들어와 있는 가사가 이름을 잃는다.
+ */
 export const LANG_LABELS: Readonly<Record<string, string>> = {
   ko: '한국어',
   en: 'English',
@@ -26,7 +33,39 @@ export const LANG_LABELS: Readonly<Record<string, string>> = {
   ja: '日本語',
 };
 
-export const SELECTABLE_LANGS: ReadonlyArray<LangCode> = ['ko', 'en', 'zh', 'ja'];
+/**
+ * **지금 UI 에 내보이는 언어.** 순서가 곧 버튼 순서다.
+ *
+ * 中文·日本語 를 뺐다 (2026-08-23 사용자 결정) — 넣은 가사가 **0줄**이었고, 고를 것이
+ * 많으면 정작 쓰는 한/영이 묻힌다. `LANG_LABELS` 에는 남겨 두었으므로 **데이터는
+ * 그대로 읽힌다.**
+ *
+ * ## 언어를 다시 켜려면
+ *
+ * **이 배열에 한 줄을 더하면 된다.** 화면·병합·저장이 모두 이 목록을 따른다.
+ * 코드를 고칠 곳은 여기뿐이다.
+ */
+export const ACTIVE_LANGS: ReadonlyArray<LangCode> = ['ko', 'en'];
+
+/**
+ * **아는 언어의 정해진 순서** — 화면에 놓는 순서의 기준이다.
+ *
+ * `ACTIVE_LANGS` 와 따로 둔다. 정렬을 활성 목록으로 하면, 꺼 둔 언어(데이터는 있는)가
+ * 이름 순으로 밀려 `ja` 가 `zh` 앞에 온다. 켜고 끄는 것과 놓는 순서는 다른 문제다.
+ */
+export const KNOWN_LANGS: ReadonlyArray<LangCode> = ['ko', 'en', 'zh', 'ja'];
+
+/**
+ * 이 곡에서 고를 수 있는 언어 — **켜진 언어 + 이미 이 곡에 들어 있는 언어.**
+ *
+ * 둘째 항이 안전장치다. 나중에 `ACTIVE_LANGS` 에서 언어를 빼도, 그 언어 가사가 있는
+ * 곡에서는 계속 보인다 — 손댈 수 없는 데이터가 남는 것을 막는다.
+ */
+export function langChoices(existing: readonly LangCode[] = []): LangCode[] {
+  const out = [...ACTIVE_LANGS];
+  for (const lang of existing) if (!out.includes(lang)) out.push(lang);
+  return out;
+}
 
 /**
  * 언어 하나를 켜거나 끈다.
@@ -60,9 +99,9 @@ export function orderLangs(langs: readonly LangCode[], primaryLang: LangCode = '
   const unique = [...new Set(langs)];
   const rank = (lang: LangCode): number => {
     if (lang === primaryLang) return -1;
-    const index = SELECTABLE_LANGS.indexOf(lang);
+    const index = KNOWN_LANGS.indexOf(lang);
     // 모르는 언어는 뒤로 — 버리지 않는다
-    return index >= 0 ? index : SELECTABLE_LANGS.length;
+    return index >= 0 ? index : KNOWN_LANGS.length;
   };
   return unique.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }

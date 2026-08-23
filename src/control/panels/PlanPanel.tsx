@@ -19,7 +19,7 @@ import {
   moveItem, newItemId,
   removeItem, splitOrderText, type PlanRow,
 } from '../../../lib/plan-deck.ts';
-import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
+import { LANG_LABELS, MAX_LANGS, ACTIVE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { itemTitle } from '../../../lib/item-title.ts';
 import { quoteSlides, verseQuotes } from '../../../lib/verse-quotes.ts';
 import { DisplayToggles } from '../components/DisplayToggles.tsx';
@@ -1712,7 +1712,7 @@ export function PlanPanel({
                     */}
                     <label title="앞으로 넣는 찬양 항목에 채워집니다">찬양 표시 언어</label>
                     <span className="candidates">
-                      {SELECTABLE_LANGS.map((lang) => {
+                      {ACTIVE_LANGS.map((lang) => {
                         const currentLangs = (plan.defaults?.song?.langs ?? ['ko']) as LangCode[];
                         const active = currentLangs.includes(lang);
                         return (

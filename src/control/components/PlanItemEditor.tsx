@@ -14,7 +14,7 @@
 import type React from 'react';
 
 import { describeItem, itemsInGroup, splitOrderText, type PlanRow } from '../../../lib/plan-deck.ts';
-import { LANG_LABELS, MAX_LANGS, SELECTABLE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
+import { LANG_LABELS, MAX_LANGS, langChoices, toggleLang } from '../../../lib/lang-select.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE, DEFAULT_LITURGY_VERSION, LITURGY_TEXTS, findLiturgy, liturgyLines,
   type LiturgyPerSlide, type LiturgyVersion,
@@ -173,7 +173,7 @@ export function PlanItemEditor({
               */}
               <label title="누른 순서대로 위에서 아래로 놓입니다">표시 언어 (최대 {MAX_LANGS})</label>
               <span className="candidates">
-                {SELECTABLE_LANGS.map((lang) => {
+                {langChoices(songLangs?.id === current.songId ? (songLangs.available as LangCode[]) : []).map((lang) => {
                   const active = current.langs.includes(lang);
                   const has = songLangs?.id === current.songId ? songLangs.available.includes(lang) : true;
                   return (

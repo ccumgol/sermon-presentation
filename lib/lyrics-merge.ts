@@ -193,3 +193,73 @@ export function mergeSecondaryLyrics(
 
   return { text: formatLyrics(next, primaryLang), paired, replaced, dropped, problems };
 }
+
+/**
+ * `|` 형식에서 **한 언어의 줄만 꺼낸다** — 별도 입력창을 미리 채우는 데 쓴다.
+ *
+ * 두 창(한국어 / 번역)으로 편집할 때, 번역 창은 이미 들어 있는 번역을 보여 줘야 한다.
+ * 빈 창을 주면 사용자가 '아직 없다' 고 오해해 다시 적고, 그러면 있던 번역이 덮인다.
+ *
+ * 절 라벨을 **항상** 붙인다. 라벨이 있으면 병합이 절을 이름으로 짝지으므로,
+ * 절을 하나 지웠다 다시 넣어도 순서가 밀리지 않는다.
+ */
+export function extractSecondaryLyrics(
+  text: string,
+  lang: LangCode,
+  primaryLang: LangCode = 'ko',
+): string {
+  const sections = parseLyrics(text, { primaryLang });
+  const blocks: string[] = [];
+
+  for (const section of sections) {
+    const lines = section.lines
+      .filter((line) => line.lang === lang)
+      .sort((a, b) => a.lineIndex - b.lineIndex)
+      .map((line) => line.text);
+    // 번역이 없는 절도 라벨을 남긴다 — 어디를 채워야 하는지 보인다
+    blocks.push([`[${section.label}]`, ...lines].join('\n'));
+  }
+
+  return blocks.join('\n\n');
+}
+
+/**
+ * 한 언어의 줄을 **모두 걷어낸다.**
+ *
+ * `mergeSecondaryLyrics` 는 붙일 것이 없으면 아무것도 하지 않는다(원본 보존이 기본).
+ * 그래서 사용자가 번역 창을 **비웠을 때** 그 뜻을 전할 길이 따로 필요하다.
+ */
+export function stripLang(text: string, lang: LangCode, primaryLang: LangCode = 'ko'): string {
+  const sections = parseLyrics(text, { primaryLang });
+  const next = sections.map((section) => ({
+    ...section,
+    lines: section.lines.filter((line) => line.lang !== lang),
+  }));
+  return formatLyrics(next);
+}
+
+export interface SectionLineCount {
+  label: string;
+  /** 기준 언어(한국어) 줄 수 */
+  primary: number;
+  /** 이 언어의 줄 수 */
+  secondary: number;
+}
+
+/**
+ * 절마다 줄 수를 견준다 — **적는 동안** 어디가 어긋났는지 보여 주기 위한 것.
+ *
+ * 곡 전체 합계로 견주면 1절만 채운 상태가 '다르다' 로 나와, 잘 하고 있는 사람에게
+ * 틀렸다고 말한다. 절 단위로 봐야 '2절부터 비어 있다' 를 알 수 있다.
+ */
+export function compareLineCounts(
+  text: string,
+  lang: LangCode,
+  primaryLang: LangCode = 'ko',
+): SectionLineCount[] {
+  return parseLyrics(text, { primaryLang }).map((section) => ({
+    label: section.label,
+    primary: section.lines.filter((line) => line.lang === primaryLang).length,
+    secondary: section.lines.filter((line) => line.lang === lang).length,
+  }));
+}
