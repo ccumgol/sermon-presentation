@@ -57,6 +57,15 @@
   /* 줄 강조 — 라이트에서는 어둡게 덮고 다크에서는 밝게 덮는다 */
   --row-hover: rgba(0, 0, 0, 0.05);
   --row-flat: rgba(0, 0, 0, 0.04);
+  /* 지금 송출 중인 줄의 바닥 — `--live` 를 옅게 깐다 (글자는 --fg 그대로 읽힌다) */
+  --live-wash: rgba(212, 42, 31, 0.1);
+  /*
+   * 그 바닥 **위에 얹는 글자**용 빨강.
+   *
+   * `--live`(#d42a1f)를 그대로 쓰면 옅은 바닥에서 4.35:1 로 기준(4.5) 아래였다
+   * (브라우저에서 실측). 12px 라벨이라 작은 글자 기준을 넘겨야 한다 → 6.2:1.
+   */
+  --live-ink: #a81f16;
 
   --radius: 10px;
   /* 좁은 화면에서만 쓰는 하단 바 높이 (넓은 화면은 오른쪽 열에 둔다) */
@@ -95,6 +104,8 @@
 
     --row-hover: rgba(255, 255, 255, 0.06);
     --row-flat: rgba(255, 255, 255, 0.05);
+    --live-wash: rgba(255, 92, 92, 0.16);
+    --live-ink: #ff8b80;
   }
 }
 
@@ -120,6 +131,8 @@
 
   --row-hover: rgba(255, 255, 255, 0.06);
   --row-flat: rgba(255, 255, 255, 0.05);
+  --live-wash: rgba(255, 92, 92, 0.16);
+  --live-ink: #ff8b80;
 }
 
 * {
@@ -524,8 +537,9 @@ select:focus {
 .hintline.ok {
   color: var(--ok);
 }
+/* `#f87171` 이 박혀 있었다 — 흰 카드에서 2.8:1 로 흐렸다. 팔레트의 빨강을 쓴다 */
 .hintline.error {
-  color: #f87171;
+  color: var(--live);
 }
 .hintline.muted {
   color: var(--muted);
@@ -789,13 +803,36 @@ select:focus {
   border-radius: var(--radius);
   min-height: 0;
 }
-.slide-item:hover {
-  border-color: var(--line-strong);
-  color: inherit;
+/*
+ * ── 슬라이드 줄의 색 (2026-08-23 사용자 보고로 고침) ──────────────
+ *
+ * 전에는 `.current` 바닥이 `#2a1f22` 로 **박혀 있었다.** 다크 테마만 보고 넣은
+ * 값이라, 라이트 테마에서 **검은 글자가 검은 바닥에 묻혀 읽을 수 없었다.**
+ *
+ * 그리고 hover 하면 글자가 파랗게 바뀌어서야 보였는데, 그것도 실수였다 —
+ * 일반 규칙 `button:hover:not(:disabled)`(0,2,1)이 `.slide-item:hover`(0,2,0)를
+ * **특정성으로 이겨** 글자색을 가져갔다. 여기는 가사를 읽는 목록이므로
+ * hover 가 글자색을 바꿔서는 안 된다. 그래서 같은 특정성으로 되받는다.
+ *
+ * 표시를 색 하나에만 걸지 않는다 — 왼쪽 띠와 굵은 라벨을 함께 둔다
+ * (예배 중 저조도·색약에서도 어느 줄이 나가는지 보여야 한다).
+ */
+.slide-item:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--row-hover);
+  color: var(--fg);
 }
 .slide-item.current {
   border-color: var(--live);
-  background: #2a1f22;
+  background: var(--live-wash);
+  box-shadow: inset 3px 0 0 var(--live);
+  color: var(--fg);
+}
+/* 송출 중인 줄은 hover 해도 표시가 흐려지지 않아야 한다 */
+.slide-item.current:hover:not(:disabled) {
+  border-color: var(--live);
+  background: var(--live-wash);
+  color: var(--fg);
 }
 .slide-item .label {
   font: 12px/1.4 ui-monospace, monospace;
@@ -803,7 +840,7 @@ select:focus {
   padding-top: 2px;
 }
 .slide-item.current .label {
-  color: var(--live);
+  color: var(--live-ink);
   font-weight: 700;
 }
 .slide-item .text {
@@ -1190,55 +1227,12 @@ label.check input[type='checkbox'] {
   font-size: 12px;
 }
 
-/* ── 예배 순서 ──────────────────────────────────────────────── */
+/* ── 예배 순서 ──────────────────────────────────────────────────────
+   `.plan-item*` 규칙 9개를 지웠다 (2026-08-23). 3차 재설계에서 목록이 `.cue-row` 로
+   바뀌었는데 옛 규칙이 남아 있었다. 그 안에 `background: #2a1f22` 가 박혀 있어서,
+   누가 그 클래스를 다시 쓰면 라이트 테마에서 글자가 묻히는 함정이 되살아난다.
+   지금 쓰는 목록 스타일은 아래 `.cue-row` 다. */
 
-.plan-items {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.plan-item {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-.plan-item.current {
-  border-color: var(--live);
-  background: #2a1f22;
-}
-.plan-item .icon {
-  font-size: 15px;
-  text-align: center;
-}
-.plan-item .body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.plan-item .title {
-  font-size: 14px;
-  word-break: keep-all;
-}
-.plan-item .meta {
-  font-size: 12px;
-  color: var(--muted);
-}
-.plan-item .actions {
-  display: flex;
-  gap: 4px;
-}
-.plan-item .actions button {
-  min-width: 34px;
-  min-height: 34px;
-  padding: 4px 8px;
-  font-size: 13px;
-}
 
 /* ── 곡집 바 ────────────────────────────────────────────────── */
 
