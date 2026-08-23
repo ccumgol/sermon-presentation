@@ -16,6 +16,7 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 무언가 안 될 때 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — 증상 → 원인 → 조치. **먼저 여기를 본다** |
 | 전에 누가 무엇을 했는지 찾을 때 | [docs/work-log.md](docs/work-log.md) (작업 이력 전체) · [docs/CHANGELOG.md](docs/CHANGELOG.md) (요약) |
 | 데이터가 이상할 때 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) — 원본 자료 자체의 문제 목록 |
+| 찬양 자료를 밖에서 정리해 올 때 | [docs/SONG-IMPORT-FORMAT.md](docs/SONG-IMPORT-FORMAT.md) — 반입 형식 규격 |
 | 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 남은 항목 |
 | 설치·구조를 알아야 할 때 | [README.md](README.md) |
 
