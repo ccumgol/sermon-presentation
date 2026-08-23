@@ -6,7 +6,6 @@
  */
 
 import { existsSync } from 'node:fs';
-import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 
 import fastifyStatic from '@fastify/static';
@@ -19,6 +18,7 @@ import { initReadingStore } from './db/readings.ts';
 import { initSongsDb, countSongs } from './db/songs.ts';
 import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
+import { lanHosts, lanInterfaces } from './lan.ts';
 import { ensureDataDirs, paths } from './paths.ts';
 import {
   SESSION_COOKIE, isAuthExemptPath, isLoopbackAddress, isTrustedAddress, parseTrustedIps,
@@ -26,6 +26,7 @@ import {
 } from '../lib/lan-auth.ts';
 import { verifySession } from './auth.ts';
 import { registerLoginRoutes } from './routes/login.ts';
+import { registerTabletRoutes } from './routes/tablet.ts';
 import { registerBibleRoutes } from './routes/bible.ts';
 import { registerBackgroundRoutes } from './routes/backgrounds.ts';
 import { registerBackupRoutes } from './routes/backup.ts';
@@ -51,30 +52,6 @@ export interface BuiltApp {
   app: FastifyInstance;
   bibleReady: boolean;
   stateRestored: { restored: boolean; corrupt: boolean };
-}
-
-export function lanHosts(): string[] {
-  return lanInterfaces().map((entry) => entry.address);
-}
-
-/**
- * LAN 에서 닿을 수 있는 주소들 — **어느 장치인지 함께 준다.**
- *
- * 맥에 Wi-Fi 와 USB 이더넷이 함께 붙어 있으면 주소가 두 개 뜬다. 그때 '어느 것을
- * 태블릿에 넣어야 하나' 를 알 수 없어 헤맸다(실제로 겪음). 장치 이름을 붙여 두면
- * 시스템 설정 → 네트워크 와 짝지어 볼 수 있다.
- *
- * 장치 이름(en0 등)을 사람이 읽는 이름(Wi-Fi)으로 바꾸려면 macOS 명령을 불러야 하는데,
- * 예배 중 도는 서버가 기동할 때 외부 프로세스를 띄우는 위험을 만들지 않는다.
- */
-export function lanInterfaces(): Array<{ address: string; iface: string }> {
-  const out: Array<{ address: string; iface: string }> = [];
-  for (const [iface, addrs] of Object.entries(networkInterfaces())) {
-    for (const a of addrs ?? []) {
-      if (a.family === 'IPv4' && !a.internal) out.push({ address: a.address, iface });
-    }
-  }
-  return out;
 }
 
 export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
@@ -261,6 +238,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   }));
 
   registerLoginRoutes(app);
+  registerTabletRoutes(app, options.getPort);
   await registerSongRoutes(app);
   await registerSongbookRoutes(app);
   await registerPlanRoutes(app);
@@ -293,3 +271,6 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
 
   return { app, bibleReady, stateRestored };
 }
+
+// `lanHosts`·`lanInterfaces` 는 server/lan.ts 로 옮겼다. 기존 import 를 위해 다시 내보낸다.
+export { lanHosts, lanInterfaces };

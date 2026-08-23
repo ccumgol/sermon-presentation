@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, ApiError, type ServerInfo } from '../api.ts';
 import { FontSetupCard } from '../components/FontSetupCard.tsx';
+import { TabletAccessCard } from '../components/TabletAccessCard.tsx';
 
 interface Props {
   info: ServerInfo | null;
@@ -193,15 +194,7 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
         </p>
       </div>
 
-      {info.lanAddresses.length > 0 && (
-        <div className="card">
-          <h2>태블릿에서 조작하기</h2>
-          {info.lanAddresses.map((url) => (
-            <CopyRow key={url} value={url} />
-          ))}
-          <p className="hintline muted">같은 네트워크의 태블릿·노트북 브라우저에서 이 주소로 접속하세요.</p>
-        </div>
-      )}
+      <TabletAccessCard />
 
       {/*
         프로젝터 안내.

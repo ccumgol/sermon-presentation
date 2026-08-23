@@ -2286,3 +2286,40 @@ button.link-inline {
   .plan-panel { height: auto; }
   .cue-list { max-height: 40vh; }
 }
+
+/* ── 태블릿 연결 QR ─────────────────────────────────────────────────
+   QR 은 어두운 테마에서도 흑백이어야 읽힌다 — 바탕을 SVG 안에서 직접 칠하고,
+   여기서는 자리와 크기만 정한다. 예배 직전에 찍는 그림이라 너무 작으면 안 된다. */
+.qr-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0 4px;
+}
+
+.qr-item {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.qr-item .qr {
+  width: 176px;
+  height: 176px;
+  border-radius: 6px;
+  /* 밝은 배경 위 QR 이 화면과 붙어 보이지 않게 얇은 테두리를 둔다 */
+  box-shadow: 0 0 0 1px var(--line, #d6d9de);
+}
+
+.qr-item figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.qr-item figcaption code {
+  font-size: 12px;
+}

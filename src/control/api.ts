@@ -5,6 +5,21 @@ import type {
   ServicePlan, Song, Songbook, SongEntry, SongSearchHit, SongSearchResult, Template, Translation,
 } from '../../shared/types.ts';
 
+/** 태블릿 연결 — QR 과 상태 (`/api/tablet-access`) */
+export interface TabletAccess {
+  /** LAN 에 열려 있는가 — 닫혀 있으면 주소를 주지 않는다 */
+  lanOpen: boolean;
+  /** 접속 암호가 정해져 있는가 */
+  passwordSet: boolean;
+  targets: Array<{
+    address: string;
+    /** 어느 장치인가 (`en0`) — 주소가 여러 개일 때 고르는 단서 */
+    iface: string;
+    url: string;
+    qr: { size: number; path: string; moduleCount: number };
+  }>;
+}
+
 export interface ServerInfo {
   port: number;
   outputUrl: string;
@@ -92,6 +107,7 @@ const get = <T,>(url: string): Promise<T> => request<T>(url);
 
 export const api = {
   info: () => get<ServerInfo>('/api/info'),
+  tabletAccess: () => get<TabletAccess>('/api/tablet-access'),
   translations: () => get<Translation[]>('/api/translations'),
   books: () => get<BookMeta[]>('/api/books'),
   parse: (q: string) => get<ParseResult>(`/api/bible/parse?q=${encodeURIComponent(q)}`),
