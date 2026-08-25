@@ -69,12 +69,52 @@ function loadDictionary(): Dictionary {
   throw new Error(`영어 사전을 찾지 못했습니다 (${DICT_PATHS.join(' 또는 ')})`);
 }
 
-/** 비교용 — 공백·문장부호·끝의 아멘을 털어 낸 글자만 남긴다 */
+/**
+ * `[아멘]` 섹션인가 — 통째로 버릴 대상이다.
+ *
+ * 원본을 전수 조사하니 아멘이 두 가지로 적혀 있었다 (2026-08-25):
+ *
+ * | 어떻게 | 몇 곡 | 뜻 |
+ * |---|---|---|
+ * | `[아멘]` 섹션 + `아멘` 한 줄 | 294 | 예배 표시 → 섹션째 버리고 `has_amen` |
+ * | 가사 줄 끝에 `… 아멘` | 13 | 같은 표시 → 그 낱말만 뗀다 |
+ *
+ * 628번의 `아멘 아멘 아멘` 은 **둘 다 아니다** — `[1절]` 안의 가사다. 그래서 라벨로
+ * 가른다. 줄 모양만 보면 그 곡의 본문을 지워 버린다.
+ */
+function isAmenSection(label: string): boolean {
+  return /^아\s*멘$/.test(label.trim());
+}
+
+/**
+ * 줄 끝에 붙은 **표시로서의 아멘**을 뗀다.
+ *
+ * ## `아멘 아멘 아멘` 은 건드리지 않는다
+ *
+ * 628번의 첫 줄이 그렇다 — 그 곡은 **가사 자체가 아멘**이다. 줄 전체가 아멘이면
+ * 표시가 아니라 본문이므로 그대로 둔다.
+ */
+function stripAmenMarker(text: string): { text: string; had: boolean } {
+  const trimmed = text.trim();
+  if (/^(아\s*멘\s*)+$/.test(trimmed)) return { text: trimmed, had: false };
+  const without = trimmed.replace(/\s*아\s*멘\s*$/, '').trim();
+  return { text: without, had: without !== trimmed && without.length > 0 };
+}
+
+/**
+ * 비교용 — 공백·문장부호를 털어 낸 글자만 남긴다.
+ *
+ * **아멘은 줄마다 떼어 낸 뒤에 부른다.** 전에는 이 함수가 '맨 끝 아멘 하나' 만 뗐는데,
+ * 반입 쪽은 **모든 줄**의 아멘을 떼고 있었다. 그래서 절마다 아멘이 붙은 곡
+ * (19·29·624번)이 '가사가 다르다' 로 잘못 걸렸다 — 실제 차이는 아멘뿐이었다.
+ */
 function squash(text: string): string {
-  return text
-    .normalize('NFC')
-    .replace(/[\s·.,!?~-]+/g, '')
-    .replace(/(아멘)+$/, '');
+  return text.normalize('NFC').replace(/[\s·.,!?~-]+/g, '');
+}
+
+/** 여러 줄에서 아멘 표시를 떼고 이어 붙인다 (양쪽을 **같은 방법으로** 견주기 위해) */
+function squashLines(lines: readonly string[]): string {
+  return squash(lines.map((line) => stripAmenMarker(line).text).join(''));
 }
 
 interface Candidate {
@@ -145,7 +185,14 @@ function main(): void {
     const keptHyphens: string[] = [];
     let amen = false;
     let scrubbed = 0;
-    const sections: NewSection[] = parsed.map((section) => ({
+    const sections: NewSection[] = parsed
+      .filter((section) => {
+        // `[아멘]` 섹션은 가사가 아니라 표시다 — 통째로 버리고 플래그로 옮긴다
+        if (!isAmenSection(section.label)) return true;
+        amen = true;
+        return false;
+      })
+      .map((section) => ({
       kind: section.kind,
       label: section.label,
       lines: section.lines
@@ -159,21 +206,21 @@ function main(): void {
             keptHyphens.push(...cleaned.kept);
             return { ...line, text: cleaned.text };
           }
-          // 끝에 홀로 붙은 아멘은 가사가 아니라 표시다
-          const withoutAmen = line.text.replace(/\s*아\s*멘\s*$/, '').trim();
-          if (withoutAmen !== line.text.trim()) amen = true;
-          return { ...line, text: withoutAmen };
+          // 끝에 붙은 아멘은 가사가 아니라 표시다 (줄 전체가 아멘이면 본문이다)
+          const marker = stripAmenMarker(line.text);
+          if (marker.had) amen = true;
+          return { ...line, text: marker.text };
         })
         .filter((line) => line.text.length > 0),
     })).filter((section) => section.lines.length > 0);
 
     // ── 가사 글자가 같은지 본다 (줄나눔만 바꾸는 작업이다) ──────
-    const incomingKo = squash(
-      sections.flatMap((s) => s.lines.filter((l) => l.lang === 'ko').map((l) => l.text)).join(''),
+    const incomingKo = squashLines(
+      sections.flatMap((s) => s.lines.filter((l) => l.lang === 'ko').map((l) => l.text)),
     );
     const currentSections = matches[0]!.sections;
-    const currentKo = squash(
-      currentSections.flatMap((s) => s.lines.filter((l) => l.lang === 'ko').map((l) => l.text)).join(''),
+    const currentKo = squashLines(
+      currentSections.flatMap((s) => s.lines.filter((l) => l.lang === 'ko').map((l) => l.text)),
     );
     if (incomingKo !== currentKo) {
       let at = 0;
