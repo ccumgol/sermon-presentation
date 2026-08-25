@@ -26,6 +26,7 @@
     "titles:borrow": "node scripts/borrow-en-titles.ts",
     "password": "node scripts/set-password.ts",
     "hymn:bilingual": "node scripts/import-hymn-bilingual.ts",
+    "report:missing-en": "node scripts/report-missing-english.ts",
     "praise:check": "node scripts/check-praise-folder.ts"
   },
   "dependencies": {
