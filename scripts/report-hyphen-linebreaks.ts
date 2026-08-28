@@ -33,7 +33,12 @@ const DEFAULT_DIR = path.join(
 interface Hit {
   number: number;
   title: string;
+  /** 파일 이름 — 사람이 열어 고칠 대상이다 */
+  file: string;
   label: string;
+  /** 앞 줄·뒷 줄이 원본 파일의 몇 번째 줄인가 (1부터) */
+  beforeLine: number;
+  afterLine: number;
   /** 합쳐질 낱말 — 뜻이 없으면 글자가 사라졌다는 신호다 */
   word: string;
   before: string;
@@ -61,6 +66,34 @@ function joinWord(before: string, after: string): string {
   return (tail + head).replace(/-/g, '');
 }
 
+/**
+ * 파서가 찾은 줄이 **원본 파일의 몇 번째 줄인가** 를 되짚는다.
+ *
+ * 파서는 줄 번호를 돌려주지 않는다. 그러나 사람이 손으로 고치려면 줄 번호가 있어야
+ * 한다 — 없으면 645개 파일에서 눈으로 찾아야 한다. 그래서 원본 줄을 앞에서부터
+ * 훑으며 짝을 맞춘다.
+ *
+ * **앞으로만 나아간다** (`cursor`). 새 94장처럼 1·2·3절의 가사가 완전히 같은 곡이
+ * 있어서, 되짚기를 매번 처음부터 하면 세 곳이 모두 같은 줄을 가리킨다.
+ */
+function makeLocator(rawLines: readonly string[]) {
+  let cursor = 0;
+  return (text: string): number => {
+    /*
+     * **줄 전체로 맞춘다.** 앞 24자만 보면 새 94장처럼 여러 줄이 같은 말로 시작하는
+     * 곡에서 엉뚱한 줄을 가리킨다 (`I'd rath-er have Je-sus than …` 이 여섯 번 나온다).
+     * 못 찾으면 0 을 돌려 알린다 — 짐작해 채우지 않는다.
+     */
+    for (let i = cursor; i < rawLines.length; i += 1) {
+      if (rawLines[i]!.includes(text)) {
+        cursor = i;
+        return i + 1; // 사람이 세는 방식 (1부터)
+      }
+    }
+    return 0;
+  };
+}
+
 function scan(dir: string): Hit[] {
   const hits: Hit[] = [];
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.txt')).sort()) {
@@ -68,17 +101,31 @@ function scan(dir: string): Hit[] {
     if (!Number.isInteger(number)) continue;
     const title = file.replace(/ - \d+\.txt$/, '');
 
-    for (const section of parseLyrics(readFileSync(path.join(dir, file), 'utf8'))) {
+    const text = readFileSync(path.join(dir, file), 'utf8');
+    const rawLines = text.split(/\r?\n/);
+    const locate = makeLocator(rawLines);
+
+    for (const section of parseLyrics(text)) {
       const en = section.lines.filter((l) => l.lang === 'en');
       for (let i = 1; i < en.length; i += 1) {
         const before = (en[i - 1]!.text ?? '').trim();
         const after = (en[i]!.text ?? '').trim();
         if (!/-\s*$/.test(before) && !/^-/.test(after)) continue;
-        hits.push({ number, title, label: section.label, word: joinWord(before, after), before, after });
+        hits.push({
+          number,
+          title,
+          file,
+          label: section.label,
+          beforeLine: locate(before),
+          afterLine: locate(after),
+          word: joinWord(before, after),
+          before,
+          after,
+        });
       }
     }
   }
-  return hits.sort((a, b) => a.number - b.number || a.label.localeCompare(b.label));
+  return hits.sort((a, b) => a.number - b.number || a.beforeLine - b.beforeLine);
 }
 
 const dir = argValue('--dir') ?? DEFAULT_DIR;
@@ -86,30 +133,52 @@ const hits = scan(dir);
 const songs = new Set(hits.map((h) => h.number));
 
 console.log(`대상: ${dir}`);
-console.log(`낱말이 줄을 넘어 쪼개진 곳: ${hits.length}곳 · ${songs.size}곡\n`);
+console.log(`낱말이 줄을 넘어 쪼개진 곳: ${hits.length}곳 · ${songs.size}곡`);
 
-const width = Math.max(8, ...hits.map((h) => h.word.length));
-console.log(`  ${'번호'.padEnd(6)}${'절'.padEnd(8)}${'합쳐질 낱말'.padEnd(width + 2)}앞 줄 끝 / 뒷 줄 머리`);
+/*
+ * **곡별로 묶어 보여 준다.** 사람이 고치는 단위가 파일 하나이므로, 번호순 한 줄짜리
+ * 목록보다 '이 파일에서 이 줄들' 이 훨씬 빠르다.
+ */
+const byFile = new Map<string, Hit[]>();
 for (const h of hits) {
-  const tail = h.before.length > 26 ? `…${h.before.slice(-26)}` : h.before;
-  const head = h.after.length > 26 ? `${h.after.slice(0, 26)}…` : h.after;
-  console.log(
-    `  ${String(h.number).padStart(4)}  ${h.label.padEnd(8)}${h.word.padEnd(width + 2)}${tail}  ⏎  ${head}`,
-  );
+  const list = byFile.get(h.file) ?? [];
+  list.push(h);
+  byFile.set(h.file, list);
+}
+
+for (const [file, list] of byFile) {
+  console.log(`\n── 새 ${list[0]!.number}장  ${list[0]!.title}  (${list.length}곳) ──`);
+  console.log(`   ${file}`);
+  for (const h of list) {
+    const mark = h.beforeLine === 0 || h.afterLine === 0 ? ' ⚠줄을 되짚지 못했습니다' : '';
+    console.log(`   ${String(h.beforeLine).padStart(4)},${String(h.afterLine).padEnd(5)}[${h.label}] → ${h.word}${mark}`);
+    console.log(`        ${h.before}`);
+    console.log(`        ${h.after}`);
+  }
 }
 
 const stamp = argValue('--stamp') ?? 'latest';
 const out = path.join('data/reports', `hyphen-linebreak-hymn_new-${stamp}.md`);
-const rows = hits
-  .map((h) => `| 새 ${h.number} | ${h.title} | ${h.label} | \`${h.word}\` | ${h.before} | ${h.after} |`)
+const body = [...byFile.values()]
+  .map((list) => {
+    const head = `## 새 ${list[0]!.number}장 · ${list[0]!.title} — ${list.length}곳\n\n\`${list[0]!.file}\`\n`;
+    const rows = list
+      .map(
+        (h) =>
+          `| ${h.beforeLine}·${h.afterLine} | ${h.label} | \`${h.word}\` | ${h.before} | ${h.after} |`,
+      )
+      .join('\n');
+    return `${head}\n| 줄 | 절 | 합쳐질 낱말 | 앞 줄 | 뒷 줄 |\n|---|---|---|---|---|\n${rows}\n`;
+  })
   .join('\n');
+
 writeFileSync(
   out,
   `# 새찬송가 — 낱말이 줄을 넘어 쪼개진 곳\n\n대상: \`${dir}\`\n\n**${hits.length}곳 · ${songs.size}곡**\n\n` +
     `줄 끝이나 줄 머리에 하이픈이 있다는 것은 한 낱말이 두 줄에 걸쳐 있다는 뜻이다.\n` +
     `기계적으로 붙일 수 없다 — 줄 나눔 자체를 고쳐야 한다.\n\n` +
-    `'합쳐질 낱말' 이 뜻 없는 글자면 줄 나눔이 아니라 **글자가 사라진 것**이다.\n\n` +
-    `| 번호 | 제목 | 절 | 합쳐질 낱말 | 앞 줄 | 뒷 줄 |\n|---|---|---|---|---|---|\n${rows}\n`,
+    `'줄' 은 원본 파일의 줄 번호(앞·뒤)다. '합쳐질 낱말' 이 뜻 없는 글자면 줄 나눔이\n` +
+    `아니라 **글자가 사라진 것**이다.\n\n다시 세려면 \`npm run report:hyphen\`.\n\n${body}`,
   'utf8',
 );
 console.log(`\n적었습니다: ${out}`);
