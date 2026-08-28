@@ -23,7 +23,13 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { existsSync } from 'node:fs';
+
+import { joinSyllableHyphens } from '../lib/lyrics-hyphen.ts';
 import { parseLyrics } from '../lib/lyrics-parser.ts';
+
+/** 낱말인지 가리는 데 쓴다. macOS·대부분의 유닉스에 있다 */
+const DICT_PATH = '/usr/share/dict/words';
 
 const DEFAULT_DIR = path.join(
   process.env.HOME ?? '',
@@ -182,3 +188,69 @@ writeFileSync(
   'utf8',
 );
 console.log(`\n적었습니다: ${out}`);
+
+/*
+ * ── 두 번째 검사: **서로 다른 두 낱말 사이**에 들어간 하이픈 ─────────────
+ *
+ * 줄을 넘지 않으므로 위 검사에 걸리지 않는다. 그런데 음절 하이픈으로 오인해
+ * 붙이면 `garden - land` → `gardenland`, `His - dear` → `Hisdear` 가 된다.
+ * 하이픈을 **공백으로** 바꿔야 하는 곳이고, 자동으로 판별할 수 없다.
+ *
+ * 가려내는 방법: 하이픈 **양쪽에 공백**이 있고, 두 조각이 **모두 온전한 낱말**이며,
+ * **붙인 결과는 낱말이 아닌** 곳. `glo - ry` 는 `glo` 가 낱말이 아니라 걸리지 않고,
+ * `re-deem - ing` 은 `redeeming` 이 낱말이라 걸리지 않는다.
+ */
+if (!existsSync(DICT_PATH)) {
+  console.log(`\n두 낱말 사이 하이픈 검사는 건너뜁니다 — ${DICT_PATH} 가 없습니다.`);
+} else {
+  const dict = new Set(
+    readFileSync(DICT_PATH, 'utf8')
+      .split('\n')
+      .map((w) => w.trim().toLowerCase())
+      .filter((w) => w.length > 0),
+  );
+
+  const pairs: Array<{ number: number; line: number; a: string; b: string; text: string }> = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.txt')).sort()) {
+    const number = Number(/ - (\d+)\.txt$/.exec(file)?.[1]);
+    if (!Number.isInteger(number)) continue;
+    readFileSync(path.join(dir, file), 'utf8')
+      .split(/\r?\n/)
+      .forEach((raw, i) => {
+        if (!raw.startsWith('|')) return;
+        for (const m of raw.matchAll(/([A-Za-z'’]+)[ \t]+-[ \t]+([A-Za-z'’]+)/g)) {
+          const a = m[1]!;
+          const b = m[2]!;
+          // 붙이기 규칙이 손대지 않는 짝(합성어 목록 등)은 문제가 없다
+          if (joinSyllableHyphens(`${a} - ${b}`) === `${a}-${b}`) continue;
+          if (a.length < 2 || b.length < 2) continue;
+          if (!dict.has(a.toLowerCase()) || !dict.has(b.toLowerCase())) continue;
+          if (dict.has((a + b).toLowerCase())) continue;
+
+          /*
+           * **양옆에 또 하이픈이 붙어 있으면 음절 사슬이다.** 사전이 굴절형을 모르기
+           * 때문에(web2 에 `began` `seeding` `straightened` 가 없다) 조각이 우연히
+           * 낱말인 경우가 많다. 그런 것을 이 신호로 걸러낸다.
+           *
+           *   re-deem - ing   → 왼쪽에 `re-` 가 있다 → 음절 사슬
+           *   Is - ra-el      → 오른쪽에 `-el` 이 있다 → 음절 사슬
+           *   garden - land   → 양옆에 없다 → 사람이 봐야 한다
+           */
+          const start = m.index ?? 0;
+          const before = raw.slice(0, start);
+          const after = raw.slice(start + m[0].length);
+          if (/-\s*$/.test(before) || /^\s*-/.test(after)) continue;
+
+          pairs.push({ number, line: i + 1, a, b, text: raw.slice(1).trim() });
+        }
+      });
+  }
+
+  console.log(`\n══ 두 낱말 사이 하이픈 — 공백으로 바꿔야 하는 후보 ══`);
+  console.log(`   ${pairs.length}곳 — **후보다.** 사전이 굴절형을 몰라 헛것이 섞인다.`);
+  console.log(`   붙여서 한 낱말이 되면 그냥 두고, 두 낱말이면 하이픈을 공백으로 바꾼다.`);
+  for (const p of pairs) {
+    console.log(`   새 ${String(p.number).padStart(3)}장 ${String(p.line).padStart(3)}줄  «${p.a} - ${p.b}»`);
+    console.log(`        ${p.text.length > 68 ? `${p.text.slice(0, 68)}…` : p.text}`);
+  }
+}
