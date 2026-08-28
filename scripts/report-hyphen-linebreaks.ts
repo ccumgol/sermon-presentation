@@ -25,7 +25,7 @@ import path from 'node:path';
 
 import { existsSync } from 'node:fs';
 
-import { joinSyllableHyphens } from '../lib/lyrics-hyphen.ts';
+import { joinHyphenated } from '../lib/hymn-hyphen.ts';
 import { parseLyrics } from '../lib/lyrics-parser.ts';
 
 /** 낱말인지 가리는 데 쓴다. macOS·대부분의 유닉스에 있다 */
@@ -221,8 +221,8 @@ if (!existsSync(DICT_PATH)) {
         for (const m of raw.matchAll(/([A-Za-z'’]+)[ \t]+-[ \t]+([A-Za-z'’]+)/g)) {
           const a = m[1]!;
           const b = m[2]!;
-          // 붙이기 규칙이 손대지 않는 짝(합성어 목록 등)은 문제가 없다
-          if (joinSyllableHyphens(`${a} - ${b}`) === `${a}-${b}`) continue;
+          // 반입이 하이픈을 남기는 짝(복합어 목록 등)은 문제가 없다
+          if (joinHyphenated(`${a}-${b}`, dict) === undefined) continue;
           if (a.length < 2 || b.length < 2) continue;
           if (!dict.has(a.toLowerCase()) || !dict.has(b.toLowerCase())) continue;
           if (dict.has((a + b).toLowerCase())) continue;

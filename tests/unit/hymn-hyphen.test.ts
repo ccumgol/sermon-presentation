@@ -86,3 +86,27 @@ describe('줄 단위로 처리한다', () => {
     expect(stripSyllableHyphens('Amazing grace how sweet', DICT).text).toBe('Amazing grace how sweet');
   });
 });
+
+/*
+ * 2026-08-28 — DB 에 `LifeLine` 이 들어가 있었다 (새 500장 「물 위에 생명줄 던지어라」,
+ * 21번). 원본은 `Life-Line` 이고 붙이면 사전에 `lifeline` 이 있어 규칙이 붙여 버렸다.
+ *
+ * 음절은 낱말 안에서 끊으므로 뒷 조각이 대문자로 시작할 수 없다. 대문자로 시작하면
+ * 고유명사 복합어이거나 문장 부호다.
+ */
+describe('하이픈 뒤가 대문자면 남긴다', () => {
+  const dict = new Set(['lifeline', 'lifeboat', 'life', 'line', 'boat', 'plea', 'christ']);
+
+  it('Life-Line 은 붙이지 않는다 — 사전에 lifeline 이 있어도', () => {
+    expect(joinHyphenated('Life-Line', dict)).toBeUndefined();
+    expect(joinHyphenated('Life-Boat', dict)).toBeUndefined();
+  });
+
+  it('줄표로 쓰인 하이픈도 남는다', () => {
+    expect(joinHyphenated('plea-Christ', dict)).toBeUndefined();
+  });
+
+  it('음절 하이픈은 그대로 붙는다 (뒤가 소문자)', () => {
+    expect(joinHyphenated('life-line', dict)).toBe('lifeline');
+  });
+});

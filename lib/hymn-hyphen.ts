@@ -102,6 +102,19 @@ export function joinHyphenated(token: string, dict: Dictionary): string | undefi
   const lower = token.toLowerCase();
   if (COMPOUNDS.has(lower)) return undefined;
 
+  /*
+   * **하이픈 뒤가 대문자면 뜻이 있는 하이픈이다.** 음절은 낱말 안에서 끊는 것이므로
+   * 뒤 조각이 대문자로 시작할 수 없다. 대문자로 시작한다면 고유명사 복합어이거나
+   * 문장 부호다.
+   *
+   *   Life-Line  → LifeLine 이 되어 있었다 (새 500장, 21번. 2026-08-28 발견)
+   *   Life-Boat  → LifeBoat
+   *   plea-Christ → `…my only plea - Christ died for me!` 의 줄표
+   *
+   * 자료 전체를 재서 이 조건에 걸리는 것이 위 셋뿐이고 전부 남기는 것이 맞았다.
+   */
+  if (/-[A-Z]/.test(token)) return undefined;
+
   const joined = token.replace(/-/g, '');
   if (JOIN_ANYWAY.has(lower)) return joined;
   // 접두사 + 불규칙 활용 (`be-came`) — 사전으로는 가릴 수 없다
