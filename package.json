@@ -30,7 +30,8 @@
     "restore:lyrics": "node scripts/restore-song-lyrics.ts",
     "praise:check": "node scripts/check-praise-folder.ts",
     "report:bilingual": "node scripts/report-bilingual-hymns.ts",
-    "report:hyphen": "node scripts/report-hyphen-linebreaks.ts"
+    "report:hyphen": "node scripts/report-hyphen-linebreaks.ts",
+    "hymn:realign": "node scripts/realign-hymn-english.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",
