@@ -57,8 +57,18 @@ export interface ParseLyricsOptions {
  */
 const LANG_TAGS: ReadonlyArray<LangCode> = ['ko', 'en', 'zh', 'ja', 'grc', 'heb'];
 
-/** `|zh 中文` · `|zh中文` · `| English` 를 가른다 */
-const SECONDARY_LINE = /^\|\s*([a-z]{2,3})?\s*([\s\S]*)$/;
+/**
+ * `|zh 中文` · `|zh中文` · `| English` 를 가른다.
+ *
+ * **언어 표 뒤에 라틴 낱말이 이어지면 표가 아니다.** 이 조건이 없으면 영어 가사
+ * `| en-vy, strife` 의 `en` 을 표로 읽고 떼어 버려 `-vy, strife` 가 된다
+ * (2026-08-28 실제로 겪었다 — 새 104·215·316·402·520·568장의 `en` 이 DB 에서 사라졌다).
+ * 악보용 음절 하이픈이 붙은 자료에서는 `en-` `ja-` `ko-` 로 시작하는 줄이 흔하다.
+ *
+ * 그래서 표로 인정하는 조건은 뒤가 **공백·줄끝, 또는 라틴 낱말이 아닌 글자**일 때다.
+ * `|zh中文` 은 그대로 살고 `| en-vy` 는 본문이 된다.
+ */
+const SECONDARY_LINE = /^\|\s*(?:([a-z]{2,3})(?![A-Za-z'\u2019-]))?\s*([\s\S]*)$/;
 
 /**
  * 붙여넣기 가사를 구조로 바꾼다.

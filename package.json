@@ -29,7 +29,8 @@
     "report:missing-en": "node scripts/report-missing-english.ts",
     "restore:lyrics": "node scripts/restore-song-lyrics.ts",
     "praise:check": "node scripts/check-praise-folder.ts",
-    "report:bilingual": "node scripts/report-bilingual-hymns.ts"
+    "report:bilingual": "node scripts/report-bilingual-hymns.ts",
+    "report:hyphen": "node scripts/report-hyphen-linebreaks.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",

@@ -157,3 +157,44 @@ describe('경계', () => {
     expect(sections[0]!.lines[0]).toEqual({ lineIndex: 0, lang: 'en', text: 'orphan' });
   });
 });
+
+/*
+ * 언어 표 오인 — 2026-08-28 에 실제로 자료를 망가뜨린 버그다.
+ *
+ * `| en-vy, strife` 의 `en` 이 언어 표로 읽혀 떼어졌고, 그 결과가 DB 에 들어가
+ * 새 104·215·316·402·520·568장의 영어 가사에서 `en` 이 사라졌다. 악보용 음절
+ * 하이픈이 붙은 자료에서는 `en-` 으로 시작하는 줄이 흔하므로 못 박아 둔다.
+ */
+describe('언어 표로 오인하지 않는다', () => {
+  const cases: Array<[string, string]> = [
+    ['en-vy, strife, and quarrels cease', 'en-vy 를 표로 보면 -vy 가 된다'],
+    ['en-ter while you may', 'en-ter → -ter'],
+    ['en-fold me in Your arms', 'en-fold → -fold'],
+    ['en-chained my spirit’s vision', '둥근 아포스트로피가 있어도 같다'],
+    ['en-circl-ing us', 'en-circling → -circling'],
+    ['ko-rea and ja-pan', '다른 코드도 같은 함정이다'],
+    ['grc-x heb-rew zh-ou', '3글자 코드도 같다'],
+  ];
+
+  for (const [text, why] of cases) {
+    it(`«${text.slice(0, 24)}…» 는 본문으로 남는다 — ${why}`, () => {
+      const sections = parseLyrics(`한국어 줄\n| ${text}`);
+      const en = sections[0]!.lines.filter((l) => l.lang === 'en');
+      expect(en).toHaveLength(1);
+      expect(en[0]!.text).toBe(text);
+    });
+  }
+
+  it('제대로 적은 언어 표는 그대로 읽는다', () => {
+    const sections = parseLyrics('한국어 줄\n|zh 中文 가사\n|ja 日本語');
+    const byLang = new Map(sections[0]!.lines.map((l) => [l.lang, l.text]));
+    expect(byLang.get('zh')).toBe('中文 가사');
+    expect(byLang.get('ja')).toBe('日本語');
+  });
+
+  it('공백 없이 붙인 표도 그대로 읽는다 (|zh中文)', () => {
+    const sections = parseLyrics('한국어 줄\n|zh中文');
+    const zh = sections[0]!.lines.find((l) => l.lang === 'zh');
+    expect(zh?.text).toBe('中文');
+  });
+});
