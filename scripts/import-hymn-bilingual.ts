@@ -7,6 +7,17 @@
  * npm run hymn:bilingual -- --dir <폴더> --only 150 # 한 곡만
  * ```
  *
+ * ## 사람이 콕 집어 허용하는 두 가지
+ *
+ * ```
+ * --allow-text-change 624,638   가사 글자가 달라도 넣는다
+ * --keep-amen 624               줄 끝 아멘을 표시로 빼내지 않는다 (아멘이 가사인 곡)
+ * ```
+ *
+ * 둘 다 **번호를 적어야** 듣는다. 전체를 끄는 스위치는 두지 않았다 — 그러면
+ * 아무도 보지 않은 채 645곡의 가사가 바뀔 수 있다. 어느 곡을 왜 허용했는지가
+ * 명령줄에 남아야 한다 (2026-08-28 사용자 요청: '원본과 다를 수 있는데 이 가사가 맞다').
+ *
  * ## 이것은 '줄나눔을 바꾸고 영어를 더하는' 작업이다
  *
  * 점검해 보니 아멘을 뺀 한국어 **글자**가 645곡 중 644곡에서 DB 와 똑같았다
@@ -36,6 +47,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { isAmenSection, stripAmenEnglish, stripAmenMarker } from '../lib/hymn-amen.ts';
 import { stripSyllableHyphens, type Dictionary } from '../lib/hymn-hyphen.ts';
 import { stripScrapeArtifacts } from '../lib/hymn-scrape-clean.ts';
 import { formatLyrics, parseLyrics } from '../lib/lyrics-parser.ts';
@@ -70,38 +82,6 @@ function loadDictionary(): Dictionary {
 }
 
 /**
- * `[아멘]` 섹션인가 — 통째로 버릴 대상이다.
- *
- * 원본을 전수 조사하니 아멘이 두 가지로 적혀 있었다 (2026-08-25):
- *
- * | 어떻게 | 몇 곡 | 뜻 |
- * |---|---|---|
- * | `[아멘]` 섹션 + `아멘` 한 줄 | 294 | 예배 표시 → 섹션째 버리고 `has_amen` |
- * | 가사 줄 끝에 `… 아멘` | 13 | 같은 표시 → 그 낱말만 뗀다 |
- *
- * 628번의 `아멘 아멘 아멘` 은 **둘 다 아니다** — `[1절]` 안의 가사다. 그래서 라벨로
- * 가른다. 줄 모양만 보면 그 곡의 본문을 지워 버린다.
- */
-function isAmenSection(label: string): boolean {
-  return /^아\s*멘$/.test(label.trim());
-}
-
-/**
- * 줄 끝에 붙은 **표시로서의 아멘**을 뗀다.
- *
- * ## `아멘 아멘 아멘` 은 건드리지 않는다
- *
- * 628번의 첫 줄이 그렇다 — 그 곡은 **가사 자체가 아멘**이다. 줄 전체가 아멘이면
- * 표시가 아니라 본문이므로 그대로 둔다.
- */
-function stripAmenMarker(text: string): { text: string; had: boolean } {
-  const trimmed = text.trim();
-  if (/^(아\s*멘\s*)+$/.test(trimmed)) return { text: trimmed, had: false };
-  const without = trimmed.replace(/\s*아\s*멘\s*$/, '').trim();
-  return { text: without, had: without !== trimmed && without.length > 0 };
-}
-
-/**
  * 비교용 — 공백·문장부호를 털어 낸 글자만 남긴다.
  *
  * **아멘은 줄마다 떼어 낸 뒤에 부른다.** 전에는 이 함수가 '맨 끝 아멘 하나' 만 뗐는데,
@@ -128,6 +108,8 @@ interface Candidate {
   keptHyphens: string[];
   /** 웹 찌꺼기를 뗀 줄 수 */
   scrubbed: number;
+  /** 맨 끝 영어 Amen 을 표시로 옮겼나 (1 또는 0) */
+  trailingAmen: number;
   before: { sections: number; koLines: number; enLines: number };
   after: { sections: number; koLines: number; enLines: number };
 }
@@ -139,6 +121,49 @@ function countLines(sections: ReadonlyArray<{ lines: readonly SongLine[] }>, lan
   );
 }
 
+/**
+ * **곡의 맨 끝 영어 `Amen` 을 뗀다** — 뗐으면 새 배열을, 뗄 것이 없으면 받은 것을 그대로 돌려준다.
+ *
+ * 한국어 원본에 아멘이 없어 짝 맞추기로 걸리지 않는 곡이 151곡 있었다 (새 1장
+ * 「만복의 근원 하나님」의 `Praise Father, Son, and Holy Ghost. Amen`, 2026-08-28 실측).
+ * 그대로 두면 영어에만 아멘이 두 번 나간다 — 본문에 한 번, `has_amen` 슬라이드로 한 번.
+ *
+ * **맨 끝 한 줄만** 본다. 절마다 아멘이 붙은 곡(새 181장은 4절 모두)은 표시 하나로
+ * 바꾸면 나머지가 사라지므로 건드리지 않고 보고만 한다.
+ */
+function stripTrailingEnglishAmen(sections: readonly NewSection[]): NewSection[] {
+  if (sections.length === 0) return sections as NewSection[];
+  const lastIndex = sections.length - 1;
+  const lines = sections[lastIndex]!.lines;
+  const enIndex = lines.map((line, i) => ({ line, i })).filter((x) => x.line.lang !== 'ko').at(-1);
+  if (enIndex === undefined) return sections as NewSection[];
+
+  const stripped = stripAmenEnglish(enIndex.line.text);
+  if (stripped === enIndex.line.text || stripped.length === 0) return sections as NewSection[];
+
+  return sections.map((section, i) =>
+    i !== lastIndex
+      ? section
+      : {
+          ...section,
+          lines: section.lines.map((line, j) =>
+            j === enIndex.i ? { ...line, text: stripped } : line,
+          ),
+        },
+  );
+}
+
+/** `--allow-text-change 624,638` 처럼 쉼표로 적은 번호를 읽는다 */
+function numberSet(raw: string | undefined): ReadonlySet<number> {
+  if (raw === undefined) return new Set();
+  const out = new Set<number>();
+  for (const part of raw.split(',')) {
+    const n = Number(part.trim());
+    if (Number.isInteger(n) && n > 0) out.add(n);
+  }
+  return out;
+}
+
 function main(): void {
   const dir = argValue('--dir');
   if (dir === undefined || !existsSync(dir)) {
@@ -148,11 +173,22 @@ function main(): void {
   }
   const apply = process.argv.includes('--apply');
   const only = Number(argValue('--only'));
+  const allowTextChange = numberSet(argValue('--allow-text-change'));
+  const keepAmen = numberSet(argValue('--keep-amen'));
   const dict = loadDictionary();
+
+  if (allowTextChange.size > 0) {
+    console.log(`가사 글자가 달라도 넣는 곡: ${[...allowTextChange].join(', ')}`);
+  }
+  if (keepAmen.size > 0) {
+    console.log(`아멘을 가사로 두는 곡: ${[...keepAmen].join(', ')}`);
+  }
 
 
   const ready: Candidate[] = [];
   const skippedText: Array<{ number: number; title: string; why: string }> = [];
+  /** `--allow-text-change` 로 가사 글자가 바뀌는 것을 허용한 곡 */
+  const forcedText: Array<{ number: number; title: string; why: string }> = [];
   const skippedMissing: number[] = [];
   const badName: string[] = [];
 
@@ -185,6 +221,7 @@ function main(): void {
     const keptHyphens: string[] = [];
     let amen = false;
     let scrubbed = 0;
+    let trailingAmen = 0;
     const sections: NewSection[] = parsed
       .filter((section) => {
         // `[아멘]` 섹션은 가사가 아니라 표시다 — 통째로 버리고 플래그로 옮긴다
@@ -192,27 +229,64 @@ function main(): void {
         amen = true;
         return false;
       })
-      .map((section) => ({
-      kind: section.kind,
-      label: section.label,
-      lines: section.lines
-        .map((line) => {
-          if (line.lang !== 'ko') {
-            // 찌꺼기를 먼저 뗀다 — 하이픈 판정이 `© Daum Corp.` 를 낱말로 보지 않게
-            const scrubbedLine = stripScrapeArtifacts(line.text);
-            if (scrubbedLine.changed) scrubbed += 1;
-            if (scrubbedLine.text.length === 0) return { ...line, text: '' };
-            const cleaned = stripSyllableHyphens(scrubbedLine.text, dict);
-            keptHyphens.push(...cleaned.kept);
-            return { ...line, text: cleaned.text };
+      .map((section) => {
+        /*
+         * **한국어를 먼저 훑어 어느 줄에서 아멘을 뗐는지 적어 둔다.** 그 줄에서만
+         * 영어의 `Amen` 도 뗀다 — 한쪽만 떼면 그 줄의 짝이 어긋난다.
+         */
+        const amenAt = new Set<number>();
+        if (!keepAmen.has(number)) {
+          for (const line of section.lines) {
+            if (line.lang !== 'ko') continue;
+            if (stripAmenMarker(line.text).had) amenAt.add(line.lineIndex);
           }
-          // 끝에 붙은 아멘은 가사가 아니라 표시다 (줄 전체가 아멘이면 본문이다)
-          const marker = stripAmenMarker(line.text);
-          if (marker.had) amen = true;
-          return { ...line, text: marker.text };
-        })
-        .filter((line) => line.text.length > 0),
-    })).filter((section) => section.lines.length > 0);
+        }
+
+        const lines = section.lines
+          .map((line) => {
+            if (line.lang !== 'ko') {
+              // 찌꺼기를 먼저 뗀다 — 하이픈 판정이 `© Daum Corp.` 를 낱말로 보지 않게
+              const scrubbedLine = stripScrapeArtifacts(line.text);
+              if (scrubbedLine.changed) scrubbed += 1;
+              if (scrubbedLine.text.length === 0) return { ...line, text: '' };
+              const cleaned = stripSyllableHyphens(scrubbedLine.text, dict);
+              keptHyphens.push(...cleaned.kept);
+              const text = amenAt.has(line.lineIndex)
+                ? stripAmenEnglish(cleaned.text)
+                : cleaned.text;
+              return { ...line, text };
+            }
+            /*
+             * 끝에 붙은 아멘은 가사가 아니라 표시다 (줄 전체가 아멘이면 본문이다).
+             * 단 `--keep-amen` 으로 집은 곡은 아멘이 **가사**다 — 새 624장
+             * 「우리 모두 찬양해」는 `우리 모두 찬양해 아멘` 이 네 번 나온다.
+             * 표시 하나로 바꾸면 화면에 아멘이 한 번만 나온다.
+             */
+            if (keepAmen.has(number)) return line;
+            const marker = stripAmenMarker(line.text);
+            if (marker.had) amen = true;
+            return { ...line, text: marker.text };
+          })
+          .filter((line) => line.text.length > 0);
+
+        return { kind: section.kind, label: section.label, lines };
+      })
+      .filter((section) => section.lines.length > 0);
+
+    /*
+     * **곡의 맨 끝 영어 `Amen` 도 표시다.** 한국어 원본에 아멘이 없어 위 짝 맞추기로는
+     * 걸리지 않는 곡이 151곡 있었다 (새 1장 「만복의 근원 하나님」의
+     * `Praise Father, Son, and Holy Ghost. Amen`). 그대로 두면 영어에만 아멘이
+     * 두 번 나간다 — 본문에 한 번, `has_amen` 슬라이드로 한 번.
+     *
+     * **맨 끝 한 줄만** 본다. 절마다 아멘이 붙은 곡(새 181장)은 절 수만큼 있으므로
+     * 표시 하나로 바꾸면 나머지가 사라진다 — 건드리지 않고 아래에서 보고한다.
+     */
+    const trimmed = keepAmen.has(number) ? sections : stripTrailingEnglishAmen(sections);
+    if (trimmed !== sections) {
+      amen = true;
+      trailingAmen = 1;
+    }
 
     // ── 가사 글자가 같은지 본다 (줄나눔만 바꾸는 작업이다) ──────
     const incomingKo = squashLines(
@@ -225,31 +299,36 @@ function main(): void {
     if (incomingKo !== currentKo) {
       let at = 0;
       while (at < Math.min(incomingKo.length, currentKo.length) && incomingKo[at] === currentKo[at]) at++;
-      skippedText.push({
-        number,
-        title: target.title,
-        why: `${at}자까지 같음 · 외부 ${incomingKo.length}자 / DB ${currentKo.length}자`,
-      });
-      continue;
+      const why = `${at}자까지 같음 · 외부 ${incomingKo.length}자 / DB ${currentKo.length}자`;
+      /*
+       * `--allow-text-change` 로 집은 곡은 사람이 '이 가사가 맞다' 고 판정한 것이다.
+       * 넘기되 **무엇을 넘겼는지 보고한다** — 조용히 지나가면 안 된다.
+       */
+      if (!allowTextChange.has(number)) {
+        skippedText.push({ number, title: target.title, why });
+        continue;
+      }
+      forcedText.push({ number, title: target.title, why });
     }
 
     ready.push({
       number,
       title: target.title,
       songId: target.id,
-      sections,
+      sections: trimmed,
       amen,
       keptHyphens,
       scrubbed,
+      trailingAmen,
       before: {
         sections: currentSections.length,
         koLines: countLines(currentSections, 'ko'),
         enLines: countLines(currentSections, 'en'),
       },
       after: {
-        sections: sections.length,
-        koLines: countLines(sections, 'ko'),
-        enLines: countLines(sections, 'en'),
+        sections: trimmed.length,
+        koLines: countLines(trimmed, 'ko'),
+        enLines: countLines(trimmed, 'en'),
       },
     });
   }
@@ -263,10 +342,19 @@ function main(): void {
   const scrubbedSongs = ready.filter((c) => c.scrubbed > 0).length;
   console.log(`  영어 줄 ${enTotal}줄 · 아멘을 뺀 곡 ${amenCount}곡 · 줄나눔이 바뀌는 곡 ${changedBreaks}곡`);
   console.log(`  ⚠️ 웹 찌꺼기를 뗀 줄 ${scrubbedLines}줄 / ${scrubbedSongs}곡 (원본에 '© Daum Corp.' 등이 붙어 있었습니다)`);
+  const trailingAmenSongs = ready.filter((c) => c.trailingAmen > 0).length;
+  if (trailingAmenSongs > 0) {
+    console.log(`  맨 끝 영어 Amen 을 표시로 옮긴 곡 ${trailingAmenSongs}곡 (한국어에는 아멘이 없던 곡)`);
+  }
 
   if (badName.length > 0) console.log(`\n이름 규약(제목 - 번호.txt)이 아닌 파일 ${badName.length}개: ${badName.slice(0, 3).join(', ')}`);
   if (skippedMissing.length > 0) {
     console.log(`\nDB 에서 곡을 하나로 특정하지 못한 번호 ${skippedMissing.length}개: ${skippedMissing.slice(0, 10).join(', ')}`);
+  }
+
+  if (forcedText.length > 0) {
+    console.log(`\n★ 가사 글자가 바뀌는데 **허용한** 곡 ${forcedText.length}곡 (--allow-text-change):`);
+    for (const item of forcedText) console.log(`   ${item.number} ${item.title} — ${item.why}`);
   }
 
   if (skippedText.length > 0) {
