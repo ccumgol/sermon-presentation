@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   LANG_LABELS, MAX_LANGS, langChoices, orderLangs, toggleLang as nextLangs,
 } from '../../../lib/lang-select.ts';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
-import { LyricsGrid } from '../components/LyricsGrid.tsx';
-import { TranslationPane } from '../components/TranslationPane.tsx';
-import { formatLyrics } from '../../../lib/lyrics-parser.ts';
+import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
+
 import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
 } from '../../../shared/types.ts';
-import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
+import { buildSongDeck, isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
+import { formatLyrics, parseLyrics } from '../../../lib/lyrics-parser.ts';
 import { api, ApiError } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
@@ -60,10 +60,47 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
 
   // 저장된 운율 행을 이 폭에 맞춰 묶는다 (하단 두 줄 템플릿은 넓게, 큰 글씨는 좁게)
   const maxChars = template?.behavior.maxCharsPerLine;
+
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draftLyrics, setDraftLyrics] = useState('');
+
+  /**
+   * **편집 중인 곡의 슬라이드를 미리 본다.**
+   *
+   * 아래 슬라이드 칸은 지금 송출 중인 곡을 보여 준다. 그래서 다른 곡을 편집하는 동안
+   * 엉뚱한 곡이 남아 있었다 (2026-08-29 사용자). 편집 중에는 **고치고 있는 곡**을 보여야
+   * 줄나눔이 화면에서 어떻게 되는지 알 수 있다.
+   *
+   * **저장 전 원문으로 만든다.** `buildSongDeck` 은 서버가 쓰는 것과 같은 lib 함수라
+   * 여기서 만든 것과 실제로 송출될 것이 같다. 그리고 **라이브 출력은 건드리지 않는다** —
+   * 예배 중에 가사를 손보다가 화면이 바뀌면 안 된다.
+   */
+  const draftDeck = useMemo(() => {
+    if (!editing || !song) return null;
+    const sections = parseLyrics(draftLyrics).map((section, index) => ({
+      ...section,
+      id: -(index + 1),
+      position: index,
+    }));
+    if (sections.length === 0) return null;
+    /*
+     * **원문에 있는 언어를 모두 보인다.** 표시 언어 설정을 따르면 방금 적은 번역이
+     * 안 보인다 — 그 설정은 저장된 곡을 기준으로 하기 때문이다. 편집 중에 확인하고
+     * 싶은 것은 '내가 적은 두 언어가 줄로 잘 맞았는가' 이므로 둘 다 보여야 한다.
+     */
+    const inDraft = orderLangs([...new Set(sections.flatMap((s) => s.lines.map((l) => l.lang)))]);
+    const built = buildSongDeck(
+      { ...song, sections, langs: inDraft },
+      {
+        langs: inDraft,
+        linesPerSlide: lines === 'section' ? 'section' : (Number(lines) as 1 | 2 | 4),
+        ...(maxChars === undefined ? {} : { maxCharsPerLine: maxChars }),
+      },
+    );
+    return built.slides.length > 0 ? built : null;
+  }, [editing, song, draftLyrics, lines, maxChars]);
   /**
    * 격자에 보일 언어. 곡이 가진 언어에 사람이 더 고른 것을 얹는다.
    *
@@ -72,7 +109,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    */
   /** 이 탭에서 띄울 때 쓸 프리셋·폰트 — 고르지 않으면 지금 템플릿 그대로 */
   const [outputStyle, setOutputStyle] = useState<OutputStyle>({});
-  const [gridLangs, setGridLangs] = useState<LangCode[] | null>(null);
   const [busy, setBusy] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -133,8 +169,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setSong(loaded);
       setLangs(availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
       setDraftLyrics(formatLyrics(loaded.sections));
-      // 곡이 바뀌면 격자 언어도 그 곡 기준으로 — 앞 곡의 선택이 남으면 헷갈린다
-      setGridLangs(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '곡을 불러오지 못했습니다');
     }
@@ -245,6 +279,15 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
 
   async function saveLyrics(): Promise<void> {
     if (!song) return;
+    /*
+     * **빈 가사로 덮지 않는다.** 두 칸 중 한국어를 비우고 저장하면 그 곡의 가사가
+     * 통째로 사라진다. `data/songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐이다.
+     * 실수로 지우는 길을 열어 두지 않는다 — 정말 지우려면 곡 삭제를 쓴다.
+     */
+    if (draftLyrics.trim().length === 0) {
+      setError('가사가 비어 있어 저장하지 않았습니다. 지우려면 곡을 삭제하세요.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -530,82 +573,16 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
             <div className="card">
               <h2>가사 편집</h2>
               {/*
-                격자를 **먼저** 둔다. 여러 언어를 다룰 때 실제로 하는 일은
-                '줄이 맞는지 보고 고치기' 이고, 원문 텍스트는 대량으로 붙여 넣을 때만
-                필요하다. 자주 쓰는 것을 위에 둔다.
+                **편집 수단은 하나다.** 전에는 넷이었다 — 줄 격자, 'X 가사 전체 지우기',
+                '원문으로 편집', '타언어 가사'. 각각 성격이 달라 무엇을 쓸지 고르는 것부터
+                일이었고, 타언어 창은 한국어가 읽기 전용이라 한국어를 고치려면 다른
+                수단으로 옮겨 가야 했다 (2026-08-29 사용자 요청으로 하나로 합쳤다).
               */}
-              {(() => {
-                // DB 는 알파벳 순으로 준다 (['en','ko','zh']). 기준 언어를 앞으로 돌린다 —
-                // 진하게 그리는 줄이 맨 위여야 무엇에 맞추는지 보인다
-                const songLangs = orderLangs(song.langs.length > 0 ? song.langs : ['ko']);
-                const shown = orderLangs(gridLangs ?? songLangs);
-                return (
-                  <>
-                    <div className="row detail-controls">
-                      <label title="격자에 보일 언어입니다. 송출 언어와는 따로입니다">
-                        편집할 언어
-                      </label>
-                      <span className="candidates">
-                        {langChoices(song.langs).map((lang) => {
-                          const on = shown.includes(lang);
-                          const has = song.langs.includes(lang);
-                          return (
-                            <button
-                              key={lang}
-                              type="button"
-                              className={on ? 'primary' : undefined}
-                              onClick={() =>
-                                setGridLangs(
-                                  on
-                                    ? shown.filter((l) => l !== lang)
-                                    : [...shown, lang],
-                                )
-                              }
-                              title={has ? '' : '아직 이 언어 가사가 없습니다 — 켜면 넣을 자리가 생깁니다'}
-                            >
-                              {LANG_LABELS[lang] ?? lang}
-                              {!has && ' +'}
-                            </button>
-                          );
-                        })}
-                      </span>
-                    </div>
-
-                    <LyricsGrid
-                      text={draftLyrics}
-                      langs={shown.length > 0 ? shown : ['ko']}
-                      onChange={setDraftLyrics}
-                    />
-                  </>
-                );
-              })()}
-
-              <details className="detail-block">
-                <summary>원문으로 편집 (대량 붙여 넣기)</summary>
-                <p className="hintline muted">
-                  <code>[1절]</code> 로 섹션을 나눕니다. <code>|</code> 로 시작하는 줄은 직전 줄의
-                  번역이고, <code>|zh</code> 처럼 언어를 붙일 수 있습니다 (없으면 영어).
-                  줄바꿈이 그대로 화면 줄이 됩니다.
-                </p>
-                <textarea
-                  className="lyrics-editor"
-                  value={draftLyrics}
-                  onChange={(e) => setDraftLyrics(e.target.value)}
-                  spellCheck={false}
-                  rows={14}
-                  aria-label="가사"
-                />
-              </details>
-              {/*
-                타언어 가사 — 한국어를 옆에 두고 줄 맞춰 적는다.
-                전에는 접힌 칸에서 붙여 넣고 '짝 맞춰 채우기' 를 눌러야 했고, 줄이 맞는지는
-                누른 뒤에야 알 수 있었다. 그래서 4,396곡 중 영어가 들어간 곡이 1곡(2줄)
-                뿐이었다. 지금은 적는 동안 짝지어지고 줄 수가 바로 보인다.
-              */}
-              <TranslationPane
+              <LyricsTwoPane
                 text={draftLyrics}
+                songId={song.id}
+                langs={song.langs}
                 onChange={setDraftLyrics}
-                existingLangs={song.langs}
               />
 
               <div className="row" style={{ marginTop: 10 }}>
@@ -626,21 +603,39 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         </>
       )}
 
-      {deck && deck.slides.length > 0 && (
+      {/*
+        편집 중에는 **고치고 있는 곡**을, 아닐 때는 송출 중인 곡을 보여 준다.
+        미리보기는 누를 수 없다 — 송출 중인 곡이 아니므로 누르면 라이브 화면이
+        엉뚱한 자리로 튄다. 보낼 때는 위의 '곡 전체 송출' 을 쓴다.
+      */}
+      {(() => {
+        const preview = draftDeck !== null;
+        const slides = preview ? draftDeck.slides : deck?.slides ?? [];
+        const labels = preview ? draftDeck.labels : deck?.labels ?? [];
+        if (slides.length === 0) return null;
+        return (
         <div className="card">
-          <h2>슬라이드 — {deck.reference}</h2>
+          <h2>
+            슬라이드 — {preview ? `${song?.title ?? ''} (편집 중)` : deck?.reference}
+          </h2>
+          {preview && (
+            <p className="hintline muted">
+              저장하기 전 모습입니다. 화면에는 아직 나가지 않았습니다 — 보내려면 위의
+              ‘곡 전체 송출’ 을 누르세요.
+            </p>
+          )}
           <div className="slides">
-            {deck.slides.map((slide, index) => (
+            {slides.map((slide, index) => (
               <button
                 key={index}
                 type="button"
-                className={`slide-item${index === currentIndex ? ' current' : ''}`}
-                onClick={() => send({ t: 'goto', index })}
-                disabled={!connected}
+                className={`slide-item${!preview && index === currentIndex ? ' current' : ''}`}
+                onClick={() => { if (!preview) send({ t: 'goto', index }); }}
+                disabled={preview || !connected}
               >
                 <span className="label">
-                  {index === currentIndex ? '▶ ' : ''}
-                  {deck.labels[index] || index + 1}
+                  {!preview && index === currentIndex ? '▶ ' : ''}
+                  {labels[index] || index + 1}
                 </span>
                 <span className="text">
                   {slide.kind === 'song'
@@ -649,7 +644,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                           {group.map((line, li) => (
                             <span key={li} className={li === 0 ? undefined : 'secondary'} style={{ display: 'block' }}>
                               {/* 몇 절인지 첫 줄 앞에 붙인다 (후렴처럼 번호가 없으면 붙지 않는다) */}
-                              {gi === 0 && li === 0 && isSectionStart(slide, deck.slides[index - 1])
+                              {gi === 0 && li === 0 && isSectionStart(slide, slides[index - 1])
                                 ? verseNumberPrefix(slide.sectionLabel)
                                 : ''}
                               {line.text}
@@ -663,7 +658,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
         </div>
       </div>
     </>
