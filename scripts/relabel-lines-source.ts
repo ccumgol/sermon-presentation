@@ -81,11 +81,12 @@ function main(): void {
     .prepare(
       `SELECT e.number AS n, s.title AS t FROM song_sections sec
        JOIN song_entries e ON e.song_id = sec.song_id JOIN songs s ON s.id = sec.song_id
-       WHERE e.songbook_id = ? AND sec.lines_source = ? GROUP BY e.number ORDER BY e.number LIMIT 5`,
+       WHERE e.songbook_id = ? AND sec.lines_source = ? GROUP BY s.id ORDER BY e.number, s.title LIMIT 5`,
     )
-    .all(songbook, from) as unknown as Array<{ n: number; t: string }>;
+    .all(songbook, from) as unknown as Array<{ n: number | null; t: string }>;
   console.log('\n표본:');
-  for (const row of sample) console.log(`  ${row.n}장  ${row.t}`);
+  // 번호가 없는 곡집이 있다 ('기타') — 그때는 제목만 보여 준다
+  for (const row of sample) console.log(`  ${row.n === null ? '  ' : `${row.n}장`}  ${row.t}`);
 
   if (!apply) {
     console.log('\n미리보기입니다. 실제로 바꾸려면 --apply 를 붙이세요.');
