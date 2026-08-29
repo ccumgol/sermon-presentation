@@ -64,8 +64,15 @@ const JOIN_ANYWAY: ReadonlySet<string> = new Set([
  */
 const PREFIXES: readonly string[] = ['be', 'for', 'un', 're', 'en', 'em', 'dis', 'mis', 'with'];
 
-/** 굴절형까지 본다 — web2 사전은 `-ing`·`-ers`·`-ies` 를 담지 않는다 */
-function isWord(raw: string, dict: Dictionary): boolean {
+/**
+ * 굴절형까지 본다 — web2 사전은 `-ing`·`-ers`·`-ies` 를 담지 않는다.
+ *
+ * 내보내는 이유: 악보 PDF 에는 음절 하이픈과 **늘임표**가 섞여 있어
+ * (`de-sire-and` 은 `desire` 와 `and` 다) 조각을 어디서 끊을지 부르는 쪽이
+ * 스스로 따져야 한다. `joinHyphenated` 의 '세 조각 이상은 음절' 규칙은
+ * 그 경우에 맞지 않는다.
+ */
+export function isWord(raw: string, dict: Dictionary): boolean {
   const word = raw.toLowerCase().replace(/'/g, '');
   if (dict.has(word)) return true;
   if (word.endsWith('ies') && dict.has(`${word.slice(0, -3)}y`)) return true;
