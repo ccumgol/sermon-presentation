@@ -401,7 +401,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 className="recent-chip"
                 onClick={() => void openAndSend(hit.id)}
                 disabled={!connected || busy}
-                title={`${hit.title} — 바로 송출`}
+                title={`${hit.title}${hit.titleAlt && !hit.title.includes(hit.titleAlt) ? ` (${hit.titleAlt})` : ''} — 바로 송출`}
               >
                 <span className="num">{entryLabel(hit) || '—'}</span>
                 <span className="title">{hit.title}</span>
@@ -429,6 +429,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                     </span>
                   )}
                 </span>
+                {/*
+                  **영어 원제를 보여 준다.** 999곡에 원제가 들어 있는데 화면 어디에도
+                  나오지 않아, 영어로는 곡을 찾을 수 없었다 (2026-08-29 사용자).
+                  제목이 이미 원제를 품고 있으면(‘한국어 - 영문’) 두 번 적지 않는다.
+                */}
+                {hit.titleAlt && !hit.title.includes(hit.titleAlt) && (
+                  <span className="title-alt">{hit.titleAlt}</span>
+                )}
                 {hit.snippet && <span className="snippet">{hit.snippet}</span>}
                 <span className="meta">
                   {hit.sectionCount}개 섹션 · {hit.langs.map((l) => LANG_LABELS[l] ?? l).join('/')}
@@ -466,6 +474,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                   .join(' · ') || '곡'}{' '}
                 — {song.title}
               </span>
+              {song.titleAlt && !song.title.includes(song.titleAlt) && (
+                <span className="title-alt">{song.titleAlt}</span>
+              )}
               {song.confirmed && (
                 <span className="confirm-tag" title="줄나눔을 확인한 곡 — 자동 갱신이 건드리지 않습니다">
                   승인
