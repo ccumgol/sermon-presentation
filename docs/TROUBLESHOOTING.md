@@ -469,6 +469,39 @@ node -e "const {DatabaseSync}=require('node:sqlite');new DatabaseSync('data/song
 node -e "const{DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.argv[1],{readOnly:true});console.log('곡',db.prepare('SELECT count(*) c FROM songs').get().c);db.close()" data/backups/songs-YYYYMMDD-HHMMSS.sqlite
 ```
 
+### 3.1b 백업이 원본과 같은 디스크에 있다 (2026-08-28 이후 경고합니다)
+
+서버가 뜰 때 이렇게 나오면 읽어 주세요.
+
+```
+WARN: 백업이 원본과 같은 디스크에 있습니다 (…/data/backups)
+WARN:   디스크가 죽으면 가사와 백업을 함께 잃습니다. 다른 디스크를 가리키세요:
+WARN:   SERMON_BACKUP_DIR=~/Library/CloudStorage/Dropbox/sermon-backups ./start.sh
+```
+
+**왜 문제인가**: `data/songs.sqlite` 에는 직접 손보고 승인한 가사가 있고 **git 에
+없습니다.** 되돌릴 방법이 백업뿐인데 그 백업이 원본과 같은 디스크에 있으면,
+디스크가 죽을 때 **둘을 함께 잃습니다.** 실수로 지운 경우에는 살아남지만
+하드웨어 고장에는 소용이 없습니다.
+
+**옮기는 법**: `SERMON_BACKUP_DIR` 로 다른 디스크·클라우드 폴더를 가리킵니다.
+스냅샷 하나가 3~7MB 라 클라우드에 두어도 부담이 없습니다.
+
+```bash
+# ~/.zshrc 에 넣어 두면 매번 적을 필요가 없습니다
+export SERMON_BACKUP_DIR="$HOME/Library/CloudStorage/Dropbox/sermon-backups"
+```
+
+이미 있는 백업은 손으로 한 번 옮기면 됩니다 (`mv data/backups/* "$SERMON_BACKUP_DIR"/`).
+
+> 경고는 **막지 않습니다.** 같은 디스크의 백업도 실수로 지웠을 때는 살려 주므로
+> 없는 것보다 낫습니다. 다만 그것만 믿지는 마세요.
+
+**아직 정리 장치가 없습니다** — 백업은 쌓이기만 합니다 (2026-08-28 기준 43개 · 135MB).
+가끔 오래된 것을 지우세요. 되돌릴 일이 생기면 **가장 최근 것**을 씁니다.
+
+---
+
 ### 3.4 '글자 크기를 바꿨는데 화면이 그대로다' 는 두 가지다 ★
 
 두 번 다른 이유로 겪었습니다. 증상이 같아 헷갈립니다.

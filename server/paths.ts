@@ -59,7 +59,22 @@ export const paths = {
   appDb: path.join(DATA_DIR, 'app.sqlite'),
 
   fontsDir: path.join(DATA_DIR, 'fonts'),
-  backupsDir: path.join(DATA_DIR, 'backups'),
+  /**
+   * 스냅샷을 두는 곳. `SERMON_BACKUP_DIR` 로 **다른 디스크**를 가리킬 수 있다.
+   *
+   * `songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐인데, 기본값은 DB 와 같은
+   * 디스크다 — 디스크가 죽으면 원본과 백업을 함께 잃는다. 외장 디스크나 클라우드
+   * 폴더를 가리키면 그 위험이 사라진다 (스냅샷 하나가 3~7MB 라 부담이 없다).
+   *
+   * ```
+   * SERMON_BACKUP_DIR=~/Library/CloudStorage/Dropbox/sermon-backups ./start.sh
+   * ```
+   *
+   * 같은 디스크면 서버가 뜰 때 알린다 (`snapshotDatabases` 의 `sameDevice`).
+   */
+  backupsDir: process.env.SERMON_BACKUP_DIR
+    ? path.resolve(process.env.SERMON_BACKUP_DIR.replace(/^~(?=\/|$)/, homedir()))
+    : path.join(DATA_DIR, 'backups'),
   /**
    * 배경 그림·동영상. 사용자가 파일을 직접 넣어도 되고 앱에서 올려도 된다.
    * 서버는 이 폴더 밖의 파일은 배경으로 내주지 않는다.

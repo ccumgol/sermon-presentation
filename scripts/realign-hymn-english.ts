@@ -252,6 +252,10 @@ function main(): void {
   const snapshot = snapshotDatabases('before-hymn-realign');
   console.log(`\n스냅샷(${snapshot.stamp}):`);
   for (const saved of snapshot.files) console.log(`  ${saved}`);
+  if (snapshot.sameDevice) {
+    console.log('  ⚠️ 백업이 원본과 같은 디스크에 있습니다 — 디스크가 죽으면 함께 잃습니다.');
+    console.log('     SERMON_BACKUP_DIR 로 다른 디스크를 가리킬 수 있습니다.');
+  }
 
   let written = 0;
   for (const song of plans) {

@@ -15,7 +15,7 @@
  * WAL 내용이 이미 반영되어 있어 복원할 때 그 파일만 제자리에 두면 된다.
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -32,6 +32,26 @@ export interface SnapshotResult {
   files: string[];
   /** 파일 이름에 들어간 시각 (같은 작업의 파일을 묶어 보는 데 쓴다) */
   stamp: string;
+  /**
+   * 백업이 **원본과 같은 디스크**에 있나.
+   *
+   * 그렇다면 디스크가 죽을 때 원본과 백업을 함께 잃는다 — 백업의 뜻이 절반만 산다.
+   * `SERMON_BACKUP_DIR` 로 다른 디스크를 가리키면 없어지는 위험이라 **알린다**.
+   * 막지는 않는다 — 같은 디스크의 백업도 실수로 지웠을 때는 살려 준다.
+   */
+  sameDevice: boolean;
+}
+
+/**
+ * 두 경로가 같은 디스크에 있나. 알 수 없으면 `false` 로 본다 —
+ * **확실할 때만 경고한다.** 헛경고가 잦으면 사람이 경고를 읽지 않게 된다.
+ */
+export function onSameDevice(a: string, b: string): boolean {
+  try {
+    return statSync(a).dev === statSync(b).dev;
+  } catch {
+    return false;
+  }
 }
 
 /** 파일 이름에 쓸 수 있는 시각 — 콜론·점을 뺀다 */
@@ -68,5 +88,6 @@ export function snapshotDatabases(reason: string): SnapshotResult {
     }
   }
 
-  return { files, stamp };
+  const sameDevice = files.length > 0 && onSameDevice(TARGETS[0]!.file, paths.backupsDir);
+  return { files, stamp, sameDevice };
 }

@@ -9,6 +9,7 @@ import { hasPassword } from './auth.ts';
 import { DEFAULT_PORT, HOST, IS_LAN_OPEN, PORT_SCAN_RANGE } from './config.ts';
 import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
+import { onSameDevice } from './db/snapshot.ts';
 import { paths } from './paths.ts';
 import { createWsHub, type WsHub } from './ws.ts';
 
@@ -123,6 +124,19 @@ if (IS_LAN_OPEN) {
 } else {
   app.log.info('접속 범위        : 이 PC 안에서만 (태블릿으로 조작하려면 ./start.sh lan)');
 }
+/*
+ * 백업이 원본과 같은 디스크에 있으면 알린다.
+ *
+ * `songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐인데, 같은 디스크라면 디스크가
+ * 죽을 때 둘을 함께 잃는다. **예배가 시작되기 전에** 보이도록 여기서 한 번 말한다 —
+ * 스크립트를 돌릴 때만 말하면 정작 봐야 할 사람이 못 본다.
+ */
+if (onSameDevice(paths.songsDb, paths.backupsDir)) {
+  app.log.warn(`백업이 원본과 같은 디스크에 있습니다 (${paths.backupsDir})`);
+  app.log.warn('  디스크가 죽으면 가사와 백업을 함께 잃습니다. 다른 디스크를 가리키세요:');
+  app.log.warn('  SERMON_BACKUP_DIR=~/Library/CloudStorage/Dropbox/sermon-backups ./start.sh');
+}
+
 if (!bibleReady) {
   app.log.warn(
     `성경 DB 가 없어 조회 기능이 비활성입니다 (${paths.bibleDb}) — 'npm run bible:build' 실행 후 재시작하세요`,
