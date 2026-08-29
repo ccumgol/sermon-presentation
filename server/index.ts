@@ -12,6 +12,33 @@ import { closeBibleDb } from './db/bible.ts';
 import { paths } from './paths.ts';
 import { createWsHub, type WsHub } from './ws.ts';
 
+/*
+ * ── 처리되지 않은 오류 — **가장 먼저 등록한다** ─────────────────────
+ *
+ * **예배 중에 도는 서버다.** 전에는 이런 오류가 나면 Node 기본 동작으로 프로세스가
+ * 사라졌다. 화면은 마지막 슬라이드로 멈춘 채 남지만(검은 화면은 아니다) 다음 장으로
+ * 넘길 수 없고, 무엇이 죽였는지는 스택 추적만 남았다.
+ *
+ * **오류를 삼켜 살려 두지 않는다.** `uncaughtException` 뒤의 프로세스 상태는 믿을 수
+ * 없다 — 반쯤 열린 트랜잭션이나 깨진 WebSocket 을 안고 예배를 계속하는 것이 더 나쁘다.
+ * 대신 **사람이 읽을 수 있게 남기고** 곧바로 나간다. 되살리는 것은 `start.sh` 의
+ * 감시 루프가 한다 (1초면 다시 뜬다).
+ *
+ * **파일 맨 위에 있어야 한다.** 처음에는 종료 처리 옆(아래쪽)에 두었는데, 이 파일은
+ * 최상위 `await` 로 앱을 만들고 포트를 연다 — 그 사이에 나는 오류는 핸들러가 등록되기
+ * **전**이라 걸리지 않았다. `PORT=1` 로 시험해 실제로 확인했다 (2026-08-28).
+ * 그래서 `app` 이 아직 없을 수 있고, 로거 대신 `console.error` 를 쓴다.
+ */
+function dieLoudly(kind: string, err: unknown): void {
+  const detail = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  console.error(`\n❌ ${kind} — 서버를 종료합니다. start.sh 가 곧 다시 띄웁니다.`);
+  console.error(detail);
+  process.exit(1);
+}
+
+process.on('uncaughtException', (err) => dieLoudly('처리되지 않은 예외', err));
+process.on('unhandledRejection', (reason) => dieLoudly('처리되지 않은 거부(Promise)', reason));
+
 let actualPort = DEFAULT_PORT;
 let hub: WsHub | null = null;
 

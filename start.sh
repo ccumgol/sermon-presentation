@@ -121,5 +121,51 @@ if [ "${OPEN_BROWSER:-1}" != "0" ]; then
   ) &
 fi
 
-# 서버 실행 — exec 로 넘겨 Ctrl+C 가 곧바로 서버에 닿게 한다
-exec env PORT="${PORT}" node server/index.ts
+# ── 서버 실행 — 죽으면 되살린다 ─────────────────────────────────────
+#
+# **예배 중에 도는 서버다.** 처리되지 않은 오류 하나로 프로세스가 사라지면 화면은
+# 마지막 슬라이드로 멈춘 채 남고(검은 화면은 아니다) 다음 장으로 넘길 수 없다.
+# 그때 터미널로 달려가 다시 띄우는 30초가 예배에서는 길다.
+#
+# 그래서 감시 루프로 감싼다. `uncaughtException` 을 삼켜 살려 두지 않는 이유는
+# 그 뒤 프로세스 상태를 믿을 수 없기 때문이다 — **빨리 죽고 빨리 살아나는 편**이
+# 안전하다. 서버는 오류를 남기고 나가고(server/index.ts), 여기서 다시 띄운다.
+#
+# Ctrl+C(130)·SIGTERM(143)·정상 종료(0)는 사람이 끝낸 것이므로 되살리지 않는다.
+# 짧은 시간에 거듭 죽으면 되살리기를 멈춘다 — 무한 재시작은 원인을 가린다.
+
+RESTART_LIMIT="${RESTART_LIMIT:-5}"   # 이만큼 거듭 빨리 죽으면 포기한다
+QUICK_DEATH=20                        # 뜬 지 이 초 안에 죽으면 '빨리 죽었다'
+quick_deaths=0
+
+while true; do
+  started_at=$(date +%s)
+  set +e
+  env PORT="${PORT}" node server/index.ts
+  code=$?
+  set -e
+  lived=$(( $(date +%s) - started_at ))
+
+  if [ "$code" -eq 0 ] || [ "$code" -eq 130 ] || [ "$code" -eq 143 ]; then
+    exit 0                            # 사람이 끝냈다
+  fi
+
+  if [ "$lived" -lt "$QUICK_DEATH" ]; then
+    quick_deaths=$(( quick_deaths + 1 ))
+  else
+    quick_deaths=1                    # 한참 돌다 죽은 것은 처음부터 센다
+  fi
+
+  if [ "$quick_deaths" -ge "$RESTART_LIMIT" ]; then
+    echo
+    echo "❌ 서버가 ${QUICK_DEATH}초 안에 ${quick_deaths}번 거듭 죽었습니다 (마지막 종료 코드 ${code})."
+    echo "   되살리기를 멈춥니다 — 위의 오류를 보세요. 같은 원인이 계속 있는 상태입니다."
+    echo "   급하면 다른 포트로: PORT=7800 ./start.sh  (OBS 소스 URL 도 함께 바꾸세요)"
+    exit "$code"
+  fi
+
+  echo
+  echo "⚠️  서버가 종료됐습니다 (코드 ${code}, ${lived}초 돌았음). 1초 뒤 다시 띄웁니다… [${quick_deaths}/${RESTART_LIMIT}]"
+  echo "   화면은 마지막 슬라이드를 그대로 두고 스스로 다시 붙습니다."
+  sleep 1
+done
