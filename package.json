@@ -32,7 +32,8 @@
     "report:bilingual": "node scripts/report-bilingual-hymns.ts",
     "report:hyphen": "node scripts/report-hyphen-linebreaks.ts",
     "hymn:realign": "node scripts/realign-hymn-english.ts",
-    "misc:import": "node scripts/import-misc-lyrics.ts"
+    "misc:import": "node scripts/import-misc-lyrics.ts",
+    "song:retitle": "node scripts/retitle-with-alt.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",
