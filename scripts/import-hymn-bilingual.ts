@@ -37,11 +37,19 @@
  *    가사에 남겨 두면 화면에 두 번 나간다.
  * 4. 절 라벨·`|` 짝은 `parseLyrics` 가 그대로 읽는다 (형식이 이미 우리 규격이다).
  *
- * ## `lines_source` 를 'manual' 로 넣는 이유
+ * ## `lines_source` 를 'imported' 로 넣는다
  *
  * 사람이 밖에서 손으로 맞춘 자료다. `auto` 로 넣으면 `lyrics:realign`·`chorus:merge`
- * 같은 자동 작업이 **이 줄나눔을 다시 헤집을 수 있다.** 'manual' 은 '자동은 손대지
- * 말라' 는 뜻이고, 지금 필요한 것이 정확히 그것이다.
+ * 같은 자동 작업이 **이 줄나눔을 다시 헤집을 수 있다.** `'imported'` 는 '원본의
+ * 줄나눔을 그대로 가져왔으니 자동은 손대지 말라' 는 뜻이고, 지금 필요한 것이 그것이다.
+ *
+ * **`'manual'` 로 넣지 않는다.** 전에는 그렇게 했는데, 그러면 새찬송가 645곡 전부가
+ * `manual` 이 되어 **사람이 앱에서 승인한 곡과 구분되지 않았다** (2026-08-28 발견).
+ * CLAUDE.md 는 `manual` 인 곡을 자동 스크립트도 Agent 도 건드리지 말라고 못 박는데,
+ * 그 표시가 전부에 찍혀 있으면 아무것도 가려내지 못한다 — 보호 규칙이 헛돈다.
+ *
+ * `'imported'` 는 자동 작업에서 `manual` 과 똑같이 보호되고(둘 다 `!== 'auto'`),
+ * 검토 대기열에도 올라오지 않는다. 다른 것은 **뜻뿐이다** — 그리고 그 뜻이 중요하다.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -396,11 +404,11 @@ function main(): void {
   for (const saved of snapshot.files) console.log(`  ${saved}`);
 
   for (const item of ready) {
-    songs.replaceSections(item.songId, item.sections, 'manual');
+    songs.replaceSections(item.songId, item.sections, 'imported');
     if (item.amen) songs.updateSongMeta(item.songId, { hasAmen: true });
   }
 
-  console.log(`\n넣었습니다: ${ready.length}곡 (lines_source = manual)`);
+  console.log(`\n넣었습니다: ${ready.length}곡 (lines_source = imported)`);
   const check = songs.getSong(ready[0]!.songId);
   console.log(`확인: ${ready[0]!.number}번 섹션 ${check?.sections.length}개 · 첫 줄 "${check?.sections[0]?.lines[0]?.text.slice(0, 24)}"`);
 }
