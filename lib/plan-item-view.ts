@@ -27,7 +27,8 @@ export function songLabelOf(entries: readonly SongEntry[]): string | undefined {
 
 /** 추가 바에서 고를 수 있는 항목 종류 */
 export type AddKind =
-  | 'bible' | 'song' | 'liturgy' | 'reading' | 'order' | 'notice' | 'quote' | 'blank' | 'divider';
+  | 'bible' | 'song' | 'liturgy' | 'reading' | 'order' | 'notice' | 'quote' | 'slideshow'
+  | 'blank' | 'divider';
 
 export const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hint: string }> = [
   { kind: 'bible', icon: '📖', label: '성경', hint: '요 3:16 · 시 23 · 롬 8:28-30' },
@@ -37,6 +38,7 @@ export const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: stri
   { kind: 'order', icon: '📋', label: '순서 표시', hint: '대표기도 · 설교 제목(둘째 줄에 설교자)' },
   { kind: 'notice', icon: '📝', label: '광고', hint: '여러 줄로 쓰면 그대로 나갑니다' },
   { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 띄울 성경 절 — 창 1:1-6 을 넣으면 낱개 6줄이 됩니다' },
+  { kind: 'slideshow', icon: '🖼', label: '그림 폴더', hint: '폴더를 고르면 그 안의 그림이 순서대로 — 한 장이면 그대로 걸립니다' },
   { kind: 'blank', icon: '⬛', label: '공백', hint: '화면을 비웁니다' },
   { kind: 'divider', icon: '▾', label: '구분', hint: '예배 부름 · 찬양 · 말씀 …' },
 ];
@@ -101,6 +103,7 @@ export const ITEM_ICONS: Record<CueItem['type'], string> = {
   text: '📝',
   liturgy: '🙏',
   reading: '🔁',
+  slideshow: '🖼',
   blank: '⬛',
   divider: '▾',
 };

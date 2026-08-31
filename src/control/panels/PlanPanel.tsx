@@ -176,6 +176,13 @@ export function PlanPanel({
 
   /** `data/backgrounds/` 파일 목록 — 그림·동영상 항목이 여기서 고른다 */
   const [bgFiles, setBgFiles] = useState<BackgroundFile[]>([]);
+  /** 슬라이드쇼가 가리킬 수 있는 폴더 */
+  const [bgFolders, setBgFolders] = useState<{
+    library: Array<{ name: string; count: number }>;
+    data: Array<{ name: string; count: number }>;
+  }>({ library: [], data: [] });
+  /** 그림 폴더 항목을 만들 때 고른 폴더 (`source/folder`) */
+  const [pickedFolder, setPickedFolder] = useState('');
   /** `~/Desktop/Data/Background` 의 그림들 — 전례문·교독문 배경을 여기서 고른다 */
   const [bgLibrary, setBgLibrary] = useState<BackgroundFile[]>([]);
 
@@ -519,6 +526,28 @@ export function PlanPanel({
         }
         const lines = item.content.split(/\r?\n/).filter((line) => line.trim().length > 0);
         return { slides: [{ kind: 'text', lines }], labels: [textVariantLabel(item.variant)] };
+      }
+
+      /*
+       * 슬라이드쇼 — 폴더를 **띄울 때** 읽는다.
+       *
+       * 순서표에는 폴더만 담겨 있다. 그림 이름을 담아 두면 나중에 파일을 더 넣어도
+       * 순서표를 고쳐야 하는데, '폴더에 넣기만 하면 되는 것' 이 이 기능의 요점이다.
+       */
+      if (item.type === 'slideshow') {
+        const { files } = await api.slideshow(item.source, item.folder);
+        if (files.length === 0) {
+          return { slides: [], labels: [], error: `폴더에 그림이 없습니다 (${item.folder || '기본 폴더'})` };
+        }
+        return {
+          slides: files.map((file) => ({
+            kind: 'image' as const,
+            src: file.url,
+            alt: file.name,
+            ...(item.fit === 'cover' ? { fit: 'cover' as const } : {}),
+          })),
+          labels: files.map((file) => file.name.replace(/\.[^.]+$/, '')),
+        };
       }
 
       if (item.type === 'liturgy') {
@@ -895,10 +924,12 @@ export function PlanPanel({
       const result = await api.backgrounds();
       setBgFiles(result.files);
       setBgLibrary(result.library ?? []);
+      setBgFolders(result.folders ?? { library: [], data: [] });
     } catch {
       // 목록을 못 읽어도 순서표 작업은 계속돼야 한다 — 고를 파일이 없을 뿐이다
       setBgFiles([]);
       setBgLibrary([]);
+      setBgFolders({ library: [], data: [] });
     }
   }, []);
 
@@ -909,6 +940,7 @@ export function PlanPanel({
       defaultsOpen ||
       addKind === 'liturgy' ||
       addKind === 'reading' ||
+      addKind === 'slideshow' ||
       items.some((i) => i.type === 'liturgy' || i.type === 'reading');
     if (needsFiles) void reloadBgFiles();
   }, [defaultsOpen, addKind, items, reloadBgFiles]);
@@ -1125,6 +1157,18 @@ export function PlanPanel({
 
     if (addKind === 'blank') {
       insertItem({ id: newItemId(), type: 'blank' });
+      return;
+    }
+    if (addKind === 'slideshow') {
+      if (pickedFolder.length === 0) return;
+      const [source, ...rest] = pickedFolder.split('/');
+      insertItem({
+        id: newItemId(),
+        type: 'slideshow',
+        source: source === 'data' ? 'data' : 'library',
+        folder: rest.join('/'),
+      });
+      setPickedFolder('');
       return;
     }
     if (text.length === 0) return;
@@ -2012,6 +2056,36 @@ export function PlanPanel({
 
               {addKind === 'blank' ? (
                 <button type="button" className="grow" onClick={() => addFromInput()}>공백 추가</button>
+              ) : addKind === 'slideshow' ? (
+                /*
+                  폴더를 고른다 — **그림을 하나씩 고르지 않는다.**
+                  폴더에 넣기만 하면 되는 것이 이 기능의 요점이라, 항목에는 폴더만 담고
+                  그림은 띄울 때 읽는다. 몇 장인지 함께 보여 준다 —
+                  1장이면 걸어 두는 썸네일, 여럿이면 구분 행의 자동 넘김이 순환한다.
+                */
+                <>
+                  <select
+                    className="grow"
+                    value={pickedFolder}
+                    onChange={(e) => setPickedFolder(e.target.value)}
+                    aria-label="그림 폴더"
+                  >
+                    <option value="">폴더 고르기…</option>
+                    {bgFolders.library.map((f) => (
+                      <option key={`library/${f.name}`} value={`library/${f.name}`}>
+                        {f.name} — {f.count}장 (모아 둔 폴더)
+                      </option>
+                    ))}
+                    {bgFolders.data.map((f) => (
+                      <option key={`data/${f.name}`} value={`data/${f.name}`}>
+                        {f.name} — {f.count}장 (앱 폴더)
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" disabled={pickedFolder.length === 0} onClick={() => addFromInput()}>
+                    추가
+                  </button>
+                </>
               ) : addKind === 'liturgy' ? (
                 <div className="candidates liturgy-add">
                   {LITURGY_TEXTS.map((text) => (

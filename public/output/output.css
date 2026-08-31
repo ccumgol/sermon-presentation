@@ -382,3 +382,37 @@ body.blanked .slide {
  * (`layout.gap` → `--block-gap`). 여기서 여백을 박아 두면 템플릿에서 조절할 수
  * 없고, 교독문 전용 템플릿(-10)이 벌려 둔 값에 더해져 두 배로 벌어진다.
  */
+
+/*
+ * 그림 슬라이드 — 예배 전 안내·악보.
+ *
+ * 글자 슬라이드와 달리 **화면을 꽉 쓴다.** 안내 그림에 여백을 더 주면 정작 그림이
+ * 작아진다. 자동 축소(--fit-scale)도 타지 않는다 — 그림은 이미 화면에 맞춰져 있다.
+ */
+.image-slide {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.image-slide img.fit-contain { max-width: 100%; max-height: 100%; object-fit: contain; }
+.image-slide img.fit-cover { width: 100%; height: 100%; object-fit: cover; }
+
+/*
+ * 세로 일부만 보이기 — 악보에서 지금 부르는 단만.
+ *
+ * 상자가 넘치는 부분을 가리고, 그림을 키워 위로 밀어 올린다. 그림을 여러 장으로
+ * 잘라 두지 않아도 되는 이유가 이것이다.
+ */
+.image-slide.cropped { align-items: flex-start; }
+.image-slide.cropped img { width: 100%; max-width: 100%; max-height: none; object-fit: fill; }
+
+/*
+ * 그림 슬라이드일 때만 무대 여백을 없앤다 — 안내 그림·악보는 화면을 꽉 써야 한다.
+ * 글자 슬라이드로 돌아가면 여백이 되살아난다 (render 가 클래스를 끈다).
+ */
+body.full-bleed .stage { padding: 0; }
+body.full-bleed .slide { max-width: none; }

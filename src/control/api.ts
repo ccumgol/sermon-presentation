@@ -234,9 +234,17 @@ export const api = {
       files: BackgroundFile[];
       /** `~/Desktop/Data/Background` 의 그림들 — 읽기 전용 */
       library: BackgroundFile[];
+      /** 슬라이드쇼가 가리킬 수 있는 하위 폴더 (그림이 있는 것만) */
+      folders: { library: Array<{ name: string; count: number }>; data: Array<{ name: string; count: number }> };
       libraryDir: string;
       dataDir: string;
     }>('/api/backgrounds'),
+
+  /** 슬라이드쇼 한 폴더의 그림 — 순서표가 폴더만 담으므로 띄울 때 읽는다 */
+  slideshow: (source: 'library' | 'data', folder: string) =>
+    get<{ source: string; folder: string; files: BackgroundFile[] }>(
+      `/api/backgrounds/slideshow?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(folder)}`,
+    ),
 
   templates: () => get<Template[]>('/api/templates'),
   createTemplate: (template: Partial<Template>) => send<Template>('POST', '/api/templates', template),

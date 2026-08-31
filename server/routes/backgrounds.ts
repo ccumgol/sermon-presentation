@@ -109,13 +109,77 @@ export function listLibraryBackgrounds(): BackgroundFile[] {
   return scanFolder(paths.backgroundSourceDir, '/background-library/');
 }
 
+export interface BackgroundFolder {
+  name: string;
+  count: number;
+}
+
+/**
+ * 하위 폴더를 나열한다 — **슬라이드쇼가 가리킬 대상.**
+ *
+ * 그림이 한 장도 없는 폴더는 빼고 개수를 함께 준다. 사람이 고를 때 '몇 장짜리인지'가
+ * 곧 '썸네일인가 순환인가' 이기 때문이다 (1장이면 걸어 두고, 여럿이면 넘어간다).
+ * **한 단계만 본다** — 폴더 안의 폴더까지 뒤지면 어디에 넣어야 할지 헷갈린다.
+ */
+function scanSubfolders(root: string): BackgroundFolder[] {
+  if (!existsSync(root)) return [];
+  return readdirSync(root)
+    .filter((name) => !name.startsWith('.'))
+    .flatMap((name) => {
+      const full = path.join(root, name);
+      try {
+        if (!statSync(full).isDirectory()) return [];
+        const count = readdirSync(full).filter(
+          (f) => !f.startsWith('.') && isBackgroundImage(f),
+        ).length;
+        return count > 0 ? [{ name, count }] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
+}
+
+/** 슬라이드쇼가 쓸 수 있는 폴더 — 두 뿌리의 하위 폴더 */
+export function listBackgroundFolders(): { library: BackgroundFolder[]; data: BackgroundFolder[] } {
+  return {
+    library: scanSubfolders(paths.backgroundSourceDir),
+    data: scanSubfolders(paths.backgroundsDir),
+  };
+}
+
+/**
+ * 슬라이드쇼 폴더의 그림을 이름순으로 준다.
+ *
+ * 폴더 이름은 부르는 쪽이 이미 걸렀다고 보지 않는다 — **여기서 다시 막는다.**
+ * 두 곳에서 따로 막으면 한쪽이 뒤처진다 (`safeBackgroundName` 과 같은 규칙).
+ */
+export function listSlideshow(source: 'library' | 'data', folder: string): BackgroundFile[] {
+  if (folder.includes('/') || folder.includes('\\') || folder.startsWith('.')) return [];
+  const root = source === 'data' ? paths.backgroundsDir : paths.backgroundSourceDir;
+  const prefix = source === 'data' ? '/backgrounds/' : '/background-library/';
+  return folder.length === 0
+    ? scanFolder(root, prefix)
+    : scanFolder(path.join(root, folder), `${prefix}${encodeURIComponent(folder)}/`);
+}
+
 export async function registerBackgroundRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/backgrounds', async () =>
     ok({
       files: listBackgrounds(),
       library: listLibraryBackgrounds(),
+      folders: listBackgroundFolders(),
       libraryDir: paths.backgroundSourceDir,
       dataDir: paths.backgroundsDir,
     }),
+  );
+
+  /** 슬라이드쇼 한 폴더의 그림 목록 */
+  app.get<{ Querystring: { source?: string; folder?: string } }>(
+    '/api/backgrounds/slideshow',
+    async (request) => {
+      const source = request.query.source === 'data' ? 'data' : 'library';
+      return ok({ source, folder: request.query.folder ?? '', files: listSlideshow(source, request.query.folder ?? '') });
+    },
   );
 }

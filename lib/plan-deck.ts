@@ -54,6 +54,8 @@ export function describeItem(item: CueItem): string {
     }
     case 'divider':
       return item.label;
+    case 'slideshow':
+      return item.label ?? (item.folder.length > 0 ? `🖼 ${item.folder}` : '🖼 그림 폴더');
     case 'blank':
       return '(공백)';
     default:
@@ -181,8 +183,16 @@ export function isExpandable(item: CueItem): boolean {
    */
   if (item.type === 'bible' && item.quote) return false;
 
+  /*
+   * 슬라이드쇼는 펼칠 수 있다 — 폴더에 그림이 여럿이면 한 장씩 골라 띄울 일이 있다.
+   * (한 장뿐이면 펼쳐도 한 줄이라 해가 없다.)
+   */
   return (
-    item.type === 'bible' || item.type === 'song' || item.type === 'liturgy' || item.type === 'reading'
+    item.type === 'bible' ||
+    item.type === 'song' ||
+    item.type === 'liturgy' ||
+    item.type === 'reading' ||
+    item.type === 'slideshow'
   );
 }
 

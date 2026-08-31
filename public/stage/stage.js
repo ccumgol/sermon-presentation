@@ -186,6 +186,16 @@
         if (slide.presenter) node.appendChild(line(slide.presenter, 'people'));
         break;
       }
+      case 'image': {
+        /*
+         * 강사 모니터는 **그림을 그리지 않는다.** 인도자에게 필요한 것은 '지금 화면에
+         * 무엇이 나가는지' 이고, 안내 그림을 작은 칸에 줄여 봐야 읽히지 않는다.
+         * 파일 이름만 적어 어느 장인지 알 수 있게 한다.
+         */
+        var name = String(slide.alt || slide.src || '').split('/').pop();
+        node.appendChild(line('🖼 ' + decodeURIComponent(name), 'empty'));
+        break;
+      }
       case 'blank': {
         node.appendChild(line('(공백)', 'empty'));
         break;

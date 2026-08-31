@@ -525,9 +525,47 @@
     setOptional(el.credit, null);
   }
 
+  /**
+   * 그림 한 장 — 예배 전 안내·악보처럼 글자 없이 그림만 나가는 화면.
+   *
+   * 배경이 아니라 **내용**이므로 기본이 `contain` 이다. 안내문이나 악보는 잘리면
+   * 읽을 수 없다 (배경은 화면을 채워야 하므로 `cover` 가 기본이다 — 반대다).
+   *
+   * `crop` 은 원본의 세로 일부만 보여 준다. 악보 한 장에서 지금 부르는 단만 잘라
+   * 내기 위한 것이라 **파일을 슬라이드마다 만들지 않아도 된다.** 자르기는 감싼 상자의
+   * 비율을 원본 조각의 비율로 맞추고 그림을 그만큼 키워 위로 밀어 올려서 한다.
+   */
+  function renderImage(payload) {
+    clearChildren(el.blocks);
+    setOptional(el.heading, null);
+    setOptional(el.reference, null);
+    setOptional(el.credit, null);
+
+    var box = document.createElement('div');
+    box.className = 'image-slide';
+    var img = document.createElement('img');
+    img.alt = payload.alt || '';
+    img.src = payload.src;
+    img.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
+
+    var crop = payload.crop;
+    if (crop && typeof crop.top === 'number' && typeof crop.bottom === 'number') {
+      var span = crop.bottom - crop.top;
+      if (span > 0 && span <= 100) {
+        box.classList.add('cropped');
+        // 보이는 부분이 span% 이므로 그림을 (100/span) 배로 키우고 top% 만큼 올린다
+        img.style.height = (100 / span) * 100 + '%';
+        img.style.marginTop = '-' + (crop.top / span) * 100 + '%';
+      }
+    }
+
+    box.appendChild(img);
+    el.blocks.appendChild(box);
+  }
+
   var RENDERERS = {
     bible: renderBible, song: renderSong, text: renderText, order: renderOrder,
-    reading: renderReading,
+    reading: renderReading, image: renderImage,
   };
 
   /**
@@ -636,6 +674,14 @@
     setOptional(el.reference, null);
     setOptional(el.credit, null);
     el.slide.dataset.empty = 'true';
+    /*
+     * 그림 슬라이드가 켰던 '여백 없음' 을 여기서도 끈다.
+     *
+     * `render` 만 끄면 모자란다 — 서버가 '내용 없음'(`clear`)을 알릴 때는
+     * `applyState` 가 이 함수를 **직접** 부르고 `render` 를 거치지 않는다.
+     * 그래서 그림을 띄운 뒤 비우면 다음 글자 슬라이드가 여백 없이 나갔다.
+     */
+    el.body.classList.remove('full-bleed');
   }
 
   /**
@@ -645,6 +691,12 @@
   function render(payload) {
     // 배경은 한 곳에서 정한다 (항목 → 템플릿)
     syncBackdrop(payload);
+    /*
+     * **그림 슬라이드는 화면을 꽉 쓴다.** 템플릿의 안쪽 여백(80/50px)은 글자가
+     * 가장자리에 붙지 않게 하는 장치다. 안내 그림이나 악보에 그 여백을 주면
+     * 정작 봐야 할 것이 작아진다.
+     */
+    el.body.classList.toggle('full-bleed', !!payload && payload.kind === 'image');
     // 폰트·글자 크기도 슬라이드마다 다시 정한다 (지정이 없으면 지운다)
     applyItemStyle(payload && payload.style);
 
@@ -671,8 +723,8 @@
       fn(payload);
       el.slide.dataset.empty = 'false';
       el.body.classList.remove('blanked');
-      // 렌더 직후 실측해 넘치면 배율로 줄인다
-      lastFit = applyAutoFit();
+      // 렌더 직후 실측해 넘치면 배율로 줄인다 (그림은 빼고 — 이미 맞춰져 있다)
+      lastFit = applyAutoFit(payload.kind);
       diag.lastRender = payload.kind;
       renderDebug();
       return true;
@@ -715,7 +767,18 @@
    * 여기서는 순수히 로컬 계산으로 한 번에 결정하고, 최소 배율에서도 넘치면
    * 그 사실을 서버에 보고해 컨트롤 패널이 '더 잘게 나누라'고 안내할 수 있게 한다.
    */
-  function applyAutoFit() {
+  function applyAutoFit(kind) {
+    /*
+     * **그림 슬라이드는 축소하지 않는다.** 그림은 이미 상자에 맞춰져 있는데
+     * 자동 축소가 또 줄이면 화면 가장자리에 흰 띠가 남는다 (실측 0.87배).
+     * 축소는 '글자가 넘칠 때 줄인다' 는 장치라 그림에는 뜻이 없다.
+     */
+    if (kind === 'image') {
+      el.slide.style.removeProperty('--fit-scale');
+      diag.fit = 'image';
+      return { overflow: false, scale: 1 };
+    }
+
     var behavior = (template && template.behavior) || {};
     if (behavior.autoFit === false) {
       el.slide.style.removeProperty('--fit-scale');
@@ -793,7 +856,7 @@
       render(msg.payload);
     } else if (msg.t === 'style') {
       applyStylePatch(msg.patch);
-      lastFit = applyAutoFit();
+      lastFit = applyAutoFit(lastSlide && lastSlide.kind);
       renderDebug();
     } else if (msg.t === 'template') {
       applyTemplate(msg.payload);
@@ -906,7 +969,7 @@
         applyStylePatch(msg.payload);
         // 글자 크기·여백이 바뀌면 넘침 여부가 달라지므로 다시 맞춘다.
         // 이걸 빼면 편집으로 글자를 키웠을 때 화면을 넘긴 채 방치된다.
-        lastFit = applyAutoFit();
+        lastFit = applyAutoFit(lastSlide && lastSlide.kind);
         renderDebug();
         reportMeasure();
       } else if (msg.t === 'template') {
@@ -982,7 +1045,7 @@
       render(lastSlide);
     } else {
       syncBackdrop(null);
-      lastFit = applyAutoFit();
+      lastFit = applyAutoFit(null);
     }
     renderDebug();
   }
@@ -993,7 +1056,7 @@
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
       resizeTimer = null;
-      lastFit = applyAutoFit();
+      lastFit = applyAutoFit(lastSlide && lastSlide.kind);
       renderDebug();
     }, 120);
   });

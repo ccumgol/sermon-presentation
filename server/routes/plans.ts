@@ -129,6 +129,21 @@ function readAuto(raw: unknown): { holdMs: number; loop: boolean } | undefined {
  * 들어온 항목을 검증해 정규화한다.
  * id 가 없으면 새로 발급한다 — 클라이언트가 잊어도 재배치가 깨지지 않게.
  */
+/**
+ * 슬라이드쇼 폴더 이름을 거른다 — **배경 폴더 밖으로 나가지 못하게.**
+ *
+ * 빈 값은 '폴더 바로 밑' 이라는 뜻이라 허용한다. 경로 구분자·`..`·숨김 이름은 막는다.
+ * 그림 이름을 거르는 것(`safeBackgroundName`)과 같은 이유이고 같은 자리에서 막는다.
+ */
+export function safeFolderName(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) return '';
+  if (typeof raw !== 'string') return undefined;
+  const name = raw.trim();
+  if (name.length === 0) return '';
+  if (name.includes('/') || name.includes('\\') || name.startsWith('.')) return undefined;
+  return name;
+}
+
 export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: string[] } {
   if (!Array.isArray(raw)) return { items: [], rejected: ['항목 목록이 배열이 아닙니다'] };
 
@@ -334,6 +349,31 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         }
         const auto = readAuto(divider.auto);
         items.push({ id, type: 'divider', label, ...(auto ? { auto } : {}) });
+        break;
+      }
+
+      case 'slideshow': {
+        const show = item as Extract<CueItem, { type: 'slideshow' }>;
+        const source = show.source === 'data' ? 'data' : 'library';
+        /*
+         * 폴더 이름은 **한 칸만** 받는다. `..` 이나 경로 구분자가 들어오면 배경 폴더
+         * 밖을 읽게 된다 — 그림 이름을 거르는 것(`safeBackgroundName`)과 같은 이유다.
+         */
+        const folder = safeFolderName(show.folder);
+        if (folder === undefined) {
+          rejected.push(`${index + 1}번째 항목: 폴더 이름이 올바르지 않습니다`);
+          continue;
+        }
+        items.push({
+          id,
+          type: 'slideshow',
+          source,
+          folder,
+          ...(show.fit === 'cover' ? { fit: 'cover' as const } : {}),
+          ...(typeof show.label === 'string' && show.label.trim().length > 0
+            ? { label: show.label.trim() }
+            : {}),
+        });
         break;
       }
 

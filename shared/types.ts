@@ -683,6 +683,26 @@ export type CueItem =
     }
   | { id: string; type: 'blank'; note?: string }
   /**
+   * **슬라이드쇼** — 폴더 하나를 가리키면 그 안의 그림이 이름순으로 슬라이드가 된다.
+   *
+   * 예배 전에 띄워 둘 안내다. **한 장이면 그대로 걸어 두는 썸네일**, 여러 장이면
+   * 구분 행의 자동 넘김(`auto`)이 순환한다 — 순환 장치를 새로 만들지 않는다.
+   *
+   * 폴더를 항목에 담고 **그림 이름은 담지 않는다.** 담아 두면 나중에 폴더에 파일을
+   * 더 넣어도 순서표를 고쳐야 한다. 폴더에 넣기만 하면 되는 것이 이 기능의 요점이다.
+   */
+  | {
+      id: string;
+      type: 'slideshow';
+      /** `library` = 사용자 폴더(읽기 전용) · `data` = 앱이 관리하는 배경 폴더 */
+      source: 'library' | 'data';
+      /** 그 폴더 아래의 하위 폴더 이름. 비우면 폴더 바로 밑 */
+      folder: string;
+      /** 기본 `contain` — 안내문은 잘리면 읽을 수 없다 */
+      fit?: BackgroundFit;
+      label?: string;
+    }
+  /**
    * 그룹 머리글 — '예배 부름 / 찬양 / 말씀 / 광고' 처럼 순서를 구획한다.
    *
    * **슬라이드를 만들지 않는다.** 덱에 들어가지 않으므로 항목 경계(groups)의
@@ -864,6 +884,27 @@ export type SlidePayload =
       reference?: string;
       background?: ItemBackground;
       style?: ItemTextStyle;
+    }
+  /**
+   * 그림 한 장 — 예배 전 안내·악보처럼 **글자 없이 그림만** 나가는 화면.
+   *
+   * 배경(`ItemBackground`)과 다르다. 배경은 글자 뒤에 까는 것이고 이것은 **내용 자체**다.
+   * 그래서 `contain` 이 기본이다 — 안내문이나 악보는 잘리면 읽을 수 없다.
+   * (배경은 화면을 채워야 하므로 `cover` 가 기본이다.)
+   *
+   * `crop` 은 원본의 **세로 일부만** 보여 준다. 악보 한 장에서 지금 부르는 단만
+   * 잘라 내기 위한 것이다 — 슬라이드마다 파일을 따로 만들지 않아도 된다.
+   */
+  | {
+      kind: 'image';
+      /** 출력 페이지가 그대로 쓰는 주소 (`/backgrounds/…` · `/background-library/…`) */
+      src: string;
+      /** 화면 낭독기를 위한 설명. 파일 이름이 기본 */
+      alt?: string;
+      /** 기본 `contain` — 내용이므로 잘리면 안 된다 */
+      fit?: BackgroundFit;
+      /** 원본의 세로 몇 %부터 몇 %까지 보일지 (0~100). 없으면 전체 */
+      crop?: { top: number; bottom: number };
     }
   | { kind: 'blank' };
 
