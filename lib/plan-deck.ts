@@ -55,7 +55,18 @@ export function describeItem(item: CueItem): string {
     case 'divider':
       return item.label;
     case 'slideshow':
-      return item.label ?? (item.folder.length > 0 ? `🖼 ${item.folder}` : '🖼 그림 폴더');
+      /*
+       * **아이콘을 붙이지 않는다.** 목록이 `ITEM_ICONS` 로 이미 붙인다 —
+       * 여기서 또 넣으면 `🖼🖼 그림 폴더` 가 된다 (2026-08-30 화면에서 걸렸다).
+       */
+      return (
+        item.label ??
+        (item.folder.length > 0
+          ? item.folder
+          : item.source === 'data'
+            ? '앱 폴더 전체'
+            : '모아 둔 폴더 전체')
+      );
     case 'blank':
       return '(공백)';
     default:

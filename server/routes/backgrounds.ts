@@ -140,12 +140,22 @@ function scanSubfolders(root: string): BackgroundFolder[] {
     .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
 }
 
-/** 슬라이드쇼가 쓸 수 있는 폴더 — 두 뿌리의 하위 폴더 */
+/**
+ * 슬라이드쇼가 쓸 수 있는 폴더 — 두 뿌리의 하위 폴더.
+ *
+ * **뿌리 자체도 넣는다** (`name: ''`). 하위 폴더를 하나도 안 만든 사람에게 빈 목록만
+ * 주면 '고장났다' 로 보인다 (2026-08-30 실제로 그랬다 — 하위 폴더 0개, 뿌리에 13장).
+ * 뿌리에 그림이 있으면 그것만으로 바로 쓸 수 있어야 한다.
+ */
 export function listBackgroundFolders(): { library: BackgroundFolder[]; data: BackgroundFolder[] } {
-  return {
-    library: scanSubfolders(paths.backgroundSourceDir),
-    data: scanSubfolders(paths.backgroundsDir),
+  const withRoot = (root: string): BackgroundFolder[] => {
+    const subs = scanSubfolders(root);
+    const loose = existsSync(root)
+      ? readdirSync(root).filter((f) => !f.startsWith('.') && isBackgroundImage(f)).length
+      : 0;
+    return loose > 0 ? [{ name: '', count: loose }, ...subs] : subs;
   };
+  return { library: withRoot(paths.backgroundSourceDir), data: withRoot(paths.backgroundsDir) };
 }
 
 /**

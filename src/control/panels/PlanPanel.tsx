@@ -183,6 +183,8 @@ export function PlanPanel({
   }>({ library: [], data: [] });
   /** 그림 폴더 항목을 만들 때 고른 폴더 (`source/folder`) */
   const [pickedFolder, setPickedFolder] = useState('');
+  /** 고를 폴더가 없을 때 '어디에 넣어야 하는지' 를 알려 주려고 들고 있는다 */
+  const [bgDirs, setBgDirs] = useState<{ library: string; data: string }>({ library: '', data: '' });
   /** `~/Desktop/Data/Background` 의 그림들 — 전례문·교독문 배경을 여기서 고른다 */
   const [bgLibrary, setBgLibrary] = useState<BackgroundFile[]>([]);
 
@@ -925,6 +927,7 @@ export function PlanPanel({
       setBgFiles(result.files);
       setBgLibrary(result.library ?? []);
       setBgFolders(result.folders ?? { library: [], data: [] });
+      setBgDirs({ library: result.libraryDir ?? '', data: result.dataDir ?? '' });
     } catch {
       // 목록을 못 읽어도 순서표 작업은 계속돼야 한다 — 고를 파일이 없을 뿐이다
       setBgFiles([]);
@@ -2063,29 +2066,45 @@ export function PlanPanel({
                   그림은 띄울 때 읽는다. 몇 장인지 함께 보여 준다 —
                   1장이면 걸어 두는 썸네일, 여럿이면 구분 행의 자동 넘김이 순환한다.
                 */
-                <>
-                  <select
-                    className="grow"
-                    value={pickedFolder}
-                    onChange={(e) => setPickedFolder(e.target.value)}
-                    aria-label="그림 폴더"
-                  >
-                    <option value="">폴더 고르기…</option>
-                    {bgFolders.library.map((f) => (
-                      <option key={`library/${f.name}`} value={`library/${f.name}`}>
-                        {f.name} — {f.count}장 (모아 둔 폴더)
-                      </option>
-                    ))}
-                    {bgFolders.data.map((f) => (
-                      <option key={`data/${f.name}`} value={`data/${f.name}`}>
-                        {f.name} — {f.count}장 (앱 폴더)
-                      </option>
-                    ))}
-                  </select>
-                  <button type="button" disabled={pickedFolder.length === 0} onClick={() => addFromInput()}>
-                    추가
-                  </button>
-                </>
+                (() => {
+                  const all = [
+                    ...bgFolders.library.map((f) => ({ ...f, source: 'library' as const })),
+                    ...bgFolders.data.map((f) => ({ ...f, source: 'data' as const })),
+                  ];
+                  /*
+                    고를 폴더가 하나도 없을 때 빈 드롭다운만 주면 '고장났다' 로 보인다.
+                    **어디에 넣어야 하는지**를 그 자리에서 알려 준다 (실제 경로로).
+                  */
+                  if (all.length === 0) {
+                    return (
+                      <span className="hintline muted grow">
+                        쓸 수 있는 그림이 없습니다. 아래 폴더에 그림을 넣거나 그 안에 폴더를 만드세요 —{' '}
+                        <code>{bgDirs.library || '~/Desktop/Data/Background'}</code>
+                      </span>
+                    );
+                  }
+                  return (
+                    <>
+                      <select
+                        className="grow"
+                        value={pickedFolder}
+                        onChange={(e) => setPickedFolder(e.target.value)}
+                        aria-label="그림 폴더"
+                      >
+                        <option value="">폴더 고르기…</option>
+                        {all.map((f) => (
+                          <option key={`${f.source}/${f.name}`} value={`${f.source}/${f.name}`}>
+                            {f.name === '' ? '(폴더 바로 밑)' : f.name} — {f.count}장{' '}
+                            {f.source === 'library' ? '(모아 둔 폴더)' : '(앱 폴더)'}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="button" disabled={pickedFolder.length === 0} onClick={() => addFromInput()}>
+                        추가
+                      </button>
+                    </>
+                  );
+                })()
               ) : addKind === 'liturgy' ? (
                 <div className="candidates liturgy-add">
                   {LITURGY_TEXTS.map((text) => (

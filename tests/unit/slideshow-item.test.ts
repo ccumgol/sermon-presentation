@@ -56,10 +56,12 @@ describe('폴더 이름 거르기', () => {
 describe('목록에서 보이는 모습', () => {
   const item = { id: 'a', type: 'slideshow', source: 'library', folder: '예배전' } as const;
 
-  it('폴더 이름으로 적는다', () => {
-    expect(describeItem(item)).toBe('🖼 예배전');
+  /* 목록이 ITEM_ICONS 로 아이콘을 붙이므로 여기서 또 넣으면 두 번 나온다 */
+  it('폴더 이름으로 적는다 — 아이콘은 붙이지 않는다', () => {
+    expect(describeItem(item)).toBe('예배전');
     expect(describeItem({ ...item, label: '주보 안내' })).toBe('주보 안내');
-    expect(describeItem({ ...item, folder: '' })).toBe('🖼 그림 폴더');
+    expect(describeItem({ ...item, folder: '' })).toBe('모아 둔 폴더 전체');
+    expect(describeItem({ ...item, source: 'data', folder: '' })).toBe('앱 폴더 전체');
   });
 
   it('펼칠 수 있다 — 여러 장이면 한 장씩 고를 일이 있다', () => {
