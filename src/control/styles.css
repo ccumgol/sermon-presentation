@@ -1970,6 +1970,23 @@ button.link-inline {
 /* 커서가 놓인 구분도 버튼을 보여 준다 — 키보드로 옮길 때 어디를 누를지 보여야 한다 */
 .cue-divider.current .actions { opacity: 1; }
 
+/*
+ * **자동 넘김 버튼은 늘 보인다.**
+ *
+ * 나머지 버튼(↑↓✕)은 마우스를 올렸을 때만 나오는 것이 맞다 — 자주 쓰지 않고,
+ * 늘 떠 있으면 목록이 시끄럽다. 그러나 ⏱·▶ 는 **기능이 있다는 것 자체를 알리는
+ * 표시**다. 숨겨 두었더니 '예배 전 안내' 가 있는 줄도 몰랐다 (2026-09-01 신고).
+ *
+ * 감싼 칸을 투명하게 두고 자식만 올리면 소용없다 — 투명도는 **곱해진다**.
+ * 그래서 구분 행은 칸을 켜 두고 **숨길 버튼만** 하나씩 끈다.
+ */
+.cue-divider .actions { opacity: 1; }
+.cue-divider .actions button { opacity: 0; }
+.cue-divider .actions .go { opacity: 1; }
+.cue-divider .actions .ghost { opacity: 0.45; }
+.cue-divider:hover .actions button,
+.cue-divider.current .actions button { opacity: 1; }
+
 .cue-row .actions button,
 .cue-divider .actions button {
   min-height: 22px;

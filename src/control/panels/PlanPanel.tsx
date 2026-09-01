@@ -1923,7 +1923,14 @@ export function PlanPanel({
                         {item.auto && <span className="auto-tag" title="예배 전 안내 — 자동으로 넘어갑니다">⏱</span>}
                       </span>
                       <span className="actions">
-                        {item.auto && (
+                        {/*
+                          **꺼져 있을 때도 자리를 보여 준다.**
+                          전에는 자동 넘김을 켜기 전까지 구분 행에 아무 표시가 없어서
+                          이 기능이 있는 줄도 몰랐다 ('▶ 를 눌러도 안 된다' 신고,
+                          2026-09-01). 흐린 ⏱ 을 누르면 켜지고 그 자리에 ▶ 가 생긴다 —
+                          켜는 곳과 시작하는 곳이 같아야 헤매지 않는다.
+                        */}
+                        {item.auto ? (
                           <button
                             type="button"
                             className="go"
@@ -1933,9 +1940,27 @@ export function PlanPanel({
                               else void startAuto(item);
                             }}
                             disabled={!connected || busy}
-                            title={running ? '자동 진행 정지' : '예배 전 안내 시작 (자동 진행)'}
+                            title={running ? '자동 진행 정지' : '예배 전 안내 시작 (자동으로 넘어갑니다)'}
                           >
                             {running ? '■' : '▶'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              patchItems(
+                                items.map((i) =>
+                                  i.id === item.id
+                                    ? { ...i, auto: { holdMs: AUTO_HOLD_MS_DEFAULT, loop: true } }
+                                    : i,
+                                ),
+                              );
+                            }}
+                            title="예배 전 안내로 쓰기 — 켜면 ▶ 가 생겨 자동으로 넘어갑니다"
+                          >
+                            ⏱
                           </button>
                         )}
                         <button
