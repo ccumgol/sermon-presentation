@@ -266,7 +266,20 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
         secondaryLang: request.body?.secondaryLang ?? 'en',
       });
 
-      const id = store.createSong({ title: title.trim(), source: 'manual', sections });
+      /*
+       * **`lines_source` 를 'manual' 로 넣는다.**
+       *
+       * 기본값은 `'auto'` 인데, 그러면 사람이 앱에서 직접 쓴 곡이 검토 대기열에
+       * 올라오고 자동 작업의 대상이 된다. 검토할 '자동 결과' 가 없는데도 그렇다.
+       * 사람이 쓴 것이므로 `manual` 이 사실에 맞고, 뒤이어 가사 편집으로 저장하면
+       * 어차피 같은 값이 된다 (`replaceSections` 의 기본값).
+       */
+      const id = store.createSong({
+        title: title.trim(),
+        source: 'manual',
+        sections,
+        linesSource: 'manual',
+      });
       return ok(store.getSong(id));
     },
   );

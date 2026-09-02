@@ -182,6 +182,17 @@ export const api = {
   confirmSong: (id: number) => send<{ id: number; confirmed: boolean }>('POST', `/api/songs/${id}/confirm`, {}),
   unconfirmSong: (id: number) => send<{ id: number; confirmed: boolean }>('DELETE', `/api/songs/${id}/confirm`, {}),
 
+  /**
+   * 새 곡을 만든다 — **곡집을 주지 않으면 '기타' 에 번호 없이 들어간다.**
+   *
+   * 가사는 비워도 된다. 만든 뒤 두 칸 편집기에서 채우는 것이 자연스럽다.
+   */
+  createSong: (title: string, text = '') =>
+    send<Song>('POST', '/api/songs', { title, text }),
+
+  /** 곡을 지운다 — 되돌릴 수 없다. 부르는 쪽이 반드시 확인을 받아야 한다 */
+  deleteSong: (id: number) => send<{ id: number }>('DELETE', `/api/songs/${id}`, {}),
+
   saveLyrics: (id: number, text: string) =>
     send<{ song: Song; availableLangs: LangCode[] }>('PUT', `/api/songs/${id}/lyrics`, { text }),
 

@@ -64,6 +64,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  /** '＋ 새 곡' 칸이 열려 있나. 열려 있으면 제목을 받는다 */
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
   const [draftLyrics, setDraftLyrics] = useState('');
 
   /**
@@ -265,6 +268,62 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     [langs, lines, sendWithStyle, loadQuickPicks],
   );
 
+  /**
+   * 새 곡을 만든다 — **곡집을 주지 않으므로 '기타' 에 들어간다.**
+   *
+   * 만든 뒤 곧바로 가사 편집을 연다. 제목만 있는 곡을 목록에 남겨 두면 '가사가 없는
+   * 곡' 이 쌓이고, 무엇을 하려던 것인지 나중에 알 수 없다.
+   */
+  async function createSong(): Promise<void> {
+    const title = newTitle.trim();
+    if (title.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const made = await api.createSong(title);
+      setCreating(false);
+      setNewTitle('');
+      setQuery('');
+      setResult(null);
+      await openSong(made.id);
+      setEditing(true);
+      setNotice(`'${made.title}' 을 기타 곡집에 만들었습니다. 가사를 넣으세요.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '만들지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * 곡을 지운다 — **되돌릴 수 없다.**
+   *
+   * `data/songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐이다. 그래서 제목을
+   * 보여 주고 한 번 물어본다. 실수로 지우는 길을 열어 두지 않는다.
+   */
+  async function removeSong(): Promise<void> {
+    if (!song) return;
+    const ok = window.confirm(
+      `'${song.title}' 을 지웁니다.\n\n가사와 함께 완전히 사라지고 되돌릴 수 없습니다.`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteSong(song.id);
+      setSong(null);
+      setEditing(false);
+      setResult(null);
+      setQuery('');
+      setNotice('곡을 지웠습니다.');
+      void loadQuickPicks();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /** 즐겨찾기에 넣거나 뺀다 — 목록은 곧바로 다시 읽는다 */
   async function toggleFavorite(): Promise<void> {
     if (!song) return;
@@ -410,6 +469,37 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           </div>
         )}
 
+        {/*
+          새 곡 만들기 — **검색 위에 둔다.** 찾다가 없어서 만드는 흐름이므로
+          결과 바로 위가 손이 가는 자리다. 곡집은 묻지 않는다 — 손으로 쓴 곡은
+          '기타' 로 간다 (번호가 없는 곡집이라 번호를 물을 것도 없다).
+        */}
+        <div className="row" style={{ marginTop: 8 }}>
+          {creating ? (
+            <>
+              <input
+                type="text"
+                className="grow"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isComposing(e)) void createSong();
+                  if (e.key === 'Escape') { setCreating(false); setNewTitle(''); }
+                }}
+                placeholder="곡 제목 — 기타 곡집에 만듭니다"
+                aria-label="새 곡 제목"
+                autoFocus
+              />
+              <button type="button" className="primary" onClick={() => void createSong()} disabled={busy || newTitle.trim().length === 0}>
+                만들기
+              </button>
+              <button type="button" onClick={() => { setCreating(false); setNewTitle(''); }}>취소</button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setCreating(true)}>＋ 새 곡</button>
+          )}
+        </div>
+
         <div className="song-hits">
           {result && result.hits.length === 0 && <p className="hintline muted">결과가 없습니다.</p>}
           {result?.hits.map((hit) => (
@@ -553,6 +643,15 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
               </button>
               <button type="button" onClick={() => setEditing((v) => !v)}>
                 {editing ? '편집 닫기' : '가사 편집'}
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => void removeSong()}
+                disabled={busy}
+                title="이 곡을 지웁니다 — 되돌릴 수 없습니다"
+              >
+                곡 삭제
               </button>
             </div>
           </div>
