@@ -86,6 +86,12 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       ...section,
       id: -(index + 1),
       position: index,
+      /*
+       * 편집 중인 가사는 **사람이 치고 있는 줄**이다. 저장하면 `manual` 이 되므로
+       * 미리보기도 같은 규칙으로 그려야 한다 — 여기서 빼면 미리보기에서는 줄이 묶여
+       * 보이다가 저장한 뒤엔 안 묶이는(또는 그 반대) 어긋남이 생긴다.
+       */
+      linesSource: 'manual' as const,
     }));
     if (sections.length === 0) return null;
     /*

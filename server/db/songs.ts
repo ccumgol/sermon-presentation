@@ -23,6 +23,7 @@ import type {
   SongSearchHit,
   SongSearchResult,
   SongSection,
+  LinesSource as SharedLinesSource,
 } from '../../shared/types.ts';
 import { ensureDataDirs, paths } from '../paths.ts';
 import * as songbooks from './songbooks.ts';
@@ -278,6 +279,8 @@ export function getSong(id: number): Song | undefined {
       label: s.label,
       position: s.position,
       lines: lines.map((l) => ({ lineIndex: l.line_index, lang: l.lang, text: l.text })),
+      // 화면에서 줄을 묶을지 정하는 데 쓴다 (shared/types.ts 의 SongSection 참고)
+      linesSource: s.lines_source as SongSection['linesSource'],
     };
   });
 
@@ -598,7 +601,8 @@ export function setEntries(songId: number, entries: readonly SongEntryInput[]): 
 }
 
 /** 줄나눔이 어디서 왔는지 — 'auto' 만 재정렬 대상이다 */
-export type LinesSource = 'auto' | 'manual' | 'imported';
+/** `shared/types.ts` 의 것을 그대로 쓴다 — 두 곳에 적으면 한쪽이 뒤처진다 */
+export type LinesSource = SharedLinesSource;
 
 function writeSections(
   songId: number,

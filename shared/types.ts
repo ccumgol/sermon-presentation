@@ -151,7 +151,21 @@ export interface SongSection {
   label: string; // '1절', '후렴', 'Bridge'
   position: number;
   lines: SongLine[];
+  /**
+   * 이 줄나눔이 어디서 왔나 — **화면에서 줄을 묶을지 정하는 데 쓴다.**
+   *
+   * 찬송가는 짧은 운율 행(`나 같은 죄인 살리신` 8자)으로 저장돼 있어 한 줄씩 띄우면
+   * 화면이 텅 빈다. 그래서 이웃 두 줄을 묶어 그린다.
+   *
+   * 그러나 **사람이 앱에서 직접 친 줄(`manual`)은 묶지 않는다.** 친 줄 자체가 의도이고,
+   * 편집 칸도 '줄바꿈이 그대로 화면 줄이 됩니다' 라고 약속한다. 묶으면 그 약속이 깨진다
+   * (2026-09-01 실제로 12줄이 6덩이가 되어 나갔다).
+   */
+  linesSource?: LinesSource;
 }
+
+/** 줄나눔 출처. `server/db/songs.ts` 의 `LinesSource` 와 같은 값이다 */
+export type LinesSource = 'auto' | 'manual' | 'imported';
 
 /**
  * 곡집(시리즈). 새찬송가·통일찬송가·많은물소리·찬미2000·기타 …

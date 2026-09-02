@@ -168,8 +168,20 @@ export function buildSectionSlides(
   const paired = pairLines(section, options.langs);
   if (paired.length === 0) return [];
 
-  // 저장된 운율 행을 표시 폭에 맞춰 묶는다 (9.9.9.9 → 19.19)
-  const groups = fitLinesToWidth(paired, options.maxCharsPerLine ?? DEFAULT_MAX_CHARS_PER_LINE);
+  /*
+   * 저장된 운율 행을 표시 폭에 맞춰 묶는다 (9.9.9.9 → 19.19).
+   *
+   * **사람이 앱에서 직접 친 줄(`manual`)은 묶지 않는다.** 친 줄 자체가 의도이고,
+   * 가사 편집 칸이 '줄바꿈이 그대로 화면 줄이 됩니다' 라고 약속한다. 묶으면 그 약속이
+   * 깨진다 — 12줄을 쳤는데 4줄이 한 화면에 나갔다 (2026-09-01 사용자 신고).
+   *
+   * 찬송가(`auto`·`imported`)는 그대로 묶는다. 짧은 운율 행을 한 줄씩 띄우면 화면이
+   * 텅 비기 때문이고, 그 모습이 이미 예배에서 쓰이고 있다.
+   */
+  const groups =
+    section.linesSource === 'manual'
+      ? paired
+      : fitLinesToWidth(paired, options.maxCharsPerLine ?? DEFAULT_MAX_CHARS_PER_LINE);
 
   const perSlide = options.linesPerSlide ?? 2;
   const pages = perSlide === 'section' ? [groups] : chunkWithoutOrphans(groups, perSlide);
