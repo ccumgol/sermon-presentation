@@ -413,6 +413,59 @@ describe('구분·인용구 항목 저장', () => {
   });
 
   /**
+   * '저장하기' 가 기대는 길 — 불러온 회차를 **그 자리에** 갱신한다.
+   *
+   * 전에는 화면에 이 길이 없었다. 저장된 순서를 불러와 고치면 '순서 저장하기' 로
+   * 긴 이름('2026-08-17 주일 1부 예배')을 똑같이 맞혀 쳐야 덮어써졌고, 한 글자만
+   * 달라도 회차가 하나 더 생겼다 (2026-09-03 사용자 보고). 서버 쪽은 되어 있었고
+   * 화면이 그 길을 막고 있었던 것이라, 여기서 못을 박아 둔다.
+   */
+  it('저장된 순서를 갱신해도 순서로 남고 회차가 늘지 않는다 (저장하기)', async () => {
+    const before = await get<ServicePlan[]>('/api/plans?kind=plan');
+
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '2026-08-17 주일 1부 예배',
+      items: [{ type: 'text', content: '대표기도', variant: 'order' }],
+    });
+    const saved = created.body.data!.plan;
+    createdPlanIds.push(saved.id);
+    expect(saved.kind).toBe('plan');
+
+    const updated = await send<PlanResponse>('PUT', `/api/plans/${saved.id}`, {
+      name: saved.name,
+      items: [
+        { type: 'text', content: '대표기도', variant: 'order' },
+        { type: 'song', songId: 1, songTitle: '은혜', langs: ['ko'] },
+      ],
+    });
+    expect(updated.body.data!.plan.id).toBe(saved.id);
+    expect(updated.body.data!.plan.kind).toBe('plan');
+    expect(updated.body.data!.plan.items).toHaveLength(2);
+
+    // 같은 이름의 회차가 둘이 되면 다음에 어느 쪽을 덮어쓸지 알 수 없다
+    const after = await get<ServicePlan[]>('/api/plans?kind=plan');
+    expect(after.body.data!.length).toBe(before.body.data!.length + 1);
+    expect(after.body.data!.filter((p) => p.name === saved.name)).toHaveLength(1);
+  });
+
+  /** '다른 이름으로 저장' 은 원본을 건드리지 않는다 */
+  it('저장된 순서를 복제하면 사본도 순서다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '복제 대상 회차',
+      items: [{ type: 'text', content: '대표기도', variant: 'order' }],
+    });
+    const source = created.body.data!.plan;
+    createdPlanIds.push(source.id);
+
+    const copy = await send<ServicePlan>('POST', `/api/plans/${source.id}/duplicate`, {});
+    createdPlanIds.push(copy.body.data!.id);
+
+    expect(copy.body.data!.kind).toBe('plan');
+    expect(copy.body.data!.id).not.toBe(source.id);
+    expect(copy.body.data!.items[0]!.id).not.toBe(source.items[0]!.id);
+  });
+
+  /**
    * '이름 바꾸기' 가 기대는 길. 이름만 보내면 항목이 그대로여야 한다 —
    * 여기서 항목이 비면 유형 하나가 통째로 날아간다.
    */

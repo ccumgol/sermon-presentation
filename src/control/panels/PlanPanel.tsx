@@ -307,9 +307,24 @@ export function PlanPanel({
     if (renamingId !== undefined) nameInputRef.current?.select();
   }, [renamingId]);
 
-  /** '템플릿 업데이트' — 지금 고친 내용을 이 유형의 원본으로 굳힌다 */
-  async function updateTemplate(): Promise<void> {
-    if (!plan || plan.kind !== 'template') return;
+  /** 지금 열어 둔 것을 뭐라고 부르는가 — 버튼·안내 문구가 이걸 따른다 */
+  const planNoun = plan?.kind === 'template' ? '유형' : '순서';
+  /** 목적격까지 붙인 것 — '유형을' / '순서를'. 받침이 달라 조사를 이어 붙일 수 없다 */
+  const planNounObj = plan?.kind === 'template' ? '유형을' : '순서를';
+
+  /**
+   * **열어 둔 것에 그대로 저장한다** — 유형이면 '템플릿 업데이트', 저장된 순서면 '저장하기'.
+   *
+   * 전에는 유형만 이 길이 있었다. 저장된 순서를 불러와 고치면 '순서 저장하기' 로
+   * 이름을 **다시 쳐서 같은 이름을 맞혀야** 덮어쓸 수 있었다. 이름이
+   * '2026-08-17 주일 1부 예배' 처럼 길어 한 글자만 달라도 덮어쓰기가 아니라
+   * 새 순서가 하나 더 생겼다 (2026-09-03 사용자 보고).
+   */
+  async function saveCurrent(): Promise<void> {
+    if (!plan) return;
+    const noun = plan.kind === 'template' ? '유형' : '순서';
+    // '유형을' / '순서를' — 받침이 달라 조사를 이어 붙일 수 없다
+    const nounObj = plan.kind === 'template' ? '유형을' : '순서를';
     setBusy(true);
     setError(null);
     try {
@@ -324,11 +339,11 @@ export function PlanPanel({
       await reload();
       setNotice(
         result.rejected && result.rejected.length > 0
-          ? `유형을 갱신했지만 ${result.rejected.length}개 항목을 버렸습니다: ${result.rejected.join(', ')}`
-          : `'${result.plan.name}' 유형을 갱신했습니다`,
+          ? `${nounObj} 갱신했지만 ${result.rejected.length}개 항목을 버렸습니다: ${result.rejected.join(', ')}`
+          : `'${result.plan.name}' ${noun}에 저장했습니다`,
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '갱신하지 못했습니다');
+      setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
     } finally {
       setBusy(false);
     }
@@ -370,9 +385,18 @@ export function PlanPanel({
           ? DEFAULT_GROUPS.map((label) => ({ id: newItemId(), type: 'divider', label }))
           : items;
 
+      /*
+        회차 날짜. 유형에서 '순서 저장하기' 로 오면 오늘 예배를 남기는 것이니 오늘이다.
+        저장된 순서에서 '다른 이름으로 저장' 으로 오면 **그 회차의 날짜를 물려받는다** —
+        오늘로 찍으면 지난주 순서를 복제한 것이 '2026-09-03 · 2026-08-17 주일 2부' 처럼
+        날짜 둘이 붙어 목록에서 어느 주의 것인지 읽히지 않는다.
+      */
+      const serviceDate =
+        nameBar.kind !== 'plan' ? '' : plan?.kind === 'plan' ? (plan.serviceDate ?? '') : today();
+
       const result = nameBarTarget
         ? await api.updatePlan(nameBarTarget.id, { name, items: payload, defaults: plan?.defaults ?? null })
-        : (await api.createPlan(name, nameBar.kind === 'plan' ? today() : '', payload, nameBar.kind));
+        : (await api.createPlan(name, serviceDate, payload, nameBar.kind));
 
       setPlan(result.plan);
       setItems(result.plan.items);
@@ -394,11 +418,12 @@ export function PlanPanel({
    * 유형 복제 — '주일 1부' 를 놔둔 채 '주일 2부' 를 만드는 길.
    * 비슷한 유형을 여럿 두는 것이 실제 운영이라, 처음부터 짜는 것보다 이게 기본이다.
    */
-  async function duplicateTemplate(): Promise<void> {
-    if (!plan || plan.kind !== 'template') return;
+  async function duplicateCurrent(): Promise<void> {
+    if (!plan) return;
     setBusy(true);
     setError(null);
     try {
+      // 서버가 kind 를 그대로 물려준다 — 순서를 복제하면 순서가 된다
       const copy = await api.duplicatePlan(plan.id);
       await reload();
       openPlan(copy);
@@ -418,7 +443,12 @@ export function PlanPanel({
    * 고장으로 보이므로 미리 알린다.
    */
   async function removeTemplate(): Promise<void> {
-    if (!plan || plan.kind !== 'template') return;
+    if (!plan) return;
+    // 저장된 순서는 지우는 절차가 따로 있다 ('순서 불러오기' 목록의 ✕ 와 같은 길)
+    if (plan.kind !== 'template') {
+      void removeSaved(plan);
+      return;
+    }
     const last = templates.length <= 1;
     const warning = last
       ? '\n\n마지막 유형입니다. 모두 지우면 다음 서버 시작 때 기본 유형이 되살아납니다.'
@@ -1562,19 +1592,38 @@ export function PlanPanel({
       <div className="plan-single">
         <div className="card plan-list">
           <div className="plan-head">
+            {/*
+              **지금 열어 둔 것**을 보여 준다 — 유형이든 저장된 순서든.
+              전에는 유형만 담아서, 저장된 순서를 불러오면 이 칸이 '— 예배 유형 —' 로
+              비어 무엇을 고치고 있는지 화면 어디에도 없었다 (2026-09-03 사용자 보고).
+            */}
             <select
               className="grow"
-              value={plan?.kind === 'template' ? plan.id : ''}
+              value={plan?.id ?? ''}
               onChange={(e) => {
-                const found = templates.find((p) => p.id === Number(e.target.value));
+                const id = Number(e.target.value);
+                const found = templates.find((p) => p.id === id) ?? saved.find((p) => p.id === id);
                 if (found) openPlan(found);
               }}
-              title="예배 유형 — 골라서 고쳐 쓰는 원본입니다"
+              title="지금 고치는 중인 예배 유형 또는 저장된 순서"
             >
               <option value="">— 예배 유형 —</option>
-              {templates.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              <optgroup label="예배 유형 (매주 고쳐 쓰는 원본)">
+                {templates.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </optgroup>
+              {saved.length > 0 && (
+                <optgroup label="저장된 순서 (회차)">
+                  {saved.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {/* 이름에 이미 날짜가 들어 있으면 앞에 또 붙이지 않는다 */}
+                      {p.serviceDate && !p.name.includes(p.serviceDate) ? `${p.serviceDate} · ` : ''}
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <button
               type="button"
@@ -1586,15 +1635,16 @@ export function PlanPanel({
             </button>
 
             {/*
-              유형 관리 — 지금 연 유형에만 쓴다.
-              전에는 만들기와 갱신뿐이라 '주일예배' 를 '주일 1부' 로 고칠 수도,
-              안 쓰는 기본 유형을 치울 수도 없었다.
+              지금 연 것을 관리한다 — 복제·이름 바꾸기·삭제.
+              전에는 유형에만 걸려 있었다. 저장된 순서를 열면 셋이 모두 회색이라,
+              이름을 고칠 길이 없었다 — 사용자가 '제목을 정확히 찾아 저장하기 어렵다'
+              고 한 것이 이것이다 (2026-09-03). 유형·순서 모두 같은 세 버튼으로 다룬다.
             */}
             <button
               type="button"
-              onClick={() => void duplicateTemplate()}
-              disabled={busy || plan?.kind !== 'template'}
-              title="이 유형을 복제합니다 (주일 1부 → 2부)"
+              onClick={() => void duplicateCurrent()}
+              disabled={busy || !plan}
+              title={`이 ${planNounObj} 복제합니다 (주일 1부 → 2부)`}
             >
               ⧉
             </button>
@@ -1603,10 +1653,10 @@ export function PlanPanel({
               onClick={() => {
                 if (!plan) return;
                 setLoadOpen(false);
-                setNameBar({ kind: 'template', value: plan.name, renameId: plan.id });
+                setNameBar({ kind: plan.kind ?? 'plan', value: plan.name, renameId: plan.id });
               }}
-              disabled={busy || plan?.kind !== 'template'}
-              title="이 유형의 이름을 바꿉니다"
+              disabled={busy || !plan}
+              title={`이 ${planNoun}의 이름을 바꿉니다`}
             >
               ✎
             </button>
@@ -1614,8 +1664,8 @@ export function PlanPanel({
               type="button"
               className="del"
               onClick={() => void removeTemplate()}
-              disabled={busy || plan?.kind !== 'template'}
-              title="이 유형을 지웁니다"
+              disabled={busy || !plan}
+              title={`이 ${planNounObj} 지웁니다`}
             >
               ✕
             </button>
@@ -1644,30 +1694,45 @@ export function PlanPanel({
                 >
                   예배용으로 올리기
                 </button>
+                {/*
+                  **열어 둔 것에 그대로 저장한다.** 유형이면 '템플릿 업데이트',
+                  저장된 순서면 '저장하기' — 이름을 다시 치지 않는다.
+                  전에는 저장된 순서에 이 버튼이 회색이라, 불러와 고친 것을 남기려면
+                  '순서 저장하기' 로 긴 이름을 똑같이 맞혀 쳐야 했다 (2026-09-03).
+                */}
                 <button
                   type="button"
                   className="grow"
-                  onClick={() => void updateTemplate()}
-                  disabled={busy || plan.kind !== 'template'}
+                  onClick={() => void saveCurrent()}
+                  disabled={busy}
                   title={
                     plan.kind === 'template'
                       ? '지금 고친 내용을 이 유형의 원본으로 굳힙니다'
-                      : '저장된 순서를 열었습니다 — 유형은 ＋ 로 새로 만드세요'
+                      : `지금 고친 내용을 '${plan.name}' 에 그대로 저장합니다`
                   }
                 >
-                  템플릿 업데이트
+                  {plan.kind === 'template' ? '템플릿 업데이트' : '저장하기'}
                 </button>
                 <button
                   type="button"
                   className="grow"
                   onClick={() => {
                     setLoadOpen(false);
-                    setNameBar({ kind: 'plan', value: `${today()} ${plan.name}` });
+                    // 유형에서는 '이번 회차' 를 새로 만드는 것이니 날짜를 붙여 준다.
+                    // 순서에서는 이미 그 회차라, 지금 이름에서 고쳐 쓰게 둔다.
+                    setNameBar({
+                      kind: 'plan',
+                      value: plan.kind === 'template' ? `${today()} ${plan.name}` : plan.name,
+                    });
                   }}
                   disabled={busy}
-                  title="이번 회차를 따로 남깁니다"
+                  title={
+                    plan.kind === 'template'
+                      ? '이번 회차를 따로 남깁니다'
+                      : '이 순서를 건드리지 않고 새 이름으로 하나 더 만듭니다'
+                  }
                 >
-                  순서 저장하기
+                  {plan.kind === 'template' ? '순서 저장하기' : '다른 이름으로 저장'}
                 </button>
                 <button
                   type="button"
@@ -1874,7 +1939,7 @@ export function PlanPanel({
                   </div>
 
                   <p className="hintline muted">
-                    바꾼 뒤 <b>템플릿 업데이트</b>(유형) 또는 <b>순서 저장하기</b> 를 눌러야 남습니다.
+                    바꾼 뒤 <b>{plan.kind === 'template' ? '템플릿 업데이트' : '저장하기'}</b> 를 눌러야 남습니다.
                   </p>
                 </div>
               )}
@@ -1894,7 +1959,13 @@ export function PlanPanel({
                   if (e.key === 'Enter') { e.preventDefault(); void commitNameBar(); }
                   if (e.key === 'Escape') { e.preventDefault(); setNameBar(null); }
                 }}
-                placeholder={nameBar.kind === 'template' ? '새 예배 유형 이름' : '저장할 순서 이름'}
+                placeholder={
+                  nameBar.renameId !== undefined
+                    ? `새 ${nameBar.kind === 'template' ? '유형' : '순서'} 이름`
+                    : nameBar.kind === 'template'
+                      ? '새 예배 유형 이름'
+                      : '저장할 순서 이름'
+                }
                 spellCheck={false}
               />
               <button
@@ -1918,7 +1989,7 @@ export function PlanPanel({
           {nameBar && nameBarTarget && (
             <p className="hintline warn">
               {nameBar.renameId !== undefined
-                ? '같은 이름의 유형이 이미 있습니다 — 다른 이름을 쓰세요.'
+                ? `같은 이름의 ${nameBar.kind === 'template' ? '유형' : '순서'}가 이미 있습니다 — 다른 이름을 쓰세요.`
                 : `같은 이름이 이미 있습니다 — 누르면 그 ${
                     nameBar.kind === 'template' ? '유형' : '순서'
                   }를 덮어씁니다.`}
@@ -1943,7 +2014,12 @@ export function PlanPanel({
 
           {plan && dirty && (
             <p className="hintline muted plan-dirty">
-              <b>저장 안 됨</b>
+              {/*
+                어디를 눌러야 하는지 여기서 말해 준다 — 버튼 이름이 열어 둔 것에 따라
+                달라지기 때문이다. '저장 안 됨' 만 있으면 어느 버튼인지 매번 헷갈린다.
+              */}
+              <b>저장 안 됨</b> — <b>{plan.kind === 'template' ? '템플릿 업데이트' : '저장하기'}</b> 를 누르면
+              {' '}'{plan.name}' {planNoun}에 남습니다
             </p>
           )}
 
