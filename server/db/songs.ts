@@ -429,18 +429,37 @@ export function searchSongs(query: string, options: SearchOptions = {}): SongSea
   }
 
   // 3) 제목 (공백 무시)
-  const titleKey = `%${escapeLike(normalizeTitle(trimmed))}%`;
+  //
+  // **일치 등급 순으로 돌려준다** — 완전일치 → 앞부분 → 어딘가 포함.
+  // 가나다순만 쓰면 '은혜' 로 찾을 때 제목이 정확히 「은혜」인 곡이 34곡 중 17번째로
+  // 밀린다. 목록이 짧게 잘리는 화면(예배 순서 탭)에서는 아예 보이지 않는다
+  // (2026-09-03 사용자 보고). 같은 등급 안에서는 짧은 제목이 먼저다 —
+  // 검색어 말고 붙은 말이 적을수록 찾던 것에 가깝다.
+  const titleNorm = normalizeTitle(trimmed);
+  const titleKey = `%${escapeLike(titleNorm)}%`;
+  const titlePrefix = `${escapeLike(titleNorm)}%`;
   const titleRows = options.songbookId
     ? (conn()
         .prepare(
           `SELECT DISTINCT s.* FROM songs s JOIN song_entries e ON e.song_id = s.id
            WHERE s.title_norm LIKE ? ESCAPE '\\' AND e.songbook_id = ?
-           ORDER BY e.number, s.title LIMIT ?`,
+           ORDER BY CASE WHEN s.title_norm = ? THEN 0
+                         WHEN s.title_norm LIKE ? ESCAPE '\\' THEN 1
+                         ELSE 2 END,
+                    e.number, s.title
+           LIMIT ?`,
         )
-        .all(titleKey, options.songbookId, limit) as unknown as SongRow[])
+        .all(titleKey, options.songbookId, titleNorm, titlePrefix, limit) as unknown as SongRow[])
     : (conn()
-        .prepare(`SELECT s.* FROM songs s WHERE s.title_norm LIKE ? ESCAPE '\\' ORDER BY s.title LIMIT ?`)
-        .all(titleKey, limit) as unknown as SongRow[]);
+        .prepare(
+          `SELECT s.* FROM songs s WHERE s.title_norm LIKE ? ESCAPE '\\'
+           ORDER BY CASE WHEN s.title_norm = ? THEN 0
+                         WHEN s.title_norm LIKE ? ESCAPE '\\' THEN 1
+                         ELSE 2 END,
+                    length(s.title_norm), s.title
+           LIMIT ?`,
+        )
+        .all(titleKey, titleNorm, titlePrefix, limit) as unknown as SongRow[]);
   for (const row of titleRows) push(row, 'title');
 
   // 4) 가사 부분일치 (한국어라 LIKE 를 쓴다)
@@ -471,7 +490,31 @@ export function searchSongs(query: string, options: SearchOptions = {}): SongSea
     for (const row of lyricRows) push(row, 'lyrics', row.snippet);
   }
 
-  return base(hits, hits.length);
+  /**
+   * 실제 일치 곡 수 — 잘렸다는 것을 화면이 알려 줄 수 있어야 한다.
+   *
+   * 전에는 `hits.length` 를 그대로 총계로 넘겼다. 그러면 `truncated` 가 늘 false 라
+   * "34곡 중 8곡만 보임" 을 아무도 알려 주지 않는다. 찾는 곡이 안 나오는데 이유도
+   * 보이지 않는 상태였다 (2026-09-03 사용자 보고).
+   *
+   * 아래 조건은 위 3)·4) 와 같은 것이어야 한다 — 다르면 총계가 화면과 어긋난다.
+   * 4,396곡·69,514줄에서 18ms (실측) — 200ms 디바운스 안에 든다.
+   */
+  const lyricCountKey = `%${escapeLike(trimmed)}%`;
+  const total = (
+    conn()
+      .prepare(
+        `SELECT count(*) AS c FROM songs s
+         WHERE (s.title_norm LIKE ?1 ESCAPE '\\'
+                OR EXISTS (SELECT 1 FROM song_sections ss JOIN song_lines l ON l.section_id = ss.id
+                           WHERE ss.song_id = s.id AND l.text LIKE ?2 ESCAPE '\\'))
+           AND (?3 IS NULL
+                OR EXISTS (SELECT 1 FROM song_entries e WHERE e.song_id = s.id AND e.songbook_id = ?3))`,
+      )
+      .get(titleKey, lyricCountKey, options.songbookId ?? null) as { c: number }
+  ).c;
+
+  return base(hits, Math.max(total, hits.length));
 }
 
 export function countSongs(songbookId?: string): number {

@@ -330,6 +330,11 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 ```
 (없음 — 사용자 결정을 기다리는 중)
 
+직전 작업: 예배 순서 탭 두 가지 개선 (2026-09-03 완료, Agent C).
+  ① 탭 이동에 편집 초안이 사라졌다 → src/control/panels/plan-draft.ts (sessionStorage)
+  ② 찬양 검색이 8건만 나와 「은혜」가 안 보였다 → 서버 일치 등급 정렬 + limit 30 + total 실측
+  검증: tsc · vitest 1,112 · vite build · 격리 서버(7810) 브라우저 확인. 자세히는 CHANGELOG.
+
 직전 작업: 새찬송가 한/영 대조 문제 목록 (2026-08-27 완료, §3.51).
   결과: A 영어 없음 8 · B 줄 부족 111 · C 줄 수는 맞지만 끊김 490 · D 정상 36
         → 손볼 곡 609/645. 리포트: npm run report:bilingual

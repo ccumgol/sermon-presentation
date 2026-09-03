@@ -44,6 +44,7 @@ import {
   type BackgroundFile, type ReadingBook, type ReadingSummary,
 } from '../api.ts';
 import { isComposing } from '../ime.ts';
+import { clearPlanDraft, readPlanDraft, writePlanDraft } from './plan-draft.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE,
   DEFAULT_LITURGY_VERSION,
@@ -57,6 +58,12 @@ import {
 import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
 import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
 import { useMeasure } from '../hooks/useMeasure.ts';
+
+/**
+ * 찬양 검색에서 한 번에 보여 줄 곡 수. '찬양' 탭(60)보다 적은 이유는
+ * 추가 바 아래 한 줄짜리 후보 띠라서 30개 남짓이 두세 줄로 들어가는 한계다.
+ */
+const SONG_HIT_LIMIT = 30;
 
 interface Props {
   deck: Deck | null;
@@ -80,9 +87,18 @@ export function PlanPanel({
   const [templates, setTemplates] = useState<ServicePlan[]>([]);
   /** 저장해 둔 회차 — 지난주 순서를 다시 열 때 */
   const [saved, setSaved] = useState<ServicePlan[]>([]);
+  /**
+   * 탭을 옮겼다 돌아온 것이면 편집 중이던 초안을 되살린다.
+   *
+   * `useState(() => …)` 로 **첫 렌더에** 넣는 것이 중요하다. effect 로 나중에 넣으면
+   * 그 사이에 '아무것도 열지 않았으면 첫 유형을 연다' 규칙이 먼저 돌아 기본 유형이
+   * 들어차고, 초안이 그것을 덮어써 화면이 한 번 튄다.
+   */
+  const [restored] = useState(readPlanDraft);
+
   /** 지금 편집 중인 것이 어디서 왔는지 */
-  const [plan, setPlan] = useState<ServicePlan | null>(null);
-  const [items, setItems] = useState<CueItem[]>([]);
+  const [plan, setPlan] = useState<ServicePlan | null>(restored?.plan ?? null);
+  const [items, setItems] = useState<CueItem[]>(restored?.items ?? []);
 
   /** 이름을 받아야 하는 저장 동작 (유형 만들기 / 순서 저장하기) */
   const [nameBar, setNameBar] = useState<{ kind: PlanKind; value: string; renameId?: number } | null>(
@@ -100,7 +116,7 @@ export function PlanPanel({
    * (2026-08-18 실측). 접을 수 있게 하고 높이도 제한한다.
    */
   const [detailOpen, setDetailOpen] = useState(true);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(restored?.dirty ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -111,10 +127,10 @@ export function PlanPanel({
    * 항목 번호가 아니라 줄 번호인 이유는 3차 재설계에서 오른쪽 열을 없애고
    * 슬라이드를 목록 안으로 넣었기 때문이다(docs/plan-service-tab-3.md).
    */
-  const [cursor, setCursor] = useState(0);
+  const [cursor, setCursor] = useState(restored?.cursor ?? 0);
 
   /** 펼친 항목 — 한 번에 하나만. 여러 개가 열리면 목록이 길어져 진행이 안 보인다. */
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(restored?.expandedId ?? null);
 
   /** 펼친 항목을 푼 결과 */
   const [preview, setPreview] = useState<{ slides: SlidePayload[]; labels: string[] } | null>(null);
@@ -193,6 +209,8 @@ export function PlanPanel({
   const [songHits, setSongHits] = useState<
     Array<{ id: number; title: string; label?: string; songLabel?: string }>
   >([]);
+  /** 일치한 곡이 몇 개였는지 — 잘렸으면 안내를 띄운다 */
+  const [songTotal, setSongTotal] = useState(0);
   const [parseOk, setParseOk] = useState<{ ok: boolean; text: string } | null>(null);
   /** 성경 항목을 추가할 때 쓸 역본 — 마지막에 고른 값을 다음 추가에도 이어 쓴다 */
   const [addPrimary, setAddPrimary] = useState(defaultTranslation);
@@ -244,6 +262,17 @@ export function PlanPanel({
       setCursor(0);
     }
   }, [templates, plan]);
+
+  /**
+   * 편집 상태를 초안에 담는다 — 탭을 옮기면 이 패널은 언마운트된다.
+   *
+   * 커서까지 담는 이유: 20개짜리 순서에서 돌아왔을 때 커서가 맨 위로 튀면
+   * 어디까지 짜던 중이었는지 다시 찾아야 한다.
+   */
+  useEffect(() => {
+    if (!plan) return;
+    writePlanDraft({ plan, items, dirty, cursor, expandedId });
+  }, [plan, items, dirty, cursor, expandedId]);
 
   /** 편집 중인 변경을 잃는 자리에는 반드시 확인을 받는다 */
   function openPlan(target: ServicePlan): void {
@@ -403,6 +432,8 @@ export function PlanPanel({
       setPlan(null);
       setItems([]);
       setDirty(false);
+      // 초안도 함께 버린다 — 남겨 두면 다음에 이 탭을 열 때 지운 유형이 되살아난다
+      clearPlanDraft();
       await reload();
       setNotice(`유형 '${plan.name}' 을(를) 지웠습니다`);
     } catch (err) {
@@ -417,7 +448,10 @@ export function PlanPanel({
     if (!window.confirm(`저장된 순서 '${target.name}' 을(를) 지웁니다. 되돌릴 수 없습니다.`)) return;
     try {
       await api.deletePlan(target.id);
-      if (plan?.id === target.id) setPlan(null);
+      if (plan?.id === target.id) {
+        setPlan(null);
+        clearPlanDraft();
+      }
       await reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
@@ -991,16 +1025,26 @@ export function PlanPanel({
 
   // ── 항목 추가 ───────────────────────────────────────────────
 
-  // 찬양 검색 (디바운스)
+  /**
+   * 찬양 검색 (디바운스).
+   *
+   * 몇 개를 받아 오는가: 전에는 8개였다. '은혜' 처럼 흔한 말은 제목만 34곡이 걸려
+   * 제목이 정확히 「은혜」인 곡이 8개 밖으로 밀려 **아예 보이지 않았다**
+   * (2026-09-03 사용자 보고). 서버가 일치 등급 순으로 돌려주도록 고쳤지만,
+   * 찾는 곡이 목록 안에 들어 있기만 하면 되는 것이 아니라 **눈에 보여야** 한다.
+   * 30개로 올리고, 그래도 잘렸으면 몇 곡 중 몇 곡인지 알려 준다.
+   */
   useEffect(() => {
     if (addKind !== 'song' || addInput.trim().length === 0) {
       setSongHits([]);
+      setSongTotal(0);
       return;
     }
     const timer = setTimeout(() => {
       void api
-        .songs(addInput, 8)
-        .then((res) =>
+        .songs(addInput, SONG_HIT_LIMIT)
+        .then((res) => {
+          setSongTotal(res.total);
           setSongHits(
             res.hits.map((hit) => ({
               id: hit.id,
@@ -1011,9 +1055,12 @@ export function PlanPanel({
               // 제목 슬라이드용 — 짧은 라벨('새305')과 달리 회중이 읽는 형태다
               songLabel: songLabelOf(hit.entries),
             })),
-          ),
-        )
-        .catch(() => setSongHits([]));
+          );
+        })
+        .catch(() => {
+          setSongHits([]);
+          setSongTotal(0);
+        });
     }, 200);
     return () => clearTimeout(timer);
   }, [addKind, addInput]);
@@ -1055,6 +1102,7 @@ export function PlanPanel({
 
     setAddInput('');
     setSongHits([]);
+    setSongTotal(0);
     setParseOk(null);
   }
 
@@ -1090,6 +1138,7 @@ export function PlanPanel({
 
     setAddInput('');
     setSongHits([]);
+    setSongTotal(0);
     setParseOk(null);
   }
 
@@ -2301,13 +2350,20 @@ export function PlanPanel({
               )}
 
               {addKind === 'song' && songHits.length > 0 && (
-                <div className="candidates">
-                  {songHits.map((hit) => (
-                    <button key={hit.id} type="button" onClick={() => addSong(hit.id, hit.title, hit.songLabel)}>
-                      {hit.label ? `${hit.label} ` : ''}{hit.title}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="candidates">
+                    {songHits.map((hit) => (
+                      <button key={hit.id} type="button" onClick={() => addSong(hit.id, hit.title, hit.songLabel)}>
+                        {hit.label ? `${hit.label} ` : ''}{hit.title}
+                      </button>
+                    ))}
+                  </div>
+                  {songTotal > songHits.length && (
+                    <p className="hintline muted">
+                      {songTotal}곡 중 {songHits.length}곡만 보입니다 — 검색어를 좁히거나 '찬양' 탭에서 찾아 보세요.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
