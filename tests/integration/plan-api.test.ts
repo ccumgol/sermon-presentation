@@ -719,6 +719,73 @@ describe('예배 기본 설정', () => {
     expect(cleared.body.data!.plan.defaults).toBeUndefined();
   });
 
+  /**
+   * '기본 설정' 카드의 저장 버튼이 기대는 길 — 기본 설정과 항목이 **한 번에** 간다.
+   *
+   * 화면은 기본 설정을 따로 저장하지 않는다. `service_plans.defaults` 에 순서표와
+   * 함께 담기고, 저장 버튼도 그것 하나뿐이다 ('기본 설정을 저장하는 버튼이 어떤
+   * 것인지 모르겠다', 2026-09-03). 그러니 이 한 번의 PUT 에서 둘 다 남아야 한다 —
+   * 한쪽만 남으면 사용자는 저장했다고 믿고 예배에 들어간다.
+   */
+  it('기본 설정과 항목이 한 번의 저장으로 함께 남는다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '기본 설정 + 항목',
+      kind: 'template',
+      items: [{ type: 'text', content: '대표기도', variant: 'order' }],
+    });
+    const id = created.body.data!.plan.id;
+    createdPlanIds.push(id);
+    expect(created.body.data!.plan.defaults).toBeUndefined();
+
+    const saved = await send<PlanResponse>('PUT', `/api/plans/${id}`, {
+      name: '기본 설정 + 항목',
+      items: [
+        { type: 'text', content: '대표기도', variant: 'order' },
+        { type: 'liturgy', textId: 'lords-prayer', version: 'new' },
+      ],
+      defaults: {
+        bible: { primary: 'krv', secondary: ['niv'], paging: 'auto' },
+        song: { langs: ['ko', 'en'], lines: '2' },
+        liturgy: { version: 'traditional', perSlide: 4 },
+        titleOnSelect: false,
+        readingBackground: { src: 'bg_1.png', source: 'library' },
+      },
+    });
+    expect(saved.body.data!.plan.items).toHaveLength(2);
+
+    // 다시 읽어도 그대로여야 한다 — 화면 state 가 아니라 DB 에 남았는지를 본다
+    const reread = await get<ServicePlan>(`/api/plans/${id}`);
+    const d = reread.body.data!.defaults!;
+    expect(d.bible).toEqual({ primary: 'krv', secondary: ['niv'], paging: 'auto' });
+    expect(d.song).toEqual({ langs: ['ko', 'en'], lines: '2' });
+    expect(d.liturgy).toEqual({ version: 'traditional', perSlide: 4 });
+    // '켬' 이 기본이라 false 만 저장된다 — 이것이 빠지면 끈 설정이 조용히 되살아난다
+    expect(d.titleOnSelect).toBe(false);
+    expect(d.readingBackground).toEqual({ src: 'bg_1.png', source: 'library' });
+    expect(reread.body.data!.items).toHaveLength(2);
+  });
+
+  /**
+   * '이름 바꾸기' 는 항목을 보내지 않는다 — 아직 저장하지 않은 편집을 굳히면 안 되므로.
+   * 그래서 돌아오는 plan 에는 **저장된** 기본 설정이 들어 있다. 화면이 그것을 그대로
+   * 받아 쓰면 편집 중인 기본 설정이 조용히 옛 값으로 돌아간다 (PlanPanel 이 지금
+   * 화면의 defaults 를 유지하는 이유).
+   */
+  it('이름만 바꾸면 서버는 저장된 기본 설정을 그대로 돌려준다', async () => {
+    const created = await send<PlanResponse>('POST', '/api/plans', {
+      name: '이름 바꿀 유형',
+      kind: 'template',
+      items: [],
+      defaults: { bible: { primary: 'krv' } },
+    });
+    const id = created.body.data!.plan.id;
+    createdPlanIds.push(id);
+
+    const renamed = await send<PlanResponse>('PUT', `/api/plans/${id}`, { name: '바뀐 이름' });
+    expect(renamed.body.data!.plan.name).toBe('바뀐 이름');
+    expect(renamed.body.data!.plan.defaults?.bible?.primary).toBe('krv');
+  });
+
   it('복제하면 기본 설정도 따라간다', async () => {
     const created = await send<PlanResponse>('POST', '/api/plans', {
       name: '복제 기본 설정',

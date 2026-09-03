@@ -2147,6 +2147,18 @@ button.link-inline {
   overflow-y: auto;
 }
 .plan-defaults .detail-controls { margin-top: 4px; }
+
+/*
+ * 기본 설정 카드의 저장 줄 — 설정을 만진 자리에서 그대로 누를 수 있어야 한다.
+ * 위쪽 경계선을 두는 것은, 이 줄이 설정 항목이 아니라 '끝맺음' 이라는 표시다.
+ */
+.plan-defaults .defaults-save {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  align-items: center;
+}
+.plan-defaults .defaults-save .hintline { margin: 0; }
 .plan-defaults select { min-height: 34px; padding: 4px 8px; font-size: 0.8rem; }
 
 /* 저장된 순서 목록 — '순서 불러오기' 를 눌렀을 때만 펼쳐진다 */

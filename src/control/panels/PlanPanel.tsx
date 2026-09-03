@@ -311,6 +311,11 @@ export function PlanPanel({
   const planNoun = plan?.kind === 'template' ? '유형' : '순서';
   /** 목적격까지 붙인 것 — '유형을' / '순서를'. 받침이 달라 조사를 이어 붙일 수 없다 */
   const planNounObj = plan?.kind === 'template' ? '유형을' : '순서를';
+  /**
+   * 저장 버튼의 이름. 안내 문구가 **실제 버튼과 같은 말**을 가리켜야 한다 —
+   * 다르면 화면에 없는 버튼을 찾게 된다.
+   */
+  const saveLabel = plan?.kind === 'template' ? '템플릿 업데이트' : '저장하기';
 
   /**
    * **열어 둔 것에 그대로 저장한다** — 유형이면 '템플릿 업데이트', 저장된 순서면 '저장하기'.
@@ -372,7 +377,21 @@ export function PlanPanel({
       // 지금 화면의 items 를 함께 보내면, 아직 저장하지 않은 편집까지 조용히 굳는다.
       if (nameBar.renameId !== undefined) {
         const renamed = await api.updatePlan(nameBar.renameId, { name });
-        if (plan?.id === nameBar.renameId) setPlan(renamed.plan);
+        /*
+          **이름만 바꾸고 편집 중인 것은 그대로 둔다.**
+
+          서버가 돌려주는 plan 에는 **저장된** 기본 설정이 들어 있다. 그것을 그대로
+          넣으면 아직 저장하지 않은 기본 설정 편집이 조용히 사라진다 — items 는
+          별도 state 라 살아남는데 defaults 만 없어져, '저장 안 됨' 이 떠 있는 채로
+          방금 고친 역본·템플릿이 옛 값으로 돌아간다.
+        */
+        const current = plan;
+        if (current?.id === nameBar.renameId) {
+          setPlan({
+            ...renamed.plan,
+            ...(current.defaults ? { defaults: current.defaults } : {}),
+          });
+        }
         setNameBar(null);
         await reload();
         setNotice(`이름을 '${name}' 으로 바꿨습니다`);
@@ -1711,7 +1730,7 @@ export function PlanPanel({
                       : `지금 고친 내용을 '${plan.name}' 에 그대로 저장합니다`
                   }
                 >
-                  {plan.kind === 'template' ? '템플릿 업데이트' : '저장하기'}
+                  {saveLabel}
                 </button>
                 <button
                   type="button"
@@ -1938,9 +1957,33 @@ export function PlanPanel({
                     </span>
                   </div>
 
-                  <p className="hintline muted">
-                    바꾼 뒤 <b>{plan.kind === 'template' ? '템플릿 업데이트' : '저장하기'}</b> 를 눌러야 남습니다.
-                  </p>
+                  {/*
+                    **기본 설정에도 저장 버튼을 둔다.**
+
+                    이 값들은 따로 저장되는 것이 아니라 **순서표 안에** 함께 담긴다
+                    (`service_plans.defaults`). 그래서 저장하는 곳은 위의 버튼 하나뿐이다.
+                    그런데 '저장하기 를 눌러야 남습니다' 만 적어 두면 그 버튼이 순서를
+                    저장하는 것으로 보여, '기본 설정 저장 버튼은 어디 있나' 를 찾게 된다
+                    (2026-09-03 사용자 보고). 같은 동작을 같은 이름으로 여기에도 둔다 —
+                    설정을 만진 자리에서 그대로 누를 수 있어야 한다.
+                  */}
+                  <div className="row defaults-save">
+                    <span className="hintline muted grow">
+                      이 값들은 <b>순서표에 함께 담깁니다</b> — 따로 저장하는 곳은 없습니다.
+                      {dirty
+                        ? ' 아직 저장되지 않았습니다.'
+                        : ` 지금은 '${plan.name}' 에 저장된 상태입니다.`}
+                    </span>
+                    <button
+                      type="button"
+                      className={dirty ? 'primary' : undefined}
+                      onClick={() => void saveCurrent()}
+                      disabled={busy}
+                      title={`기본 설정과 순서를 함께 '${plan.name}' ${planNoun}에 저장합니다 (위의 버튼과 같습니다)`}
+                    >
+                      {saveLabel}
+                    </button>
+                  </div>
                 </div>
               )}
             </>
@@ -2018,7 +2061,7 @@ export function PlanPanel({
                 어디를 눌러야 하는지 여기서 말해 준다 — 버튼 이름이 열어 둔 것에 따라
                 달라지기 때문이다. '저장 안 됨' 만 있으면 어느 버튼인지 매번 헷갈린다.
               */}
-              <b>저장 안 됨</b> — <b>{plan.kind === 'template' ? '템플릿 업데이트' : '저장하기'}</b> 를 누르면
+              <b>저장 안 됨</b> — <b>{saveLabel}</b> 를 누르면
               {' '}'{plan.name}' {planNoun}에 남습니다
             </p>
           )}
