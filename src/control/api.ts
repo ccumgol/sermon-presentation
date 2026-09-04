@@ -111,6 +111,11 @@ export const api = {
   tabletAccess: () => get<TabletAccess>('/api/tablet-access'),
   translations: () => get<Translation[]>('/api/translations'),
   books: () => get<BookMeta[]>('/api/books'),
+  /**
+   * 성경 DB 를 언제 무엇으로 만들었는지 (`build_info` 표).
+   * 값은 빌드 스크립트가 넣는 대로라 키가 늘 수 있어 문자열 사전 그대로 받는다.
+   */
+  bibleBuildInfo: () => get<Record<string, string>>('/api/bible/build-info'),
   parse: (q: string) => get<ParseResult>(`/api/bible/parse?q=${encodeURIComponent(q)}`),
   /**
    * 낱말로 절을 찾는다. 한 역본 안에서만 찾는다 — 서버가 역본마다 다른 방식을 쓴다
@@ -203,6 +208,12 @@ export const api = {
 
   /** 곡을 지운다 — 되돌릴 수 없다. 부르는 쪽이 반드시 확인을 받아야 한다 */
   deleteSong: (id: number) => send<{ id: number }>('DELETE', `/api/songs/${id}`, {}),
+  /**
+   * 대응곡 연결·해제 (새찬송가 ↔ 통일찬송가처럼 **가사가 다른 같은 찬송**).
+   * 둘 다 갱신된 곡을 돌려준다 — 화면이 다시 조회하지 않아도 된다.
+   */
+  linkSong: (id: number, linkedId: number) => send<Song>('POST', `/api/songs/${id}/link`, { linkedId }),
+  unlinkSong: (id: number, linkedId: number) => send<Song>('DELETE', `/api/songs/${id}/link/${linkedId}`),
 
   saveLyrics: (id: number, text: string) =>
     send<{ song: Song; availableLangs: LangCode[] }>('PUT', `/api/songs/${id}/lyrics`, { text }),

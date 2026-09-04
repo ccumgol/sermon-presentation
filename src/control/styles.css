@@ -2500,3 +2500,48 @@ button.link-inline {
   padding: 3px 9px;
   font-size: 12px;
 }
+
+/* ── 대응곡 연결 ─────────────────────────────────────────────
+ * 칩 하나 = 이어진 곡 하나. 제목과 '풀기'(✕)를 한 덩어리로 붙여 두어
+ * 어느 것을 푸는지 헷갈리지 않게 한다.
+ */
+.song-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.song-links > button {
+  min-height: 26px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.song-links .dim { color: var(--dim); }
+
+.link-chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.link-chip .link-inline {
+  padding: 2px 8px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+}
+.link-chip .del {
+  min-height: 0;
+  padding: 2px 6px;
+  border: none;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.link-picker { margin-top: 6px; }
+.link-picker .candidates { margin-top: 6px; }

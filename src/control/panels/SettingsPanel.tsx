@@ -152,6 +152,42 @@ function BackupCard(): React.JSX.Element {
   );
 }
 
+/**
+ * 성경 DB 를 **언제 무엇으로** 만들었는지.
+ *
+ * 원본 자료가 바뀌었는데 다시 빌드하지 않으면 앱은 옛 본문을 계속 내보낸다. 그것을
+ * 알아챌 단서가 화면에 하나도 없었다 — 서버는 `build_info` 를 들고 있었는데
+ * 꺼내 보는 길이 없었다 (§4.6 U-7, 2026-09-03).
+ */
+function BibleBuildRows({ ready }: { ready: boolean }): React.JSX.Element | null {
+  const [info, setInfo] = useState<Record<string, string> | null>(null);
+
+  useEffect(() => {
+    if (!ready) return;
+    // 없어도 되는 정보다 — 실패하면 줄을 안 보여 주고 넘어간다
+    void api.bibleBuildInfo().then(setInfo).catch(() => undefined);
+  }, [ready]);
+
+  if (!info) return null;
+
+  const builtAt = info.built_at;
+  const verses = info.verse_count;
+
+  return (
+    <>
+      {builtAt && (
+        <>
+          <dt>성경 DB 빌드</dt>
+          <dd>
+            {new Date(builtAt).toLocaleString('ko-KR')}
+            {verses ? ` · ${Number(verses).toLocaleString()}절` : ''}
+          </dd>
+        </>
+      )}
+    </>
+  );
+}
+
 export function SettingsPanel({ info }: Props): React.JSX.Element {
   if (!info) return <p className="hintline muted">서버 정보를 불러오는 중…</p>;
 
@@ -262,7 +298,14 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
           <dd>{info.dataDir}</dd>
           <dt>원본 성경 DB</dt>
           <dd>{info.bibleSourceDir}</dd>
+          <BibleBuildRows ready={info.bibleReady} />
         </dl>
+        {info.bibleReady && (
+          <p className="hintline muted">
+            원본 자료를 고쳤다면 <code>npm run bible:build</code> 로 다시 만들고 서버를 재시작하세요 —
+            그때까지는 위 시각의 본문이 나갑니다.
+          </p>
+        )}
       </div>
     </>
   );

@@ -18,7 +18,11 @@ export type ConnectionStatus = 'connecting' | 'open' | 'closed';
 
 export interface OutputError {
   message: string;
-  url: string;
+  /**
+   * 어느 출력 페이지에서 났는지. 서버가 보낸 오류(`{ t: 'error' }`)에는 없다 —
+   * 그때는 이 조작 화면이 보낸 것을 서버가 거절한 것이라 주소가 의미 없다.
+   */
+  url?: string;
   at: number;
 }
 
@@ -116,6 +120,16 @@ export function useLiveState(): LiveConnection {
           ]);
         } else if (msg.t === 'output:stale') {
           setStaleOutput(msg.payload.layer);
+        } else if (msg.t === 'error') {
+          /*
+           * **서버가 거절한 것**을 화면에 올린다.
+           *
+           * 전에는 이 가지가 아예 없어서 조용히 버려졌다 (§4.6 D, 2026-09-03).
+           * 서버는 모르는 메시지·깨진 JSON·형식 오류에 이걸 돌려주는데, 조작
+           * 화면에 아무 표시가 없으니 버튼을 눌렀는데 아무 일도 안 일어난 것으로만
+           * 보였다 — 예배 중이면 무엇이 잘못됐는지 알 방법이 없다.
+           */
+          setOutputErrors((prev) => [...prev.slice(-4), { message: msg.message, at: Date.now() }]);
         }
       };
 

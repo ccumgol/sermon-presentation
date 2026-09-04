@@ -69,6 +69,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    * 곡이 여기 있고, '최근' 은 목록이 매주 흔들린다.
    */
   const [quickMode, setQuickMode] = useState<QuickMode>('favorite');
+  /**
+   * 대응곡을 붙이는 중이면 검색어. `null` 이면 닫혀 있다.
+   *
+   * 목록을 늘 펼쳐 두지 않는 이유: 대응곡은 자료를 반입할 때 한 번 정해지고 그 뒤로는
+   * 좀처럼 손대지 않는다. 늘 보이면 매번 지나쳐야 하는 줄이 하나 는다.
+   */
+  const [linking, setLinking] = useState<string | null>(null);
+  const [linkHits, setLinkHits] = useState<SongSearchHit[]>([]);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
 
@@ -202,6 +210,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     setError(null);
     setNotice(null);
     setEditing(false);
+    setLinking(null);
     try {
       const { song: loaded, availableLangs } = await api.song(id);
       setSong(loaded);
@@ -360,6 +369,63 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   }
 
   /** 즐겨찾기에 넣거나 뺀다 — 목록은 곧바로 다시 읽는다 */
+  // ── 대응곡 연결·해제 ────────────────────────────────────────
+
+  // 붙일 곡 찾기 (디바운스). 자기 자신과 이미 붙은 곡은 목록에서 뺀다
+  useEffect(() => {
+    if (linking === null || linking.trim().length === 0 || !song) {
+      setLinkHits([]);
+      return;
+    }
+    const linked = new Set([song.id, ...(song.links ?? []).map((l) => l.id)]);
+    const timer = setTimeout(() => {
+      void api
+        .songs(linking, 12)
+        .then((found) => setLinkHits(found.hits.filter((hit) => !linked.has(hit.id))))
+        .catch(() => setLinkHits([]));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [linking, song]);
+
+  /**
+   * 대응곡을 붙인다 — 새찬송가 ↔ 통일찬송가처럼 **가사가 다른 같은 찬송**.
+   *
+   * 서버는 처음부터 되어 있었고 화면에만 길이 없었다. 반입 스크립트가 붙인 연결이
+   * 틀렸을 때 앱에서 고칠 방법이 없었다 (§4.6 U-3, 2026-09-03).
+   */
+  async function linkSong(linkedId: number): Promise<void> {
+    if (!song) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api.linkSong(song.id, linkedId);
+      setSong(updated);
+      setLinking(null);
+      setLinkHits([]);
+      setNotice(`대응곡을 연결했습니다`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '연결하지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 되돌릴 수 있는 동작이라(다시 붙이면 된다) 확인을 받지 않는다 */
+  async function unlinkSong(linkedId: number, label: string): Promise<void> {
+    if (!song) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api.unlinkSong(song.id, linkedId);
+      setSong(updated);
+      setNotice(`'${label}' 연결을 풀었습니다`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '풀지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleFavorite(): Promise<void> {
     if (!song) return;
     try {
@@ -636,24 +702,74 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
               )}
             </h2>
 
-            {song.links && song.links.length > 0 && (
-              <p className="hintline muted">
-                대응곡:{' '}
-                {song.links.map((link, index) => (
-                  <span key={link.id}>
-                    {index > 0 && ', '}
-                    <button
-                      type="button"
-                      className="link-inline"
-                      onClick={() => void openSong(link.id)}
-                      title="가사가 다른 판본입니다"
-                    >
-                      {entryLabel(link) || link.title}
-                    </button>
-                  </span>
-                ))}
-                {' '}(가사가 다릅니다)
-              </p>
+            {/*
+              **대응곡** — 새찬송가 ↔ 통일찬송가처럼 가사가 다른 같은 찬송.
+              전에는 보여 주기만 했다. 반입이 잘못 붙인 연결을 앱에서 고칠 길이 없어
+              DB 를 직접 만져야 했다 (§4.6 U-3).
+            */}
+            <p className="hintline muted song-links">
+              <span>대응곡</span>
+              {(song.links ?? []).map((link) => (
+                <span key={link.id} className="link-chip">
+                  <button
+                    type="button"
+                    className="link-inline"
+                    onClick={() => void openSong(link.id)}
+                    title="가사가 다른 판본입니다 — 눌러서 엽니다"
+                  >
+                    {entryLabel(link) || link.title}
+                  </button>
+                  <button
+                    type="button"
+                    className="del"
+                    disabled={busy}
+                    onClick={() => void unlinkSong(link.id, entryLabel(link) || link.title)}
+                    title="연결 풀기 (곡은 지워지지 않습니다)"
+                    aria-label="연결 풀기"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              {(song.links ?? []).length === 0 && <span className="dim">없음</span>}
+              <button
+                type="button"
+                className={linking !== null ? 'primary' : undefined}
+                disabled={busy}
+                onClick={() => setLinking((prev) => (prev === null ? '' : null))}
+                title="가사가 다른 같은 찬송을 이어 둡니다 (새 305 ↔ 통 405)"
+              >
+                {linking !== null ? '닫기' : '＋ 연결'}
+              </button>
+              {(song.links ?? []).length > 0 && <span className="dim">가사가 다릅니다</span>}
+            </p>
+
+            {linking !== null && (
+              <div className="link-picker">
+                <input
+                  className="grow"
+                  autoFocus
+                  value={linking}
+                  onChange={(event) => setLinking(event.target.value)}
+                  placeholder="이어 둘 곡 — 통 405 · 나같은죄인"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="대응곡 찾기"
+                />
+                {linkHits.length > 0 && (
+                  <div className="candidates">
+                    {linkHits.map((hit) => (
+                      <button key={hit.id} type="button" disabled={busy} onClick={() => void linkSong(hit.id)}>
+                        {entryLabel(hit) ? `${entryLabel(hit)} ` : ''}
+                        {hit.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {linking.trim().length > 0 && linkHits.length === 0 && (
+                  <p className="hintline muted">이을 곡이 없습니다 (이미 이어진 곡과 자기 자신은 빠집니다).</p>
+                )}
+              </div>
             )}
 
             {/*

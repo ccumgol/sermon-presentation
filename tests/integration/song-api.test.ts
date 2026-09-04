@@ -260,3 +260,59 @@ describe('가사 편집', () => {
     expect(after.sections).toEqual(before.sections);
   });
 });
+
+/**
+ * 대응곡 연결·해제 — 새찬송가 ↔ 통일찬송가처럼 **가사가 다른 같은 찬송**.
+ *
+ * 라우트는 처음부터 있었는데 화면에 길이 없어 테스트도 없었다 (§4.6 U-3).
+ * 이제 사람이 앱에서 붙이고 뗀다 — 잘못 붙은 연결이 그대로 굳으면 안 된다.
+ */
+describe('대응곡 연결', () => {
+  async function post<T>(url: string, payload: Record<string, unknown>): Promise<{ status: number; body: ApiResponse<T> }> {
+    const response = await app.inject({ method: 'POST', url, payload });
+    return { status: response.statusCode, body: response.json() as ApiResponse<T> };
+  }
+  async function del<T>(url: string): Promise<{ status: number; body: ApiResponse<T> }> {
+    const response = await app.inject({ method: 'DELETE', url });
+    return { status: response.statusCode, body: response.json() as ApiResponse<T> };
+  }
+
+  it('붙이면 양쪽에서 서로 보인다', async () => {
+    await post(`/api/songs/${hymnId}/link`, { linkedId: ccmId });
+
+    const forward = (await get<{ song: Song }>(`/api/songs/${hymnId}`)).body.data!.song;
+    const backward = (await get<{ song: Song }>(`/api/songs/${ccmId}`)).body.data!.song;
+    expect((forward.links ?? []).some((l) => l.id === ccmId)).toBe(true);
+    // 한쪽에서만 보이면 반대쪽 곡을 열었을 때 대응곡이 없는 것으로 보인다
+    expect((backward.links ?? []).some((l) => l.id === hymnId)).toBe(true);
+  });
+
+  it('풀면 양쪽에서 사라진다 — 곡 자체는 남는다', async () => {
+    await post(`/api/songs/${hymnId}/link`, { linkedId: ccmId });
+    await del(`/api/songs/${hymnId}/link/${ccmId}`);
+
+    const forward = (await get<{ song: Song }>(`/api/songs/${hymnId}`)).body.data!.song;
+    const backward = (await get<{ song: Song }>(`/api/songs/${ccmId}`)).body.data!.song;
+    // 연결이 하나도 안 남으면 `links` 자체가 빠진다 — 그래서 `?? []` 로 받는다
+    expect((forward.links ?? []).some((l) => l.id === ccmId)).toBe(false);
+    expect((backward.links ?? []).some((l) => l.id === hymnId)).toBe(false);
+    expect(backward.title).toBe('한국어만 있는 곡');
+  });
+
+  it('두 번 붙여도 하나다', async () => {
+    await post(`/api/songs/${hymnId}/link`, { linkedId: ccmId });
+    const twice = await post<Song>(`/api/songs/${hymnId}/link`, { linkedId: ccmId });
+    expect((twice.body.data!.links ?? []).filter((l) => l.id === ccmId)).toHaveLength(1);
+    await del(`/api/songs/${hymnId}/link/${ccmId}`);
+  });
+
+  it('없는 곡은 404 — 잘못된 id 로 유령 연결이 생기면 안 된다', async () => {
+    expect((await post(`/api/songs/${hymnId}/link`, { linkedId: 999999 })).status).toBe(404);
+    expect((await post('/api/songs/999999/link', { linkedId: hymnId })).status).toBe(404);
+  });
+
+  it('붙지 않은 것을 풀어도 조용히 넘어간다', async () => {
+    const response = await del<Song>(`/api/songs/${hymnId}/link/${ccmId}`);
+    expect(response.status).toBe(200);
+  });
+});

@@ -275,10 +275,18 @@ export function App(): React.JSX.Element {
               <button type="button" className="close" onClick={dismissErrors}>
                 닫기
               </button>
-              출력 화면에서 오류가 발생했습니다:
+              {/*
+                두 가지가 함께 들어온다 — 출력 페이지에서 난 오류(url 이 있다)와
+                서버가 이 조작 화면의 요청을 거절한 것(url 이 없다). 한 문장으로
+                뭉뚱그리면 어디를 봐야 하는지 알 수 없어 문구를 나눈다.
+              */}
+              {outputErrors.some((err) => err.url === undefined) ? '오류가 발생했습니다:' : '출력 화면에서 오류가 발생했습니다:'}
               {outputErrors.map((err, index) => (
                 <div key={index}>
-                  <small>{err.message}</small>
+                  <small>
+                    {err.url === undefined && <b>서버: </b>}
+                    {err.message}
+                  </small>
                 </div>
               ))}
             </div>
