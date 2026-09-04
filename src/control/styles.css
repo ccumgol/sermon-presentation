@@ -2493,3 +2493,10 @@ button.link-inline {
   border-radius: 2px;
   padding: 0 1px;
 }
+
+/* 빠른 칩 줄의 '즐겨찾기 | 최근' 전환 — 칩보다 작게 두어 칩이 주인공으로 남는다 */
+.quick-mode button {
+  min-height: 28px;
+  padding: 3px 9px;
+  font-size: 12px;
+}

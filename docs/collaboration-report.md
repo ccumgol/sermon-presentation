@@ -136,7 +136,7 @@ npm start               # http://localhost:7777
 | ID | 기능 | 어디까지 되어 있나 | 상태 |
 |---|---|---|---|
 | U-1 | **성경 전문 검색** `GET /api/bible/search` | 한국어 LIKE · 영어 FTS · 신/구약 필터 · 잘림 표시. 통합 테스트 2개. 실측 '사랑' 557절 | 🟢 **완료** Agent C (2026-09-03) — 성경 탭 '🔍 낱말로 찾기' |
-| U-2 | **최근 부른 곡** `GET /api/songs/recent` | `api.recentSongs()` 래퍼까지 있다. 사용 기록은 실제로 쌓이는 중 | 🔴 부르는 곳 없음 |
+| U-2 | **최근 부른 곡** `GET /api/songs/recent` | `api.recentSongs()` 래퍼까지 있다. 사용 기록은 실제로 쌓이는 중 | 🟢 **완료** Agent C (2026-09-03) — 찬양 탭 '즐겨찾기 \| 최근' |
 | U-3 | **대응곡 연결·해제** `POST/DELETE /api/songs/:id/link` | 화면은 대응곡을 **보여 주기만** 한다 | 🔴 UI 없음 · 통합 테스트도 0개 |
 | U-4 | **곡 수록 정보(곡집·번호) 편집** `PUT /api/songs/:id/entries` | `api.setSongEntries()` 래퍼까지 있다 | 🔴 부르는 곳 없음 |
 | U-5 | **가사 파싱 미리보기** `POST /api/songs/parse-lyrics` | 실측 확인. 새 곡 입력에서 저장 전 확인용 | 🔴 UI 없음 |
@@ -380,7 +380,13 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
-(없음 — 사용자 결정을 기다리는 중)
+- [시작 2026-09-03 / Agent C] §4.6 나머지 항목 이어서
+  U-2 최근 부른 곡 → 찬양 탭 빠른 칩 줄에 '즐겨찾기 | 최근' 전환을 넣는다
+    (서버·api.recentSongs 래퍼는 이미 있다. openAndSend 가 이미 loadQuickPicks 를
+     부르므로 모드만 넣으면 송출 직후 자동 갱신된다)
+  이어서: U-3 대응곡 연결·해제 · U-4 수록 정보 편집 · U-5 가사 파싱 미리보기 ·
+          U-7 성경 DB 빌드 정보 · D 서버 오류를 화면에 띄우기
+  다음 단계: U-2 완료(커밋함). 이어서 U-5 가사 파싱 미리보기 → U-3 대응곡 → U-7 → D
 
 직전 작업 3: U-1 성경 낱말 찾기 (2026-09-03 완료, Agent C).
   성경 탭 참조 칸 아래 '🔍 낱말로 찾기'. src/control/components/BibleSearch.tsx ·

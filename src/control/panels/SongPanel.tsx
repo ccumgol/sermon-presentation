@@ -19,6 +19,21 @@ import { SongbookManager } from './SongbookManager.tsx';
 /** 즐겨찾기 칸 수 — 한 줄에 들어가고 손이 기억할 수 있는 개수 */
 const FAVORITE_SLOTS = 5;
 
+/**
+ * '최근' 에 보여 줄 곡 수.
+ *
+ * 즐겨찾기(5)보다 하나 많다 — 한 예배에서 4~5곡을 부르므로 5칸이면 이번 주로 꽉 차
+ * **지난주가 하나도 안 보인다.**
+ *
+ * 8칸도 재 봤는데 칩 줄이 129px(세 줄)이 됐다. 곡집 칸은 폭이 596px 로 고정이라
+ * (창을 넓혀도 늘지 않는다) 줄 수가 줄지 않고, 그만큼 아래 검색 결과가 밀린다.
+ * 6칸이면 두 줄이다 — 더 거슬러 갈 일은 검색이 맡는다.
+ */
+const RECENT_SLOTS = 6;
+
+/** 빠른 칩 줄이 무엇을 보여 주는가 */
+type QuickMode = 'favorite' | 'recent';
+
 const LINE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: '1', label: '1줄씩' },
   { value: '2', label: '2줄씩' },
@@ -49,6 +64,11 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   const [songbooks, setSongbooks] = useState<Songbook[]>([]);
   const [quickPicks, setQuickPicks] = useState<SongSearchHit[]>([]);
   const [quickIsFallback, setQuickIsFallback] = useState(false);
+  /**
+   * 즐겨찾기를 기본으로 둔다. 송영·봉헌송처럼 **늘 같은 자리에 있어야 손이 기억하는**
+   * 곡이 여기 있고, '최근' 은 목록이 매주 흔들린다.
+   */
+  const [quickMode, setQuickMode] = useState<QuickMode>('favorite');
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
 
@@ -131,14 +151,23 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   }, []);
 
   /**
-   * 즐겨찾기 — 예배마다 쓰는 곡을 검색 없이 바로 꺼낸다.
+   * 검색 없이 바로 꺼내는 칩 줄.
    *
-   * 최근 송출 순으로 두면 목록이 매번 흔들려 손이 기억하지 못한다. 송영·봉헌송
-   * 처럼 늘 쓰는 곡은 사람이 지정하는 편이 낫다. 아직 지정한 곡이 없으면
-   * 자주 쓴 곡을 대신 보여 준다 — 빈 줄을 보여 주는 것보다 쓸모 있다.
+   * **즐겨찾기** — 송영·봉헌송처럼 매주 쓰는 곡. 최근 순으로 두면 목록이 매번 흔들려
+   * 손이 기억하지 못하므로 사람이 지정한다. 아직 지정한 곡이 없으면 자주 쓴 곡을
+   * 대신 보여 준다 — 빈 줄보다 쓸모 있다.
+   *
+   * **최근** — 방금 부른 곡과 지난주 곡. 서버가 덱을 만들 때마다 기록해 두는데
+   * (`song_usage`) 그 기록을 꺼내 보는 길이 화면에 없었다 (§4.6 U-2, 2026-09-03).
+   * '지난주에 뭐 불렀지' 와 '방금 띄운 곡 다시' 가 여기서 해결된다.
    */
   const loadQuickPicks = useCallback(async () => {
     try {
+      if (quickMode === 'recent') {
+        setQuickPicks(await api.recentSongs(RECENT_SLOTS));
+        setQuickIsFallback(false);
+        return;
+      }
       const favorites = await api.favorites(FAVORITE_SLOTS);
       if (favorites.length > 0) {
         setQuickPicks(favorites);
@@ -151,7 +180,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     } catch {
       // 편의 기능이므로 실패해도 조용히 넘긴다
     }
-  }, []);
+  }, [quickMode]);
 
   useEffect(() => {
     void loadSongbooks();
@@ -454,11 +483,31 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           {' '}<b>Enter</b> 를 누르면 첫 결과를 바로 송출합니다.
         </div>
 
-        {quickPicks.length > 0 && query.trim().length === 0 && (
+        {query.trim().length === 0 && (
           <div className="recent-row">
-            <span className="recent-label" title={quickIsFallback ? '즐겨찾기가 비어 자주 쓴 곡을 보여 줍니다' : undefined}>
-              {quickIsFallback ? '자주 쓴 곡' : '즐겨찾기'}
+            {/*
+              무엇을 보여 줄지 고른다. 줄을 둘로 늘리지 않고 전환으로 둔 이유는
+              이 아래가 곧바로 검색 결과라, 한 줄이 늘 때마다 목록이 그만큼 밀리기
+              때문이다 (예배 순서 탭에서 겪은 것과 같다).
+            */}
+            <span className="candidates quick-mode">
+              {([['favorite', '즐겨찾기'], ['recent', '최근']] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={quickMode === mode ? 'primary' : undefined}
+                  onClick={() => setQuickMode(mode)}
+                  title={mode === 'recent' ? '최근 송출한 곡 — 지난주에 무엇을 불렀는지' : '★ 로 지정해 둔 곡'}
+                >
+                  {label}
+                </button>
+              ))}
             </span>
+            {quickIsFallback && (
+              <span className="recent-label" title="즐겨찾기가 비어 자주 쓴 곡을 보여 줍니다">
+                (자주 쓴 곡)
+              </span>
+            )}
             {quickPicks.map((hit) => (
               <button
                 key={hit.id}
@@ -472,6 +521,13 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 <span className="title">{hit.title}</span>
               </button>
             ))}
+            {quickPicks.length === 0 && (
+              <span className="recent-label">
+                {quickMode === 'recent'
+                  ? '아직 송출한 곡이 없습니다 — 곡을 한 번 띄우면 여기 쌓입니다.'
+                  : '★ 를 눌러 매주 쓰는 곡을 지정해 두세요.'}
+              </span>
+            )}
           </div>
         )}
 
