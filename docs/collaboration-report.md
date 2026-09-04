@@ -126,6 +126,58 @@ npm start               # http://localhost:7777
 
 상태: 🔴 미착수 · 🟡 진행중 · 🟢 완료 · ⚪ 보류(의도적)
 
+### 4.6 만들어져 있는데 화면에 길이 없는 것 (AUDIT-2026-09-03, Agent C)
+
+사용자 요청으로 전수 조사했다 — 서버 라우트 67개 · `api.*` 45개 · WS 메시지 · `TextStyle`
+14필드 · `CueItem` 8종을 화면 사용처와 대조. 방법과 실측은 §3.52.
+
+**A. 완성돼 있고 동작도 확인했는데 부를 곳이 없다** (격리 서버 7811 실측)
+
+| ID | 기능 | 어디까지 되어 있나 | 상태 |
+|---|---|---|---|
+| U-1 | **성경 전문 검색** `GET /api/bible/search` | 한국어 LIKE · 영어 FTS · 신/구약 필터 · 잘림 표시. 통합 테스트 2개. 실측 '사랑' 557절 | 🔴 UI 없음 (`api.ts` 래퍼조차 없다) |
+| U-2 | **최근 부른 곡** `GET /api/songs/recent` | `api.recentSongs()` 래퍼까지 있다. 사용 기록은 실제로 쌓이는 중 | 🔴 부르는 곳 없음 |
+| U-3 | **대응곡 연결·해제** `POST/DELETE /api/songs/:id/link` | 화면은 대응곡을 **보여 주기만** 한다 | 🔴 UI 없음 · 통합 테스트도 0개 |
+| U-4 | **곡 수록 정보(곡집·번호) 편집** `PUT /api/songs/:id/entries` | `api.setSongEntries()` 래퍼까지 있다 | 🔴 부르는 곳 없음 |
+| U-5 | **가사 파싱 미리보기** `POST /api/songs/parse-lyrics` | 실측 확인. 새 곡 입력에서 저장 전 확인용 | 🔴 UI 없음 |
+| U-6 | **역본별 장 수** `GET /api/bible/chapters` | 실측 시편 150 | 🔴 UI 없음 |
+| U-7 | **성경 DB 빌드 정보** `GET /api/bible/build-info` | 12역본 · 342,317절 · 빌드 시각 | 🔴 설정 탭에 없음 |
+| U-8 | **곡 수** `GET /api/songs/count` | 실측 4,528 | ⚪ 백업 요약으로 대신 얻는다 |
+| U-9 | **템플릿 CSS 미리보기** `GET /api/templates/:id/css` | 주석에 '편집 UI 미리보기용' | ⚪ 그 UI 가 없다 |
+
+**B. 화면에서 못 바꾸는 값** — 렌더는 되고 프리셋만 쓴다
+
+`lineGapPx`(절대 행간) · `letterSpacing`(자간) · `opacity`(글자 투명도) ·
+`bgBox`(글자 뒤 상자) · `textTransform`(대문자화). `lib/template-css.ts` 가 CSS 변수로
+내보내고 프리셋이 실제로 쓴다. 템플릿 탭의 `StyleFields` 는 `TextStyle` 14개 중 **9개만**
+편집시킨다 → JSON 내보내기/가져오기로만 바꿀 수 있다.
+
+**C. 자리만 잡아 둔 것 (의도적이거나 미완성)**
+
+- `t: 'show'` 단일 슬라이드 송출 — `state.show()` 까지 있는데 **아무도 보내지 않는다**.
+  덱 모델로 바뀌면서 남았다.
+- `t: 'measure:report'` — `server/ws.ts` 에 "Phase 3 에서 사용한다. 지금은 받아만 둔다"
+  라고 적혀 있다. 실제 측정은 숨긴 iframe + postMessage 로 한다.
+- `t: 'state:patch'` — `ServerMsg` 에 있고 `public/stage/stage.js` 에 처리기도 있는데
+  **서버가 한 번도 보내지 않는다.** 타입과 처리기만 있는 유령이다.
+- `image` 슬라이드의 `crop` — `public/output/output.js` 가 실제로 자를 줄 안다.
+  그런데 `crop` 을 담은 슬라이드를 만드는 곳이 없다 → **악보 출력의 남은 절반**(D-6).
+- `lib/song-slides.ts` 의 `buildSongSlides` · `describeSongSlide` — 아무 데서도 안 쓴다
+  (`buildSongDeck` 이 쓰인다).
+
+**D. 조용히 버려지는 것**
+
+서버가 보내는 `{ t: 'error' }` 를 **컨트롤 패널도 출력 페이지도 처리하지 않는다**
+(`useLiveState` 에 case 없음 · `output.js` 의 `onmessage` 에도 없음). 잘못된 메시지를
+보내면 서버는 오류를 돌려주는데 화면에는 아무 표시가 없다.
+
+**E. 문서에 없는 스크립트**
+
+`npm run titles:borrow` (`scripts/borrow-en-titles.ts`) — 대응곡에서 영어 원제를
+물려받는다. 문서 표 어디에도 없다.
+
+---
+
 ### 4.1 데이터 — 찬양 자료
 
 | ID | 항목 | 상태 | 담당 | 비고 |
@@ -329,6 +381,13 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 ### 현재 진행 중
 ```
 (없음 — 사용자 결정을 기다리는 중)
+
+직전 작업 2: 만들어져 있는데 화면에 길이 없는 기능 전수 조사 (2026-09-03, Agent C).
+  방법: 서버 라우트 67개 · api.* 45개 · WS 메시지 · TextStyle 14필드 · CueItem 8종을
+        화면 사용처와 대조하고, 후보는 격리 서버(7811)에서 실제로 호출해 확인.
+  결과: §4.6 — A 부를 곳 없는 기능 9개(성경 전문 검색·최근 부른 곡·대응곡 연결 …) ·
+        B 화면에서 못 바꾸는 글자 값 5개 · C 자리만 잡은 것 5개 · D 버려지는 서버 오류 ·
+        E 문서 없는 스크립트 1개. **고치지는 않았다 — 무엇부터 할지 사용자 결정 대기.**
 
 직전 작업: 예배 순서 탭 네 가지 개선 (2026-09-03 완료, Agent C).
   ① 탭 이동에 편집 초안이 사라졌다 → src/control/panels/plan-draft.ts (sessionStorage)
