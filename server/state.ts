@@ -101,21 +101,17 @@ function commit(next: CommitInput): void {
 // 조작
 // ─────────────────────────────────────────────────────────────
 
-/**
- * 단일 슬라이드를 즉시 송출한다. 기존 묶음은 버린다.
+/*
+ * **이 아래 어느 함수도 블랙을 스스로 끄지 않는다.**
  *
- * **블랙 상태는 건드리지 않는다.** 블랙은 '지금 화면을 가린다'는 사람의 결정이라,
- * 그 사이 다음 것을 골라 둬도 화면은 계속 가려져 있어야 한다. 해제는 사람이 한다
- * (블랙 해제·Esc). 예전에는 여기서 blank 를 꺼 버려 **다른 슬라이드를 누르는 순간
+ * 블랙은 '지금 화면을 가린다'는 **사람의 결정**이다. 그 사이 다음 것을 골라 둬도
+ * 화면은 계속 가려져 있어야 하고, 해제도 사람이 한다(블랙 해제·Esc).
+ * 예전에는 새 슬라이드를 올릴 때 blank 를 꺼 버려 **다른 슬라이드를 누르는 순간
  * 블랙이 풀렸다** — 2026-08-15 실사용에서 발견.
+ *
+ * 그러니 `commit({ state: ... })` 에 `blank` 를 넣지 않는다. 끄는 곳은 `setBlank`
+ * 와 `clear` 뿐이다.
  */
-export function show(payload: SlidePayload): void {
-  commit({
-    state: { slide: payload, cursor: null },
-    deck: null,
-    lastSlide: payload,
-  });
-}
 
 /** 슬라이드 묶음을 올리고 지정 위치를 송출한다. */
 export function loadDeck(deck: Deck): void {
@@ -125,7 +121,7 @@ export function loadDeck(deck: Deck): void {
 
   commit({
     state: {
-      // 블랙은 유지한다 (show 주석 참고)
+      // 블랙은 유지한다 (이 절 머리말)
       slide,
       cursor: { planItemIndex: 0, slideIndex: index },
       ...(templateId !== undefined ? { templateId } : {}),
@@ -171,7 +167,7 @@ export function goto(index: number): boolean {
   const templateId = groupTemplateAt(deck, next);
   commit({
     state: {
-      // 블랙은 유지한다 (show 주석 참고)
+      // 블랙은 유지한다 (이 절 머리말)
       slide,
       cursor: { planItemIndex: 0, slideIndex: next },
       // 항목에 템플릿이 지정돼 있으면 경계를 넘을 때 함께 바뀐다

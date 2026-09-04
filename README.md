@@ -212,7 +212,27 @@ npm run dev
 | `npm run praise:check` | 찬양 자료 폴더 점검 (읽기 전용, 리포트만 생성) |
 | `npm run measure:meter` | 운율 순위 규칙 비교 측정 (아무것도 쓰지 않음) |
 | `npm test` | 테스트 (단위 + 통합) |
+| `npm run test:watch` | 테스트 감시 모드 (개발용) |
 | `npm run typecheck` | 타입 검사 |
+
+### 자료 반입·정리 스크립트
+
+원본 자료를 `data/songs.sqlite` 로 가져오거나 이미 들어 있는 것을 손보는 도구입니다.
+**리포트(`report:*`)는 읽기만 하고**, 쓰는 것은 **미리보기가 기본이고 `-- --apply`
+를 붙여야 실제로 씁니다.**
+
+| 명령 | 하는 일 |
+|------|---------|
+| `npm run hymn:bilingual` | 새찬송가 한/영 병기 자료 반입 (외부 폴더 → DB) |
+| `npm run misc:import` | '기타' 곡집에 곡 넣기 (반입 형식 폴더 → DB) · [형식](docs/SONG-IMPORT-FORMAT.md) |
+| `npm run lyrics:lang` | 번역 가사 반입 (`<폴더>/언어/곡집/번호.txt`) |
+| `npm run hymn:realign` | 새찬송가 영어 가사를 **한국어 줄에 맞춰 다시 끊기** |
+| `npm run titles:borrow` | 대응곡에서 **영어 원제 물려받기** (통일찬송가는 원제가 비어 있었다) |
+| `npm run song:retitle` | 제목을 **`한국어 - 영문`** 으로 바꾸기 |
+| `npm run restore:lyrics` | 백업에서 **곡을 콕 집어** 가사 되돌리기 |
+| `npm run report:bilingual` | 새찬송가 한/영 대조 리포트 |
+| `npm run report:hyphen` | 영어 가사에서 **낱말이 줄을 넘어 쪼개진 곳** 찾기 |
+| `npm run report:missing-en` | 영어 가사가 빠진 곡·줄 목록 |
 
 ## 조작
 

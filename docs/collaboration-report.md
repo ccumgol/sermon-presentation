@@ -161,18 +161,27 @@ npm start               # http://localhost:7777
   키를 지워 서버(`mergeTemplate`)에 안 가고, 옛 값이 남아 **화면에서 끌 수 없다.**
   단위 테스트로 못을 박았다 (`0` 은 '여백 없음' 이라 끈 것으로 보면 안 된다).
 
-**C. 자리만 잡아 둔 것 (의도적이거나 미완성)**
+**C. 자리만 잡아 둔 것** — 🟢 **정리 완료** Agent C (2026-09-04)
 
-- `t: 'show'` 단일 슬라이드 송출 — `state.show()` 까지 있는데 **아무도 보내지 않는다**.
-  덱 모델로 바뀌면서 남았다.
-- `t: 'measure:report'` — `server/ws.ts` 에 "Phase 3 에서 사용한다. 지금은 받아만 둔다"
-  라고 적혀 있다. 실제 측정은 숨긴 iframe + postMessage 로 한다.
-- `t: 'state:patch'` — `ServerMsg` 에 있고 `public/stage/stage.js` 에 처리기도 있는데
-  **서버가 한 번도 보내지 않는다.** 타입과 처리기만 있는 유령이다.
-- `image` 슬라이드의 `crop` — `public/output/output.js` 가 실제로 자를 줄 안다.
-  그런데 `crop` 을 담은 슬라이드를 만드는 곳이 없다 → **악보 출력의 남은 절반**(D-6).
-- `lib/song-slides.ts` 의 `buildSongSlides` · `describeSongSlide` — 아무 데서도 안 쓴다
-  (`buildSongDeck` 이 쓰인다).
+| 무엇 | 판단 |
+|---|---|
+| `t: 'show'` (단일 슬라이드 송출) + `state.show()` | 🟢 **지웠다.** 아무도 보내지 않았고, 덱을 버리는 동작이라 남겨 두면 LAN 의 아무 클라이언트가 예배 중 진행 위치를 날릴 수 있었다 |
+| `t: 'state:patch'` | 🟢 **지웠다** (타입 + `stage.js` 처리기). 서버가 한 번도 보내지 않았다 |
+| `lib/song-slides.ts` `buildSongSlides` | 🟢 **지웠다.** `buildSongDeck` 과 `order` 계산이 그대로 겹쳤다 |
+| 같은 자리의 어긋난 주석 | 🟢 **바로잡았다.** `verseNumberPrefix` 의 설명이 `isSectionStart` 위에 붙어 있었다 |
+| `t: 'measure:report'` | ⚪ **남긴다.** `server/ws.ts` 에 "Phase 3 에서 사용한다" 고 명시돼 있다 |
+| `image` 슬라이드의 `crop` | ⚪ **남긴다.** `output.js` 가 실제로 자를 줄 안다 — **악보 출력(D-6)의 남은 절반**이라 지우면 그 작업을 다시 해야 한다 |
+
+**앞선 조사에서 틀린 것**: `describeSongSlide` 는 죽지 않았다 — `buildSongDeck` 이
+같은 파일 안에서 쓴다. 조사 스크립트가 **파일 밖 사용만** 봐서 잘못 짚었다.
+
+`state.show()` 를 지우면서 함께 옮긴 것:
+- **블랙 유지 규칙**(2026-08-15 실사용 발견)이 `show` 의 주석에만 있었다 →
+  `server/state.ts` 의 '조작' 절 머리말로 옮겼다. `loadDeck`·`goto` 두 곳이 그 주석을
+  가리키고 있었다.
+- 테스트가 `state.show()` 를 **11곳에서** 썼다. '묶음 없는 한 장' 상태를 만들려고
+  쓴 것인데, 그 상태는 **비우기 → 복구** 로 실제로 도달한다. 테스트를 그 경로로
+  바꿨다 — 이제 사람이 누르는 버튼으로 같은 상태를 검사한다.
 
 **D. 조용히 버려지는 것**
 
@@ -181,10 +190,18 @@ npm start               # http://localhost:7777
 출력 페이지(`output.js`)는 그대로 둔다: 거기서 오류를 그리면 **예배 중 화면에 글자가
 나간다.** 출력 쪽 오류는 이미 `client:error` → `output:error` 로 조작 화면에 올라온다.
 
-**E. 문서에 없는 스크립트**
+**E. 문서에 없는 스크립트** — 🟢 **완료** Agent C (2026-09-04)
 
-`npm run titles:borrow` (`scripts/borrow-en-titles.ts`) — 대응곡에서 영어 원제를
-물려받는다. 문서 표 어디에도 없다.
+`titles:borrow` 하나가 아니었다. README 스크립트 표에 **11개**가 빠져 있었다
+(`test:watch` · `lyrics:lang` · `titles:borrow` · `hymn:bilingual` ·
+`report:missing-en` · `restore:lyrics` · `report:bilingual` · `report:hyphen` ·
+`hymn:realign` · `misc:import` · `song:retitle`). 앞선 조사가 **문서 전체**에서
+찾아서 CHANGELOG·work-log 에 이름만 나오면 '문서에 있다' 로 봤다 — 정작 찾아보는
+곳은 README 표다.
+
+README 에 **'자료 반입·정리 스크립트'** 표를 새로 만들어 전부 넣었다. 각 스크립트의
+머리말을 읽어 설명을 달았고, 리포트는 읽기만 하고 쓰는 것은 `-- --apply` 가 필요하다는
+규칙을 표 앞에 적었다. `node -e` 로 package.json ↔ README 를 대조해 0개 남은 것을 확인했다.
 
 ---
 
@@ -390,7 +407,17 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
-(없음 — §4.6 의 기능 항목을 모두 처리했다)
+(없음 — §4.6 을 모두 처리했다. 남은 것은 악보 출력(D-6) 뿐이다)
+
+직전 작업 7: §4.6 C·E 부채 정리 (2026-09-04 완료, Agent C).
+  지운 것: t:'show' + state.show() · t:'state:patch' + stage.js 처리기 ·
+           buildSongSlides · 어긋난 주석 하나.
+  옮긴 것: 블랙 유지 규칙(show 주석 → state.ts '조작' 절 머리말).
+  고친 것: 테스트 11곳이 state.show() 로 만들던 '묶음 없는 한 장' 을
+           비우기→복구(실제 도달 경로)로 바꿨다.
+  README 에 빠져 있던 스크립트 11개를 넣었다.
+  검증: tsc · vitest 1,149 · vite build · 격리 서버(7818)에서 강사 모니터·출력 페이지가
+        그대로 도는 것 확인(state:patch 처리기를 뗀 자리다). 자세히는 CHANGELOG.
 
 직전 작업 6: §4.6 U-4 곡 수록 정보 편집 (2026-09-03 완료, Agent C).
   찬양 탭 곡 카드 '수록' 줄 + '고치기'. 통합 테스트 7개.

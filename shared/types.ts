@@ -975,7 +975,6 @@ export interface Deck {
 export type ServerMsg =
   /** 접속 직후 전체 스냅샷. 새로고침 후 즉시 복구되는 근거. */
   | { t: 'state'; payload: LiveState }
-  | { t: 'state:patch'; payload: Partial<LiveState>; revision: number }
   /** 컨트롤 패널과 **강사 모니터**에만 보낸다 (출력 페이지는 쓰지 않는다) */
   | { t: 'deck'; payload: Deck | null }
   /**
@@ -1002,7 +1001,6 @@ export type ClientMsg =
    * 서버가 출력 파일 수정 시각과 비교해 '옛 판이니 새로고침하라'를 컨트롤 패널에 띄운다.
    */
   | { t: 'hello'; role: ClientRole; layer?: string; loadedAt?: number }
-  | { t: 'show'; payload: SlidePayload }
   /** 슬라이드 묶음을 올린다 (본문 조회 결과) */
   | { t: 'deck:load'; payload: Deck }
   | { t: 'next' }

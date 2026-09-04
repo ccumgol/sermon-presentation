@@ -681,6 +681,16 @@ GET  /api/settings   PUT /api/settings
 
 ### 7.2 WebSocket (실시간 상태)
 
+> **아래는 설계 당시(2026-08) 초안이다. 실제 프로토콜은 `shared/types.ts` 의
+> `ServerMsg`·`ClientMsg` 가 유일한 기준이다.**
+>
+> 그 뒤로 달라진 것: `t: 'show'`(단일 슬라이드 송출)와 `t: 'state:patch'`(부분 갱신)는
+> **2026-09-03 에 지웠다** — 둘 다 아무도 보내지 않았다. 진행은 `deck:load` 로
+> 묶음을 올려서 하고(한 장짜리도 한 장 덱으로 보낸다), 상태는 늘 `state` 전체를
+> 보낸다. 반대로 초안에 없던 것이 늘었다: `deck` · `connections` ·
+> `output:error` · `output:stale` · `goto` · `group:next/prev` · `clear` ·
+> `client:error` · `hello`.
+
 ```ts
 // 서버 → 클라이언트
 type ServerMsg =

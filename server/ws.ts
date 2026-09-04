@@ -234,10 +234,6 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         }
         break;
 
-      case 'show':
-        state.show(msg.payload);
-        break;
-
       case 'deck:load':
         state.loadDeck(msg.payload);
         break;

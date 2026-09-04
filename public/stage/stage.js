@@ -296,7 +296,6 @@
         return;
       }
       if (msg.t === 'state') applyState(msg.payload);
-      else if (msg.t === 'state:patch') applyState(Object.assign({}, live || {}, msg.payload));
       else if (msg.t === 'deck') {
         deck = msg.payload;
         render();
