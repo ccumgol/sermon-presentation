@@ -18,6 +18,19 @@
  * **손실 압축은 쓰지 않는다.** 선화(線畵)라 q90 이 오히려 무손실보다 6배 컸다
  * (1000번: 무손실 38KB · q90 238KB). 게다가 얇은 선 둘레에 링잉이 생긴다.
  *
+ * ## 기울기를 편다
+ *
+ * 스캔이 조금씩 기울어 있다. 그대로 두면 **단 경계 검출이 무너진다** — 오선 한 줄이
+ * 여러 행에 걸쳐 어느 행도 길게 이어지지 않기 때문이다. 0301번은 7단짜리인데 줄이
+ * 2개만 잡혔고, 펴고 나니 35개(7단×5)가 정확히 잡혔다.
+ *
+ * **검출할 때만 펴서는 안 된다.** 잘라 낼 좌표가 화면에 나가는 그림과 같아야 한다.
+ * 그래서 저장하는 그림 자체를 편다.
+ *
+ * 편 뒤에는 **다시 흑백으로 되돌린다**(`-threshold 50%`). 회전은 가장자리를 회색으로
+ * 만드는데, 원본이 1비트라 회색이 섞이면 WebP 무손실이 **7배** 커진다
+ * (0001번: 17KB → 123KB → 되돌리면 다시 17KB, 실측).
+ *
  * ## 원본은 건드리지 않는다
  *
  * `~/Desktop/Data/Praise` 는 읽기 전용이다. 여기서는 읽기만 하고, 원본이 있어야
@@ -208,8 +221,21 @@ function main(): void {
   for (const job of jobs) {
     mkdirSync(path.dirname(job.to), { recursive: true });
     try {
-      // 무손실 — 픽셀이 원본과 같아야 한다 (2026-09-04 magick compare 로 0 확인)
-      execFileSync('magick', [job.from, '-define', 'webp:lossless=true', job.to], { stdio: 'pipe' });
+      execFileSync(
+        'magick',
+        [
+          job.from,
+          // 회전으로 생기는 빈 자리는 흰색 (악보 바탕과 같다)
+          '-background', 'white',
+          '-deskew', '40%',
+          '+repage',
+          // 회전이 만든 회색을 다시 흑백으로 — 안 하면 무손실 용량이 7배가 된다
+          '-threshold', '50%',
+          '-define', 'webp:lossless=true',
+          job.to,
+        ],
+        { stdio: 'pipe' },
+      );
       outBytes += statSync(job.to).size;
       done++;
     } catch (err) {
@@ -220,6 +246,7 @@ function main(): void {
 
   console.log('');
   console.log(`바꿨습니다: ${done}장  ${mb(sourceBytes)} → ${mb(outBytes)} (${((outBytes / sourceBytes) * 100).toFixed(1)}%)`);
+  console.log('기울기를 폈으므로 그림 크기가 원본과 조금 다릅니다 — 좌표는 이 결과 기준입니다.');
   if (failed.length > 0) {
     console.log(`❌ 실패 ${failed.length}장: ${failed.slice(0, 5).map((f) => f.number).join(', ')}`);
     for (const one of failed.slice(0, 3)) console.log(`   ${one.number}: ${one.message}`);
