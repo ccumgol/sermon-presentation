@@ -84,7 +84,8 @@ function textStyleVars(prefix: string, style: TextStyle): CssVars {
      * 따라가고(1em) 여백만 고정이라, 글자를 키워도 줄 사이가 벌어지지 않고 겹치지도 않는다.
      */
     [`--${prefix}-line-height`]:
-      style.lineGapPx === undefined
+      // null 도 '쓰지 않는다' 다 — 화면에서 끄면 null 로 온다 (shared/types.ts 머리말)
+      style.lineGapPx === undefined || style.lineGapPx === null
         ? String(style.lineHeight)
         : `calc(1em + ${style.lineGapPx}px)`,
     [`--${prefix}-spacing`]: px(style.letterSpacing),

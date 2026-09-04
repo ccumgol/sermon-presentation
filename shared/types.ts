@@ -337,8 +337,13 @@ export interface TextStyle {
    * 배수(1.4)로 두면 글자를 84 → 110px 로 키울 때 여백도 34 → 44px 로 벌어져
    * 화면이 헐거워진다. 반대로 `line-height` 를 px 로 고정하면 글자가 커질 때 겹친다.
    * `1em + Npx` 는 글자 상자는 글자를 따라가고 **여백만** 고정이라 겹치지 않는다.
+   *
+   * **`null` 은 '쓰지 않는다'** 는 뜻이다. `undefined` 로 두면 안 되는 이유:
+   * 템플릿 저장은 초안을 통째로 PUT 하고 서버가 얕게 병합하는데(`mergeTemplate`),
+   * `JSON.stringify` 가 `undefined` 키를 **지워 버려** 서버에는 그 필드가 아예 오지
+   * 않는다. 그러면 옛 값이 그대로 남아 **화면에서 끌 수 없다.**
    */
-  lineGapPx?: number;
+  lineGapPx?: number | null;
   letterSpacing: number; // px
   color: string;
   opacity: number;

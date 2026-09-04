@@ -94,6 +94,15 @@ interface TextStyleFieldsProps {
    * (`--item-font` 는 `.line-primary`·`.line-secondary` 에만 걸린다) 여기서 정한다.
    */
   showFontChain?: boolean;
+  /**
+   * 자간·절대 행간·대문자화·글자 뒤 상자를 보일지.
+   *
+   * **주·보조 텍스트에서만 켠다.** 이 넷은 `lib/template-css.ts` 의
+   * `textStyleVars` 만 CSS 변수로 내보내고, 절 번호·참조·소제목은
+   * `simpleStyleVars` 를 타서 **변수가 아예 나가지 않는다.** 거기에 컨트롤을 두면
+   * 만져도 화면이 안 바뀌는 칸이 된다 (2026-09-03 §4.6 B).
+   */
+  full?: boolean;
 }
 
 /** 한 역할(주 역본·보조 역본 등)의 글자 스타일 편집 묶음 */
@@ -102,7 +111,11 @@ export function TextStyleFields({
   style,
   onChange,
   showFontChain = true,
+  full = false,
 }: TextStyleFieldsProps): React.JSX.Element {
+  /** 절대 행간을 쓰는 중인가 — 쓰면 '줄 간격'(배수)은 화면에 영향을 주지 않는다 */
+  const absoluteGap = style.lineGapPx !== undefined && style.lineGapPx !== null;
+
   return (
     <details className="style-group" open>
       <summary>{title}</summary>
@@ -111,6 +124,21 @@ export function TextStyleFields({
         onChange={(fontSize) => onChange({ fontSize })} />
 
       <ColorField label="글자 색" value={style.color} onChange={(color) => onChange({ color })} />
+
+      {/*
+        **글자 투명도.** 모든 역할에 있다 (`simpleStyleVars` 도 `--*-opacity` 를 내보낸다).
+        참조 표기·저작권을 흐리게 두는 데 프리셋이 이미 쓰던 값인데(0.75~0.95) 화면에서
+        바꿀 길이 없었다. 20% 아래로는 못 내린다 — 0% 는 글자가 사라져 고장으로 보인다.
+      */}
+      <NumberField
+        label="글자 투명도"
+        value={Math.round(style.opacity * 100)}
+        min={20}
+        max={100}
+        step={5}
+        suffix="%"
+        onChange={(percent) => onChange({ opacity: percent / 100 })}
+      />
 
       <div className="row">
         <div className="field grow">
@@ -122,14 +150,52 @@ export function TextStyleFields({
           </select>
         </div>
         <div className="field grow">
-          <label>줄 간격</label>
-          <select value={style.lineHeight} onChange={(e) => onChange({ lineHeight: Number(e.target.value) })}>
+          <label>줄 간격 {absoluteGap && <span className="num-value">고정 여백을 씁니다</span>}</label>
+          <select
+            value={style.lineHeight}
+            disabled={absoluteGap}
+            title={absoluteGap ? '아래 «줄 사이 고정» 을 끄면 이 배수를 씁니다' : '글자 크기의 배수'}
+            onChange={(e) => onChange({ lineHeight: Number(e.target.value) })}
+          >
             {[1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8].map((h) => (
               <option key={h} value={h}>{h}</option>
             ))}
           </select>
         </div>
       </div>
+
+      {/*
+        **절대 행간** — 글자를 키워도 줄 사이가 벌어지지 않는다. 프리셋이 쓰던 값인데
+        (`lineGapPx`) 화면에서 켜고 끌 길이 없었다.
+      */}
+      {full && (
+        <div className="row">
+          <label className="check" title="글자를 키워도 줄 사이 여백이 그대로입니다">
+            <input
+              type="checkbox"
+              checked={absoluteGap}
+              // 끌 때는 반드시 null 이다 — undefined 는 JSON 에서 사라져 서버에 안 간다
+              onChange={(e) => onChange({ lineGapPx: e.target.checked ? 16 : null })}
+            />
+            줄 사이 고정
+          </label>
+          {absoluteGap && (
+            <div className="field grow">
+              <label>
+                여백 <span className="num-value">{style.lineGapPx}px</span>
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={60}
+                value={style.lineGapPx ?? 16}
+                onChange={(e) => onChange({ lineGapPx: Number(e.target.value) })}
+                aria-label="줄 사이 고정 여백"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {showFontChain ? (
         <>
@@ -204,6 +270,93 @@ export function TextStyleFields({
           어절 단위 줄바꿈
         </label>
       </div>
+
+      {/*
+        여기 아래는 손대는 일이 드물어 접어 둔다. 위쪽(크기·색·외곽선)은 예배 준비마다
+        만지는 값이라 늘 펼쳐져 있어야 하고, 이것들이 그 위에 끼면 그때마다 지나쳐야 한다.
+      */}
+      {full && (
+        <details className="style-advanced">
+          <summary>자간 · 대문자 · 글자 뒤 상자</summary>
+
+          <NumberField
+            label="자간"
+            value={style.letterSpacing}
+            min={-3}
+            max={12}
+            step={0.5}
+            suffix="px"
+            onChange={(letterSpacing) => onChange({ letterSpacing })}
+          />
+
+          <label className="check" title="영어에만 걸립니다 — 한글에는 대문자가 없습니다">
+            <input
+              type="checkbox"
+              checked={style.textTransform === 'uppercase'}
+              onChange={(e) => onChange({ textTransform: e.target.checked ? 'uppercase' : 'none' })}
+            />
+            영어를 대문자로
+          </label>
+
+          {/*
+            **글자 뒤 상자** — 밝은 영상 위에서 외곽선만으로 부족할 때 쓴다.
+            프리셋 두 개가 이미 쓰고 있었다 (`rgba(0,0,0,0.55)`).
+          */}
+          <label className="check" title="밝은 영상 위에서 외곽선만으로 부족할 때">
+            <input
+              type="checkbox"
+              checked={style.bgBox !== null}
+              onChange={(e) =>
+                onChange({
+                  bgBox: e.target.checked
+                    ? { color: 'rgba(0,0,0,0.55)', paddingX: 28, paddingY: 14, radius: 10 }
+                    : null,
+                })
+              }
+            />
+            글자 뒤 상자
+          </label>
+
+          {style.bgBox && (
+            <div className="box-fields">
+              {/* rgba 를 쓰므로 색 고르기가 아니라 글자로 받는다 (투명도가 값에 들어 있다) */}
+              <ColorField
+                label="상자 색 (rgba 가능)"
+                value={style.bgBox.color}
+                onChange={(color) => onChange({ bgBox: { ...style.bgBox!, color } })}
+              />
+              <div className="row">
+                <NumberField
+                  label="좌우 여백"
+                  value={style.bgBox.paddingX}
+                  min={0}
+                  max={120}
+                  step={2}
+                  suffix="px"
+                  onChange={(paddingX) => onChange({ bgBox: { ...style.bgBox!, paddingX } })}
+                />
+                <NumberField
+                  label="위아래 여백"
+                  value={style.bgBox.paddingY}
+                  min={0}
+                  max={80}
+                  step={2}
+                  suffix="px"
+                  onChange={(paddingY) => onChange({ bgBox: { ...style.bgBox!, paddingY } })}
+                />
+              </div>
+              <NumberField
+                label="모서리 둥글기"
+                value={style.bgBox.radius}
+                min={0}
+                max={40}
+                suffix="px"
+                onChange={(radius) => onChange({ bgBox: { ...style.bgBox!, radius } })}
+              />
+            </div>
+          )}
+        </details>
+      )}
     </details>
   );
 }

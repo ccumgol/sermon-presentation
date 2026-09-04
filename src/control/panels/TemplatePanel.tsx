@@ -489,8 +489,13 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           아래 셋(절 번호·참조 표기·소제목)은 `--item-font` 가 걸리지 않는 자리라
           (CSS 가 .line-primary·.line-secondary 에만 건다) 여기서 정해야 한다.
         */}
-        <TextStyleFields title="주 역본 / 주 언어" style={draft.text.primary} onChange={(p) => patchText('primary', p)} showFontChain={false} />
-        <TextStyleFields title="보조 역본 / 보조 언어" style={draft.text.secondary} onChange={(p) => patchText('secondary', p)} showFontChain={false} />
+        {/*
+          `full` 은 주·보조에만 준다 — 자간·절대 행간·대문자화·글자 뒤 상자는
+          `textStyleVars` 만 CSS 변수로 내보내서, 아래 셋(절 번호·참조·소제목)에는
+          컨트롤을 둬도 화면이 안 바뀐다 (§4.6 B).
+        */}
+        <TextStyleFields title="주 역본 / 주 언어" style={draft.text.primary} onChange={(p) => patchText('primary', p)} showFontChain={false} full />
+        <TextStyleFields title="보조 역본 / 보조 언어" style={draft.text.secondary} onChange={(p) => patchText('secondary', p)} showFontChain={false} full />
         <TextStyleFields title="절 번호" style={draft.text.verseNum} onChange={(p) => patchText('verseNum', p)} />
         <TextStyleFields title="참조 표기" style={draft.text.reference} onChange={(p) => patchText('reference', p)} />
         <TextStyleFields title="소제목" style={draft.text.heading} onChange={(p) => patchText('heading', p)} />

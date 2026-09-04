@@ -365,3 +365,69 @@ describe('성경·찬양 탭에서 고를 수 있는 프리셋', () => {
     for (const id of [-9, -10, -11, -6, -7]) expect(SHARED_PRESET_IDS).not.toContain(id);
   });
 });
+
+/**
+ * 템플릿 탭에서 새로 편집할 수 있게 된 값들 (§4.6 B, 2026-09-03).
+ *
+ * 렌더는 전부터 되어 있었고 프리셋만 쓰고 있었다. 화면에 컨트롤을 붙이면서
+ * **끄는 길**이 필요해졌는데, 거기 함정이 하나 있다 — 아래 첫 테스트가 그것이다.
+ */
+describe('화면에서 새로 만질 수 있는 글자 값', () => {
+  function withPrimary(patch: Partial<Template['text']['primary']>): Record<string, string> {
+    const template = base();
+    return templateToCssVars({ ...template, text: { ...template.text, primary: { ...template.text.primary, ...patch } } });
+  }
+
+  /**
+   * **끄기는 `null` 이어야 한다.**
+   *
+   * `undefined` 로 끄면 `JSON.stringify` 가 그 키를 지워서 서버(`mergeTemplate`)에는
+   * 필드가 아예 오지 않는다 → 옛 값이 그대로 남아 화면에서 끌 수 없다.
+   * 그래서 `lineGapPx` 는 `number | null` 이고, 둘 다 '안 쓴다' 로 읽어야 한다.
+   */
+  it('절대 행간: null 도 undefined 처럼 배수로 돌아간다', () => {
+    expect(withPrimary({ lineGapPx: 20, lineHeight: 1.4 })['--primary-line-height']).toBe('calc(1em + 20px)');
+    expect(withPrimary({ lineGapPx: null, lineHeight: 1.4 })['--primary-line-height']).toBe('1.4');
+    expect(withPrimary({ lineGapPx: undefined, lineHeight: 1.4 })['--primary-line-height']).toBe('1.4');
+    // 0 은 '여백 없음' 이라는 뜻이 있는 값이다 — 끈 것으로 보면 안 된다
+    expect(withPrimary({ lineGapPx: 0, lineHeight: 1.4 })['--primary-line-height']).toBe('calc(1em + 0px)');
+  });
+
+  it('자간·대문자화·투명도가 변수로 나간다', () => {
+    const vars = withPrimary({ letterSpacing: 2.5, textTransform: 'uppercase', opacity: 0.8 });
+    expect(vars['--primary-spacing']).toBe('2.5px');
+    expect(vars['--primary-transform']).toBe('uppercase');
+    expect(vars['--primary-opacity']).toBe('0.8');
+  });
+
+  it('글자 뒤 상자를 켜면 네 값이 함께 나간다', () => {
+    const on = withPrimary({ bgBox: { color: 'rgba(0,0,0,0.55)', paddingX: 28, paddingY: 14, radius: 10 } });
+    expect(on['--primary-box-bg']).toBe('rgba(0,0,0,0.55)');
+    expect(on['--primary-box-pad-x']).toBe('28px');
+    expect(on['--primary-box-pad-y']).toBe('14px');
+    expect(on['--primary-box-radius']).toBe('10px');
+  });
+
+  it('끄면 상자가 투명하고 여백이 0 이다 — 껐는데 자리를 차지하면 안 된다', () => {
+    const off = withPrimary({ bgBox: null });
+    expect(off['--primary-box-bg']).toBe('transparent');
+    expect(off['--primary-box-pad-x']).toBe('0px');
+    expect(off['--primary-box-pad-y']).toBe('0px');
+    expect(off['--primary-box-radius']).toBe('0px');
+  });
+
+  /**
+   * 절 번호·참조·소제목은 `simpleStyleVars` 를 타서 이 변수들이 **나가지 않는다.**
+   * 그래서 템플릿 탭이 거기에는 컨트롤을 두지 않는다(`full` 프롭). 여기가 바뀌면
+   * 화면도 함께 바뀌어야 하므로 못을 박아 둔다.
+   */
+  it('절 번호·참조·소제목에는 자간·상자 변수가 없다 (투명도는 있다)', () => {
+    const vars = templateToCssVars(base());
+    for (const prefix of ['versenum', 'reference', 'heading', 'credit']) {
+      expect(vars[`--${prefix}-opacity`]).toBeDefined();
+      expect(vars[`--${prefix}-spacing`]).toBeUndefined();
+      expect(vars[`--${prefix}-transform`]).toBeUndefined();
+      expect(vars[`--${prefix}-box-bg`]).toBeUndefined();
+    }
+  });
+});

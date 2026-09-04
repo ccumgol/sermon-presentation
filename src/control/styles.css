@@ -2545,3 +2545,24 @@ button.link-inline {
 
 .link-picker { margin-top: 6px; }
 .link-picker .candidates { margin-top: 6px; }
+
+/* 글자 스타일의 '고급' 접이 — 위쪽 기본 칸과 구분되게 한 겹 들여 둔다 */
+.style-advanced {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.style-advanced > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.style-advanced[open] > summary { margin-bottom: 8px; }
+.style-advanced .check { margin-top: 6px; }
+.box-fields {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
