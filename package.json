@@ -33,7 +33,8 @@
     "report:hyphen": "node scripts/report-hyphen-linebreaks.ts",
     "hymn:realign": "node scripts/realign-hymn-english.ts",
     "misc:import": "node scripts/import-misc-lyrics.ts",
-    "song:retitle": "node scripts/retitle-with-alt.ts"
+    "song:retitle": "node scripts/retitle-with-alt.ts",
+    "sheets:convert": "node scripts/convert-sheets.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",

@@ -233,6 +233,7 @@ npm run dev
 | `npm run report:bilingual` | 새찬송가 한/영 대조 리포트 |
 | `npm run report:hyphen` | 영어 가사에서 **낱말이 줄을 넘어 쪼개진 곳** 찾기 |
 | `npm run report:missing-en` | 영어 가사가 빠진 곡·줄 목록 |
+| `npm run sheets:convert` | 악보 원본 BMP → `data/sheets/` WebP 무손실 (340MB → 52MB) · ImageMagick 필요 |
 
 ## 조작
 

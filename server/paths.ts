@@ -31,6 +31,16 @@ export const BIBLE_SOURCE_DIR = process.env.BIBLE_DB_DIR
   : path.join(homedir(), 'Desktop', 'Data', 'BibleDB');
 
 /**
+ * 찬양 자료 원본 폴더 — **읽기 전용으로만 접근한다.**
+ *
+ * 악보 원본(`찬미예수 2000 악보/`, BMP 2,062장 340MB)이 여기 있다. 변환 결과만
+ * `data/sheets/` 로 나가고 원본은 그대로 둔다 — 원본이 있어야 다시 변환할 수 있다.
+ */
+export const PRAISE_SOURCE_DIR = process.env.SERMON_PRAISE_DIR
+  ? path.resolve(process.env.SERMON_PRAISE_DIR)
+  : path.join(homedir(), 'Desktop', 'Data', 'Praise');
+
+/**
  * 사용자가 모아 둔 배경 그림 폴더 — **읽기 전용으로만 접근한다.**
  *
  * 성경 DB 폴더와 같은 규칙이다. 여기에 쓰지 않고, 복사해 오지도 않는다 —
@@ -45,6 +55,7 @@ export const paths = {
   appRoot: APP_ROOT,
   dataDir: DATA_DIR,
   bibleSourceDir: BIBLE_SOURCE_DIR,
+  praiseSourceDir: PRAISE_SOURCE_DIR,
   backgroundSourceDir: BACKGROUND_SOURCE_DIR,
 
   /**
@@ -86,6 +97,16 @@ export const paths = {
    * 실제 리포트 폴더에 섞여 "어느 파일로 빌드했는지"를 잘못 알려주는 일이 있었다.
    */
   reportsDir: path.join(DATA_DIR, 'reports'),
+  /**
+   * 악보 이미지 — 원본 BMP 를 WebP 로 바꿔 둔 곳. 곡집별로 나눈다
+   * (`sheets/chanmi2000/0001.webp`).
+   *
+   * **원본을 복사해 오는 것이 아니라 변환해서 둔다.** 무손실이라 그림은 같고
+   * 용량만 340MB → 50MB 로 준다(실측 14.7%). 배경 그림과 달리 원본 폴더를 그대로
+   * 읽지 않는 이유는 BMP 를 브라우저가 잘 다루지 못하고, 한 장이 2,245px 까지
+   * 되어 예배 중에 그대로 내보내기에 무겁기 때문이다.
+   */
+  sheetsDir: path.join(DATA_DIR, 'sheets'),
 
   publicDir: path.join(APP_ROOT, 'public'),
   outputDir: path.join(APP_ROOT, 'public', 'output'),
@@ -93,7 +114,9 @@ export const paths = {
 
 /** 쓰기 대상 디렉터리를 필요 시 생성한다. 원본 DB 폴더는 건드리지 않는다. */
 export function ensureDataDirs(): void {
-  for (const dir of [paths.dataDir, paths.fontsDir, paths.backupsDir, paths.reportsDir, paths.backgroundsDir]) {
+  for (const dir of [
+    paths.dataDir, paths.fontsDir, paths.backupsDir, paths.reportsDir, paths.backgroundsDir, paths.sheetsDir,
+  ]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 }
