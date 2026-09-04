@@ -2566,3 +2566,20 @@ button.link-inline {
   padding-top: 8px;
   border-top: 1px solid var(--line);
 }
+
+/* 수록 정보 편집 — 통째로 교체하는 동작이라 [저장] 이 있는 한 덩어리로 둔다 */
+.entry-editor {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.entry-editor .row { margin-top: 6px; }
+.entry-editor .row:first-child { margin-top: 0; }
+.entry-editor input[type='number'] { width: 92px; }
+.entry-editor .dim { color: var(--dim); font-size: 12px; }
+
+/* 고칠 수 없는 칩 (수록 목록) — 누를 것이 없으니 손 모양도 주지 않는다 */
+.link-chip.static { cursor: default; }
+.link-chip.static .link-inline { color: var(--fg); }

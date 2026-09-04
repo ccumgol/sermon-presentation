@@ -7,7 +7,7 @@
 
 import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../../server/app.ts';
 import * as store from '../../server/db/songs.ts';
@@ -314,5 +314,90 @@ describe('대응곡 연결', () => {
   it('붙지 않은 것을 풀어도 조용히 넘어간다', async () => {
     const response = await del<Song>(`/api/songs/${hymnId}/link/${ccmId}`);
     expect(response.status).toBe(200);
+  });
+});
+
+/**
+ * 수록 정보(어느 곡집 몇 번) 편집 — `PUT /api/songs/:id/entries`.
+ *
+ * 라우트는 처음부터 있었는데 화면에 길이 없어 테스트도 없었다 (§4.6 U-4).
+ * 이제 사람이 앱에서 고친다 — **통째로 교체**하는 동작이라 실수의 값이 크다.
+ */
+describe('수록 정보 편집', () => {
+  let target: number;
+
+  beforeEach(() => {
+    // 이 describe 안에서만 쓰는 곡 — 다른 테스트의 수록 정보를 갈아 버리면 안 된다
+    store.deleteBySource('entry-test');
+    target = store.createSong({
+      title: '수록 정보 시험곡',
+      source: 'entry-test',
+      entries: [{ songbookId: 'misc' }],
+      sections: [{ kind: 'verse', label: '1절', lines: [{ lineIndex: 0, lang: 'ko', text: '가사' }] }],
+    });
+  });
+
+  afterAll(() => {
+    store.deleteBySource('entry-test');
+  });
+
+  async function setEntries(id: number, entries: unknown): Promise<{ status: number; body: ApiResponse<Song> }> {
+    const response = await app.inject({ method: 'PUT', url: `/api/songs/${id}/entries`, payload: { entries } });
+    return { status: response.statusCode, body: response.json() as ApiResponse<Song> };
+  }
+
+  it('곡집과 번호를 붙인다', async () => {
+    const { body } = await setEntries(target, [{ songbookId: 'hymn_new', number: 42 }]);
+    const entry = body.data!.entries.find((e) => e.songbookId === 'hymn_new');
+    expect(entry?.number).toBe(42);
+    // 통째로 교체다 — 전에 있던 '기타' 는 남지 않는다
+    expect(body.data!.entries.some((e) => e.songbookId === 'misc')).toBe(false);
+  });
+
+  it('번호를 null 로 주면 번호 없는 수록이 된다', async () => {
+    const { body } = await setEntries(target, [{ songbookId: 'hymn_new', number: null }]);
+    expect(body.data!.entries.find((e) => e.songbookId === 'hymn_new')?.number).toBeUndefined();
+  });
+
+  it('여러 곡집에 함께 실을 수 있다', async () => {
+    const { body } = await setEntries(target, [
+      { songbookId: 'hymn_new', number: 305 },
+      { songbookId: 'hymn_old', number: 405 },
+    ]);
+    expect(body.data!.entries.map((e) => `${e.songbookShortLabel}${e.number}`).sort()).toEqual(['새305', '통405']);
+  });
+
+  /**
+   * `song_entries` 의 기본키가 `(song_id, songbook_id)` 라 같은 곡집을 두 번 넣으면
+   * 하나로 합쳐진다. 화면은 ＋ 목록에서 이미 쓴 곡집을 빼서 이 상황을 막는데,
+   * 서버 쪽에서도 데이터가 깨지지 않는다는 것을 못 박아 둔다.
+   */
+  it('같은 곡집을 두 번 넣으면 하나로 합쳐진다 (마지막 값)', async () => {
+    const { body } = await setEntries(target, [
+      { songbookId: 'hymn_new', number: 1 },
+      { songbookId: 'hymn_new', number: 2 },
+    ]);
+    const found = body.data!.entries.filter((e) => e.songbookId === 'hymn_new');
+    expect(found).toHaveLength(1);
+    expect(found[0]!.number).toBe(2);
+  });
+
+  /** 곡이 어느 곡집에도 없으면 목록에서 사라진다 — 서버가 '기타' 로 떨어뜨린다 */
+  it('빈 목록을 보내면 기타 곡집으로 떨어진다', async () => {
+    const { body } = await setEntries(target, []);
+    expect(body.data!.entries.map((e) => e.songbookId)).toEqual(['misc']);
+  });
+
+  it('없는 곡집은 버린다 — 유령 수록이 생기면 안 된다', async () => {
+    const { body } = await setEntries(target, [
+      { songbookId: '없는곡집', number: 7 },
+      { songbookId: 'hymn_new', number: 8 },
+    ]);
+    expect(body.data!.entries.map((e) => e.songbookId)).toEqual(['hymn_new']);
+  });
+
+  it('entries 가 배열이 아니면 400, 없는 곡은 404', async () => {
+    expect((await setEntries(target, '새305')).status).toBe(400);
+    expect((await setEntries(999999, [{ songbookId: 'hymn_new' }])).status).toBe(404);
   });
 });

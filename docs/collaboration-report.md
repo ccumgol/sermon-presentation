@@ -138,7 +138,7 @@ npm start               # http://localhost:7777
 | U-1 | **성경 전문 검색** `GET /api/bible/search` | 한국어 LIKE · 영어 FTS · 신/구약 필터 · 잘림 표시. 통합 테스트 2개. 실측 '사랑' 557절 | 🟢 **완료** Agent C (2026-09-03) — 성경 탭 '🔍 낱말로 찾기' |
 | U-2 | **최근 부른 곡** `GET /api/songs/recent` | `api.recentSongs()` 래퍼까지 있다. 사용 기록은 실제로 쌓이는 중 | 🟢 **완료** Agent C (2026-09-03) — 찬양 탭 '즐겨찾기 \| 최근' |
 | U-3 | **대응곡 연결·해제** `POST/DELETE /api/songs/:id/link` | 화면은 대응곡을 **보여 주기만** 했다 | 🟢 **완료** Agent C (2026-09-03) — 찬양 탭 곡 카드 · 통합 테스트 5개 |
-| U-4 | **곡 수록 정보(곡집·번호) 편집** `PUT /api/songs/:id/entries` | `api.setSongEntries()` 래퍼까지 있다 | 🔴 부르는 곳 없음 |
+| U-4 | **곡 수록 정보(곡집·번호) 편집** `PUT /api/songs/:id/entries` | `api.setSongEntries()` 래퍼까지 있었다 | 🟢 **완료** Agent C (2026-09-03) — 찬양 탭 곡 카드 '수록' 줄 · 통합 테스트 7개 |
 | U-5 | **가사 파싱 미리보기** `POST /api/songs/parse-lyrics` | 실측 확인 | ⚪ **보류(의도적)** — `parseLyrics` 가 `lib/` 에 있어 패널이 직접 부르고, 가사 편집 창이 이미 `draftDeck` 로 슬라이드를 실시간 미리보기한다. 라우트를 쓰면 오히려 느려진다 |
 | U-6 | **역본별 장 수** `GET /api/bible/chapters` | 실측 시편 150 | 🔴 UI 없음 |
 | U-7 | **성경 DB 빌드 정보** `GET /api/bible/build-info` | 12역본 · 342,317절 · 빌드 시각 | 🟢 **완료** Agent C (2026-09-03) — 설정 탭 '서버 정보' |
@@ -390,7 +390,14 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
-(없음 — 사용자 결정을 기다리는 중)
+(없음 — §4.6 의 기능 항목을 모두 처리했다)
+
+직전 작업 6: §4.6 U-4 곡 수록 정보 편집 (2026-09-03 완료, Agent C).
+  찬양 탭 곡 카드 '수록' 줄 + '고치기'. 통합 테스트 7개.
+  덤: SongPanel 이 1,120줄이 되어(상한 800) 수록·대응곡 줄을
+      src/control/components/SongMetaRows.tsx 로 떼어 냈다 → 859 + 346.
+      중복된 entryLabel 을 lib/plan-item-view.ts 의 shortEntryLabel 로 합쳤다.
+  검증: tsc · vitest 1,150 · vite build · 격리 서버(7817) 브라우저. 자세히는 CHANGELOG.
 
 직전 작업 5: §4.6 B 글자 값 5개 (2026-09-03 완료, Agent C).
   템플릿 탭에서 자간·절대 행간·글자 투명도·글자 뒤 상자·대문자화를 바꿀 수 있다.

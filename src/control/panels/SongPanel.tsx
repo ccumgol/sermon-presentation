@@ -5,12 +5,14 @@ import {
 } from '../../../lib/lang-select.ts';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
+import { SongMetaRows } from '../components/SongMetaRows.tsx';
 
 import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
 } from '../../../shared/types.ts';
 import { buildSongDeck, isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import { formatLyrics, parseLyrics } from '../../../lib/lyrics-parser.ts';
+import { shortEntryLabel } from '../../../lib/plan-item-view.ts';
 import { api, ApiError } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
@@ -53,13 +55,6 @@ interface Props {
 }
 
 /** 수록 정보를 짧게 — '새305 · 통405' */
-function entryLabel(hit: Pick<SongSearchHit, 'entries'>): string {
-  return hit.entries
-    .filter((entry) => entry.number !== undefined)
-    .map((entry) => `${entry.songbookShortLabel}${entry.number}`)
-    .join(' · ');
-}
-
 export function SongPanel({ deck, currentIndex, connected, template, send }: Props): React.JSX.Element {
   const [songbooks, setSongbooks] = useState<Songbook[]>([]);
   const [quickPicks, setQuickPicks] = useState<SongSearchHit[]>([]);
@@ -77,6 +72,13 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    */
   const [linking, setLinking] = useState<string | null>(null);
   const [linkHits, setLinkHits] = useState<SongSearchHit[]>([]);
+  /**
+   * 수록 정보(곡집·번호)를 고치는 중이면 초안. `null` 이면 닫혀 있다.
+   *
+   * 번호를 **문자열로** 들고 있는 이유: 칸을 비울 수 있어야 한다('번호 없음').
+   * 숫자로 두면 지우는 순간 0 이나 NaN 이 되어, 비운 것과 0번을 구분할 수 없다.
+   */
+  const [entryDraft, setEntryDraft] = useState<Array<{ songbookId: string; number: string }> | null>(null);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
 
@@ -195,6 +197,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     void loadQuickPicks();
   }, [loadSongbooks, loadQuickPicks]);
 
+  /**
+   * 검색 결과를 다시 받아 오는 방아쇠.
+   *
+   * 수록 정보를 고치면 목록에 보이는 번호(`새305`)가 달라진다. 다시 찾지 않으면
+   * 왼쪽 목록만 옛 번호를 들고 있어, 방금 고친 것이 안 먹은 것처럼 보인다.
+   */
+  const [searchKey, setSearchKey] = useState(0);
+
   // 검색 — 곡집을 고르면 그 범위, 아니면 전체 통합 검색 (디바운스)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -204,13 +214,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         .catch((err) => setError(err instanceof ApiError ? err.message : '곡을 찾지 못했습니다'));
     }, 200);
     return () => clearTimeout(timer);
-  }, [query, selectedBook]);
+  }, [query, selectedBook, searchKey]);
 
   const openSong = useCallback(async (id: number) => {
     setError(null);
     setNotice(null);
     setEditing(false);
     setLinking(null);
+    setEntryDraft(null);
     try {
       const { song: loaded, availableLangs } = await api.song(id);
       setSong(loaded);
@@ -369,63 +380,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   }
 
   /** 즐겨찾기에 넣거나 뺀다 — 목록은 곧바로 다시 읽는다 */
-  // ── 대응곡 연결·해제 ────────────────────────────────────────
-
-  // 붙일 곡 찾기 (디바운스). 자기 자신과 이미 붙은 곡은 목록에서 뺀다
-  useEffect(() => {
-    if (linking === null || linking.trim().length === 0 || !song) {
-      setLinkHits([]);
-      return;
-    }
-    const linked = new Set([song.id, ...(song.links ?? []).map((l) => l.id)]);
-    const timer = setTimeout(() => {
-      void api
-        .songs(linking, 12)
-        .then((found) => setLinkHits(found.hits.filter((hit) => !linked.has(hit.id))))
-        .catch(() => setLinkHits([]));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [linking, song]);
-
-  /**
-   * 대응곡을 붙인다 — 새찬송가 ↔ 통일찬송가처럼 **가사가 다른 같은 찬송**.
-   *
-   * 서버는 처음부터 되어 있었고 화면에만 길이 없었다. 반입 스크립트가 붙인 연결이
-   * 틀렸을 때 앱에서 고칠 방법이 없었다 (§4.6 U-3, 2026-09-03).
-   */
-  async function linkSong(linkedId: number): Promise<void> {
-    if (!song) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await api.linkSong(song.id, linkedId);
-      setSong(updated);
-      setLinking(null);
-      setLinkHits([]);
-      setNotice(`대응곡을 연결했습니다`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '연결하지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** 되돌릴 수 있는 동작이라(다시 붙이면 된다) 확인을 받지 않는다 */
-  async function unlinkSong(linkedId: number, label: string): Promise<void> {
-    if (!song) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const updated = await api.unlinkSong(song.id, linkedId);
-      setSong(updated);
-      setNotice(`'${label}' 연결을 풀었습니다`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '풀지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function toggleFavorite(): Promise<void> {
     if (!song) return;
     try {
@@ -583,7 +537,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 disabled={!connected || busy}
                 title={`${hit.title}${hit.titleAlt && !hit.title.includes(hit.titleAlt) ? ` (${hit.titleAlt})` : ''} — 바로 송출`}
               >
-                <span className="num">{entryLabel(hit) || '—'}</span>
+                <span className="num">{shortEntryLabel(hit.entries) || '—'}</span>
                 <span className="title">{hit.title}</span>
               </button>
             ))}
@@ -637,7 +591,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
               className={`song-hit${song?.id === hit.id ? ' current' : ''}`}
               onClick={() => void openSong(hit.id)}
             >
-              <span className="num">{entryLabel(hit) || '—'}</span>
+              <span className="num">{shortEntryLabel(hit.entries) || '—'}</span>
               <span className="body">
                 <span className="title">
                   {hit.title}
@@ -703,74 +657,24 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
             </h2>
 
             {/*
-              **대응곡** — 새찬송가 ↔ 통일찬송가처럼 가사가 다른 같은 찬송.
-              전에는 보여 주기만 했다. 반입이 잘못 붙인 연결을 앱에서 고칠 길이 없어
-              DB 를 직접 만져야 했다 (§4.6 U-3).
+              수록 정보(곡집·번호)와 대응곡. SongPanel 이 800줄 상한을 넘어가서
+              떼어 냈다 — 이 두 줄은 곡 하나만 알면 되고 송출·가사 편집과 상태를
+              나누지 않아 경계가 깔끔하다.
             */}
-            <p className="hintline muted song-links">
-              <span>대응곡</span>
-              {(song.links ?? []).map((link) => (
-                <span key={link.id} className="link-chip">
-                  <button
-                    type="button"
-                    className="link-inline"
-                    onClick={() => void openSong(link.id)}
-                    title="가사가 다른 판본입니다 — 눌러서 엽니다"
-                  >
-                    {entryLabel(link) || link.title}
-                  </button>
-                  <button
-                    type="button"
-                    className="del"
-                    disabled={busy}
-                    onClick={() => void unlinkSong(link.id, entryLabel(link) || link.title)}
-                    title="연결 풀기 (곡은 지워지지 않습니다)"
-                    aria-label="연결 풀기"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-              {(song.links ?? []).length === 0 && <span className="dim">없음</span>}
-              <button
-                type="button"
-                className={linking !== null ? 'primary' : undefined}
-                disabled={busy}
-                onClick={() => setLinking((prev) => (prev === null ? '' : null))}
-                title="가사가 다른 같은 찬송을 이어 둡니다 (새 305 ↔ 통 405)"
-              >
-                {linking !== null ? '닫기' : '＋ 연결'}
-              </button>
-              {(song.links ?? []).length > 0 && <span className="dim">가사가 다릅니다</span>}
-            </p>
-
-            {linking !== null && (
-              <div className="link-picker">
-                <input
-                  className="grow"
-                  autoFocus
-                  value={linking}
-                  onChange={(event) => setLinking(event.target.value)}
-                  placeholder="이어 둘 곡 — 통 405 · 나같은죄인"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label="대응곡 찾기"
-                />
-                {linkHits.length > 0 && (
-                  <div className="candidates">
-                    {linkHits.map((hit) => (
-                      <button key={hit.id} type="button" disabled={busy} onClick={() => void linkSong(hit.id)}>
-                        {entryLabel(hit) ? `${entryLabel(hit)} ` : ''}
-                        {hit.title}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {linking.trim().length > 0 && linkHits.length === 0 && (
-                  <p className="hintline muted">이을 곡이 없습니다 (이미 이어진 곡과 자기 자신은 빠집니다).</p>
-                )}
-              </div>
-            )}
+            <SongMetaRows
+              song={song}
+              songbooks={songbooks}
+              busy={busy}
+              setBusy={setBusy}
+              onSongChange={setSong}
+              onOpenSong={(id) => void openSong(id)}
+              onError={setError}
+              onNotice={setNotice}
+              onEntriesSaved={() => {
+                setSearchKey((prev) => prev + 1);
+                void loadSongbooks();
+              }}
+            />
 
             {/*
               이 탭은 순서를 벗어나 급히 띄우는 자리다 — 예배 중 곡이 갑자기 바뀔 때 쓴다.

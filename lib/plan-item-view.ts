@@ -25,6 +25,23 @@ export function songLabelOf(entries: readonly SongEntry[]): string | undefined {
   return numbered ? `${numbered.songbookName} ${numbered.number}장` : undefined;
 }
 
+/**
+ * 짧은 곡집·번호 표기 — `새305 · 통405`. 목록·칩처럼 **좁은 자리**에 쓴다.
+ *
+ * `songLabelOf` 와 다르다: 이건 수록을 **모두** 적고 줄임말(`새`)을 쓴다. 화면에
+ * 나가는 제목 슬라이드는 회중이 읽어야 해서 첫 수록만 풀어 쓰지만, 조작 화면의
+ * 목록은 이 곡이 새·통 어디에 몇 번인지 한눈에 보이는 것이 낫다.
+ *
+ * 번호 없는 수록('기타')은 빠지므로 **빈 문자열이 나올 수 있다** — 부르는 쪽이
+ * `|| '—'` 같은 대체 표기를 정한다.
+ */
+export function shortEntryLabel(entries: readonly SongEntry[]): string {
+  return entries
+    .filter((entry) => entry.number !== undefined)
+    .map((entry) => `${entry.songbookShortLabel}${entry.number}`)
+    .join(' · ');
+}
+
 /** 추가 바에서 고를 수 있는 항목 종류 */
 export type AddKind =
   | 'bible' | 'song' | 'liturgy' | 'reading' | 'order' | 'notice' | 'quote' | 'slideshow'
