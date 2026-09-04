@@ -56,6 +56,8 @@
 
   /* 줄 강조 — 라이트에서는 어둡게 덮고 다크에서는 밝게 덮는다 */
   --row-hover: rgba(0, 0, 0, 0.05);
+  /* 검색어가 걸린 자리 — 배경만 칠한다 */
+  --mark-bg: rgba(255, 214, 0, 0.45);
   --row-flat: rgba(0, 0, 0, 0.04);
   /* 지금 송출 중인 줄의 바닥 — `--live` 를 옅게 깐다 (글자는 --fg 그대로 읽힌다) */
   --live-wash: rgba(212, 42, 31, 0.1);
@@ -103,6 +105,7 @@
     --field: #0d1117;
 
     --row-hover: rgba(255, 255, 255, 0.06);
+    --mark-bg: rgba(255, 214, 0, 0.30);
     --row-flat: rgba(255, 255, 255, 0.05);
     --live-wash: rgba(255, 92, 92, 0.16);
     --live-ink: #ff8b80;
@@ -130,6 +133,7 @@
   --field: #0d1117;
 
   --row-hover: rgba(255, 255, 255, 0.06);
+  --mark-bg: rgba(255, 214, 0, 0.30);
   --row-flat: rgba(255, 255, 255, 0.05);
   --live-wash: rgba(255, 92, 92, 0.16);
   --live-ink: #ff8b80;
@@ -2423,3 +2427,69 @@ button.link-inline {
 
 .translation-problems { margin: 8px 0 0; padding-left: 18px; }
 .translation-problems li { margin: 2px 0; }
+
+/* ── 성경 낱말 찾기 ──────────────────────────────────────────
+ *
+ * 목록이 길어질 수 있다 ('여호와' 는 5,912절). 카드가 화면을 밀어내면 아래의
+ * '슬라이드' 가 보이지 않으므로 이 안에서만 스크롤한다.
+ */
+
+.search-toggle {
+  margin-top: 10px;
+  align-items: center;
+}
+.search-toggle .hintline { margin: 0; }
+
+.bible-search {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.bible-search .hintline { margin: 6px 0 0; }
+
+.search-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/*
+ * 한 절 = 한 줄. 참조를 고정 폭으로 왼쪽에 세워 두면 눈이 세로로 훑는다 —
+ * 목록에서 찾는 것은 대개 '어느 책 어느 장' 이다.
+ */
+.search-hit {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.search-hit:hover { background: var(--row-hover); }
+.search-hit.picked { background: var(--row-hover); outline: 1px solid var(--accent); }
+
+.search-hit .ref {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.search-hit .text { color: var(--fg); }
+
+/* 걸린 자리. 배경만 칠하고 글자색은 그대로 둔다 — 두 가지가 함께 바뀌면 목록이 어지럽다 */
+.search-hit mark {
+  background: var(--mark-bg);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}

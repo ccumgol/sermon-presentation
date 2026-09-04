@@ -2,7 +2,8 @@
 
 import type {
   ApiResponse, BookMeta, Deck, LangCode, Passage, ParseResult, PlanKind, ReviewQueue,
-  ServicePlan, Song, Songbook, SongEntry, SongSearchHit, SongSearchResult, Template, Translation,
+  SearchResult, ServicePlan, Song, Songbook, SongEntry, SongSearchHit, SongSearchResult,
+  Template, Testament, Translation,
 } from '../../shared/types.ts';
 
 /** 태블릿 연결 — QR 과 상태 (`/api/tablet-access`) */
@@ -111,6 +112,16 @@ export const api = {
   translations: () => get<Translation[]>('/api/translations'),
   books: () => get<BookMeta[]>('/api/books'),
   parse: (q: string) => get<ParseResult>(`/api/bible/parse?q=${encodeURIComponent(q)}`),
+  /**
+   * 낱말로 절을 찾는다. 한 역본 안에서만 찾는다 — 서버가 역본마다 다른 방식을 쓴다
+   * (한국어는 부분일치, 그 밖은 어절 검색). 여러 역본을 한 번에 섞으면 어느 방식으로
+   * 걸린 것인지 알 수 없어 강조도 안내도 어긋난다.
+   */
+  searchBible: (q: string, translationId: string, testament?: Testament, limit = 50) =>
+    get<SearchResult>(
+      `/api/bible/search?q=${encodeURIComponent(q)}&t=${encodeURIComponent(translationId)}&limit=${limit}` +
+        (testament ? `&testament=${testament}` : ''),
+    ),
   passage: (ref: string, translationIds: string[], paging: string) =>
     get<PassageResponse>(
       `/api/bible/passage?ref=${encodeURIComponent(ref)}&t=${encodeURIComponent(translationIds.join(','))}&paging=${paging}`,

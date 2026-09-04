@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { BibleSearch } from '../components/BibleSearch.tsx';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
 import type { ClientMsg, Deck, ParseResult, Template, Translation } from '../../../shared/types.ts';
@@ -71,6 +72,13 @@ export function BiblePanel({
   const [loading, setLoading] = useState(false);
   /** 이 탭에서 띄울 때 쓸 프리셋·폰트 — 고르지 않으면 지금 템플릿 그대로 */
   const [outputStyle, setOutputStyle] = useState<OutputStyle>({});
+  /**
+   * 낱말 찾기를 펼쳤는가.
+   *
+   * 기본은 접힘 — 예배 진행 중에는 참조를 바로 치는 것이 거의 전부다. 대신 버튼을
+   * **늘 보이게** 둔다. 이 기능이 없던 것이 아니라 들어갈 문이 없었다 (§4.6 U-1).
+   */
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const measurer = useMeasure();
@@ -255,6 +263,33 @@ export function BiblePanel({
               </button>
             ))}
           </div>
+        )}
+
+        {/*
+          참조를 모를 때 들어가는 문. 같은 카드 안에 두는 이유는 둘 다 '본문을 찾는
+          일' 이고, 찾은 절이 **바로 위 참조 칸**으로 들어가기 때문이다 — 결과와
+          목적지가 떨어져 있으면 무엇이 일어났는지 눈으로 잇지 못한다.
+        */}
+        <div className="row search-toggle">
+          <button
+            type="button"
+            className={searchOpen ? 'primary' : undefined}
+            onClick={() => setSearchOpen((prev) => !prev)}
+            title="참조를 모를 때 — 낱말이 들어간 절을 찾습니다"
+          >
+            🔍 낱말로 찾기
+          </button>
+          {!searchOpen && <span className="hintline muted">참조를 모를 때 — 예: 사랑 · 은혜 · love</span>}
+        </div>
+
+        {searchOpen && (
+          <BibleSearch
+            translation={translations.find((t) => t.id === primary)}
+            onPick={(reference) => {
+              setInput(reference);
+              inputRef.current?.focus();
+            }}
+          />
         )}
       </div>
 

@@ -135,7 +135,7 @@ npm start               # http://localhost:7777
 
 | ID | 기능 | 어디까지 되어 있나 | 상태 |
 |---|---|---|---|
-| U-1 | **성경 전문 검색** `GET /api/bible/search` | 한국어 LIKE · 영어 FTS · 신/구약 필터 · 잘림 표시. 통합 테스트 2개. 실측 '사랑' 557절 | 🔴 UI 없음 (`api.ts` 래퍼조차 없다) |
+| U-1 | **성경 전문 검색** `GET /api/bible/search` | 한국어 LIKE · 영어 FTS · 신/구약 필터 · 잘림 표시. 통합 테스트 2개. 실측 '사랑' 557절 | 🟢 **완료** Agent C (2026-09-03) — 성경 탭 '🔍 낱말로 찾기' |
 | U-2 | **최근 부른 곡** `GET /api/songs/recent` | `api.recentSongs()` 래퍼까지 있다. 사용 기록은 실제로 쌓이는 중 | 🔴 부르는 곳 없음 |
 | U-3 | **대응곡 연결·해제** `POST/DELETE /api/songs/:id/link` | 화면은 대응곡을 **보여 주기만** 한다 | 🔴 UI 없음 · 통합 테스트도 0개 |
 | U-4 | **곡 수록 정보(곡집·번호) 편집** `PUT /api/songs/:id/entries` | `api.setSongEntries()` 래퍼까지 있다 | 🔴 부르는 곳 없음 |
@@ -381,6 +381,12 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 ### 현재 진행 중
 ```
 (없음 — 사용자 결정을 기다리는 중)
+
+직전 작업 3: U-1 성경 낱말 찾기 (2026-09-03 완료, Agent C).
+  성경 탭 참조 칸 아래 '🔍 낱말로 찾기'. src/control/components/BibleSearch.tsx ·
+  lib/search-highlight.ts(테스트 17) · api.searchBible.
+  누르면 참조 칸에 넣기만 한다 — 예배 중에 잘못 눌러도 화면이 안 바뀐다.
+  검증: tsc · vitest 1,133 · vite build · 격리 서버(7812) 브라우저. 자세히는 CHANGELOG.
 
 직전 작업 2: 만들어져 있는데 화면에 길이 없는 기능 전수 조사 (2026-09-03, Agent C).
   방법: 서버 라우트 67개 · api.* 45개 · WS 메시지 · TextStyle 14필드 · CueItem 8종을
