@@ -34,6 +34,7 @@ import { registerPlanRoutes } from './routes/plans.ts';
 import { registerReadingRoutes } from './routes/readings.ts';
 import { registerSongbookRoutes } from './routes/songbooks.ts';
 import { registerSongRoutes } from './routes/songs.ts';
+import { bibleMissingMessage, isPackagedApp } from '../lib/bible-missing.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTemplateRoutes } from './routes/templates.ts';
 import { getState, initState } from './state.ts';
@@ -251,6 +252,10 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
       dataDir: paths.dataDir,
       bibleSourceDir: paths.bibleSourceDir,
       bibleReady,
+      /** 성경 DB 를 찾은 자리 — 없을 때 '어디에 넣으라' 고 말하려면 필요하다 */
+      bibleDb: paths.bibleDb,
+      /** 설치한 앱인가 — 화면이 안내 문구를 가려 쓴다 (터미널·저장소가 없다) */
+      packaged: isPackagedApp(),
       translationCount: bibleReady ? listTranslations().length : 0,
       songCount: countSongs(),
       planCount: countPlans(),
@@ -288,7 +293,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
       reply.code(503).send({
         success: false,
         data: null,
-        error: `성경 DB 가 없습니다 (${paths.bibleDb}). 'npm run bible:build' 를 실행하세요.`,
+        error: bibleMissingMessage(paths.bibleDb),
       }),
     );
   }

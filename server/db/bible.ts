@@ -9,6 +9,7 @@
 import { existsSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
+import { bibleMissingMessage } from '../../lib/bible-missing.ts';
 import { formatRanges } from '../../lib/reference-parser.ts';
 import type {
   BookMeta,
@@ -34,7 +35,7 @@ let db: DatabaseSync | null = null;
 export class BibleDbMissingError extends Error {
   constructor(dbPath: string) {
     super(
-      `성경 DB 를 찾을 수 없습니다: ${dbPath}\n먼저 'npm run bible:build' 를 실행하세요.`,
+      bibleMissingMessage(dbPath),
     );
     this.name = 'BibleDbMissingError';
   }

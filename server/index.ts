@@ -11,6 +11,7 @@ import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
 import { closeSongsDb } from './db/songs.ts';
 import { onSameDevice } from './db/snapshot.ts';
+import { bibleMissingLine } from '../lib/bible-missing.ts';
 import { listenWithFallback } from './listen.ts';
 import { paths } from './paths.ts';
 import { createWsHub, type WsHub } from './ws.ts';
@@ -126,7 +127,7 @@ if (onSameDevice(paths.songsDb, paths.backupsDir)) {
 
 if (!bibleReady) {
   app.log.warn(
-    `성경 DB 가 없어 조회 기능이 비활성입니다 (${paths.bibleDb}) — 'npm run bible:build' 실행 후 재시작하세요`,
+    bibleMissingLine(paths.bibleDb),
   );
 }
 

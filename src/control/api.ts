@@ -52,6 +52,10 @@ export interface ServerInfo {
   dataDir: string;
   bibleSourceDir: string;
   bibleReady: boolean;
+  /** 성경 DB 를 찾은 자리 */
+  bibleDb: string;
+  /** 설치한 앱인가 — 안내 문구가 갈린다 */
+  packaged: boolean;
   translationCount: number;
   songCount: number;
   planCount: number;

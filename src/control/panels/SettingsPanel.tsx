@@ -309,10 +309,31 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
           <dd>{info.bibleSourceDir}</dd>
           <BibleBuildRows ready={info.bibleReady} />
         </dl>
-        {info.bibleReady && (
+        {/*
+          안내를 갈라 쓴다. 설치한 앱에는 터미널도 원본 자료도 없다 —
+          `npm run` 을 시키는 것은 할 수 없는 일을 시키는 것이다.
+        */}
+        {info.bibleReady && !info.packaged && (
           <p className="hintline muted">
             원본 자료를 고쳤다면 <code>npm run bible:build</code> 로 다시 만들고 서버를 재시작하세요 —
             그때까지는 위 시각의 본문이 나갑니다.
+          </p>
+        )}
+        {!info.bibleReady && (
+          <p className="hintline warn">
+            <b>성경 DB 가 없습니다.</b>{' '}
+            {info.packaged ? (
+              <>
+                위의 <b>데이터 폴더 열기</b> 로 폴더를 연 뒤 그 안에 <code>bible.sqlite</code> 를
+                넣고 앱을 다시 시작하세요.
+              </>
+            ) : (
+              <>
+                터미널에서 <code>npm run bible:build</code> 를 실행한 뒤 서버를 재시작하세요.
+              </>
+            )}
+            <br />
+            <small>찾은 자리: <code>{info.bibleDb}</code></small>
           </p>
         )}
       </div>

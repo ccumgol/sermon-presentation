@@ -408,6 +408,31 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
+- [완료 2026-09-05 / Agent C] 포장한 앱이 성경 DB 를 엉뚱한 곳에서 찾는다 (사용자 보고)
+  증상: 사용자가 data/ 를 앱 데이터 폴더에 그대로 복사했는데도
+        '성경 DB 가 없습니다. 터미널에서 npm run bible:build ...' 가 뜬다.
+  실측: 앱 데이터 폴더에 bible.sqlite 107MB 가 **분명히 있다.**
+  원인: 내가 electron/main.cjs 에 넣은 한 줄.
+        SERMON_BIBLE_DB = APP_ROOT/data/bible.sqlite → **앱 번들 안**을 가리킨다.
+        거기엔 data/ 가 없다(저작권 자료라 일부러 안 넣는다).
+        paths.ts 의 기본값(DATA_DIR/bible.sqlite)이 이미 맞았는데 덮어썼다.
+  함께 고칠 것: 안내 문구가 'npm run bible:build' 를 시킨다 — 포장한 앱을 쓰는
+        사람에게는 터미널도 저장소도 없다. 무엇을 어디에 넣으라고 말해야 한다.
+  계획: ① main.cjs 의 덮어쓰기를 지운다 (기본값이 맞다)
+        ② 포장 여부를 서버에 알려(SERMON_PACKAGED) 안내 문구를 갈라 쓴다
+        ③ 격리 서버로 두 경우를 다 확인하고, 앱을 다시 빌드해 실제로 성경이 뜨는지 본다
+  조치: ① main.cjs 의 SERMON_BIBLE_DB 덮어쓰기를 지웠다 (paths.ts 기본값이 맞다)
+        ② main.cjs 가 SERMON_PACKAGED=1 을 남기고, lib/bible-missing.ts 가
+           그것을 보고 안내를 갈라 쓴다. 문구가 서버 로그·조작 화면·설정 탭
+           **세 군데**에 흩어져 있어 한 곳으로 모았다 — 한 곳만 고치면 나머지가
+           옛말을 한다. /api/info 에 bibleDb·packaged 를 실어 화면도 쓸 수 있게 했다.
+        ③ 찾은 자리를 함께 보여 준다 — 어디를 봤는지 모르면 엉뚱한 곳에 넣고 헤맨다.
+  검증: tsc · vitest 1,316개(신규 7) · vite build.
+        **앱을 다시 빌드해 사용자 데이터 폴더 그대로 띄웠다** —
+        성경 준비 True · 자리 …/Application Support/sermon-presentation/data/bible.sqlite ·
+        역본 12개 · 요 3:16 조회됨 · 곡 4,531 · 순서표 7.
+        아이콘도 이 빌드에 들어 있다(해시 일치) — 사용자가 설치한 것은 아이콘 넣기
+        전 빌드라 기본 아이콘이 보였을 것이다.
 - [완료 2026-09-05 / Agent C] 앱 아이콘 (사용자 요청)
   지금은 Electron 기본 아이콘이라 독·작업표시줄에서 다른 Electron 앱과 구별되지 않는다.
   근거로 삼을 것: 프로젝터 PWA 아이콘(public/projector/icon-512.png)이 이미 있다 —

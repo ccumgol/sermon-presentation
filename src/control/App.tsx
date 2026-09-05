@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { Translation } from '../../shared/types.ts';
+import { bibleMissingMessage } from '../../lib/bible-missing.ts';
 import { api, type ServerInfo } from './api.ts';
 import { ColumnResizer } from './components/ColumnResizer.tsx';
 import { ControlBar } from './components/ControlBar.tsx';
@@ -65,9 +66,8 @@ export function App(): React.JSX.Element {
         if (serverInfo.bibleReady) {
           setTranslations(await api.translations());
         } else {
-          setBootError(
-            `성경 DB 가 없습니다. 터미널에서 'npm run bible:build' 를 실행한 뒤 서버를 재시작하세요.`,
-          );
+          // 설치한 앱에는 터미널도 저장소도 없다 — 할 수 있는 일을 말해 준다
+          setBootError(bibleMissingMessage(serverInfo.bibleDb, serverInfo.packaged));
           setTab('settings');
         }
       } catch (err) {

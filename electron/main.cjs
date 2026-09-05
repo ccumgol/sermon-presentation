@@ -43,8 +43,22 @@ process.env.SERMON_APP_ROOT = APP_ROOT;
  * 이미 정해 둔 것이 있으면 존중한다 (검증·이전용).
  */
 if (!process.env.SERMON_DATA_DIR) process.env.SERMON_DATA_DIR = path.join(app.getPath('userData'), 'data');
-// 성경 DB 는 앱과 함께 배포된다 (있을 때만)
-if (!process.env.SERMON_BIBLE_DB) process.env.SERMON_BIBLE_DB = path.join(APP_ROOT, 'data', 'bible.sqlite');
+/*
+ * 성경 DB 는 **건드리지 않는다.**
+ *
+ * `server/paths.ts` 의 기본값이 이미 `<데이터 폴더>/bible.sqlite` 로 맞다.
+ *
+ * 처음에는 여기서 `APP_ROOT/data/bible.sqlite` 로 덮어썼는데, 그 자리는 **앱
+ * 번들 안**이고 거기엔 `data/` 가 없다 — 저작권 자료라 일부러 넣지 않기 때문이다.
+ * 그래서 사용자가 성경 DB 를 데이터 폴더에 제대로 넣어도 '성경 DB 가 없습니다'
+ * 가 떴다 (2026-09-05 사용자 보고).
+ *
+ * 다른 자리를 쓰고 싶으면 `SERMON_BIBLE_DB` 로 지정한다 — 여러 계정이 한 파일을
+ * 나눠 쓰는 경우다.
+ */
+
+/** 서버가 안내 문구를 가려 쓰도록 알려 준다 — 포장한 앱에는 터미널도 저장소도 없다 */
+process.env.SERMON_PACKAGED = '1';
 
 /** 두 번 켜지 않는다 — 두 번째 창은 첫 번째를 앞으로 불러오고 끝낸다 */
 if (!app.requestSingleInstanceLock()) {
