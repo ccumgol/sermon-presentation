@@ -30,7 +30,9 @@ copyright: Copyright © 2026 지우선교회
 
 directories:
   output: release
-  buildResources: build
+  # `build/` 가 아니라 `build-resources/` 인 이유: `.gitignore` 가 `build/` 를
+  # 산출물로 보고 무시한다. 아이콘은 **저장소에 있어야** CI(윈도우 빌드)가 쓴다.
+  buildResources: build-resources
 
 # asar 을 쓰지 않으므로 남아 있는 무결성 항목을 빌드 뒤에 지운다 —
 # 그것이 없는 파일을 가리켜 앱이 뜨자마자 죽는다 (electron/after-pack.cjs 머리말).
@@ -53,6 +55,9 @@ files:
 
 mac:
   category: public.app-category.productivity
+  # build/ 가 buildResources 라 이름만 맞으면 자동으로 집어 가지만, 어느 파일이
+  # 아이콘인지 여기 적어 두는 편이 찾기 쉽다. 만드는 법은 `npm run icons`
+  icon: build-resources/icon.icns
   # Finder·독에 보이는 이름. **`CFBundleName` 은 건드리지 않는다** —
   # Electron 이 그 이름으로 Helper 앱을 찾는다. 덮어쓰면
   # 'Unable to find helper app' 으로 앱이 뜨지 않는다 (실제로 겪었다).
@@ -66,6 +71,7 @@ mac:
   identity: null
 
 win:
+  icon: build-resources/icon.ico
   target:
     - target: nsis
       arch: [x64]

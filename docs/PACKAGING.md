@@ -96,6 +96,32 @@ electron-builder 가 `default_app.asar` 을 지우면서도 `Info.plist` 의
 
 ---
 
+## 아이콘 고치기
+
+원본은 SVG 두 개입니다.
+
+| 파일 | 쓰이는 곳 |
+|---|---|
+| `build-resources/icon.svg` | 32px 이상 — 줄 세 개 |
+| `build-resources/icon-small.svg` | 16px — 줄 두 개 |
+
+고친 뒤:
+
+```bash
+npm run icons
+```
+
+`icon.icns`(맥) · `icon.ico`(윈도우) · 프로젝터 PWA 아이콘 두 개가 함께 만들어집니다.
+`librsvg` 와 `imagemagick` 이 필요합니다 (`brew install librsvg imagemagick`).
+
+- **큰 그림을 고치면 작은 변형도 함께 고치세요** — 어긋나면 크기에 따라 다른 앱처럼 보입니다.
+- **16px 에서 읽히는지 꼭 확인하세요.** 1픽셀이 64단위입니다 — 선 사이 틈이 128단위는
+  되어야 두 줄로 보입니다. 처음에 40단위로 두었다가 통째로 뭉쳤습니다.
+- `.icns` 는 맥에서만 만들어집니다(`iconutil` 이 맥 전용). 그래서 저장소에 커밋해
+  두고 윈도우 CI 는 그것을 그대로 씁니다.
+
+---
+
 ## 왜 서버를 JS 로 뽑는가
 
 개발 중에는 Node 가 `server/*.ts` 를 그대로 실행합니다(타입 스트리핑). 하지만

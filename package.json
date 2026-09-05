@@ -40,7 +40,8 @@
     "electron": "npm run app:build && npm run build:server && electron .",
     "dist": "npm run app:build && npm run build:server && electron-builder",
     "dist:mac": "npm run app:build && npm run build:server && electron-builder --mac",
-    "dist:win": "npm run app:build && npm run build:server && electron-builder --win"
+    "dist:win": "npm run app:build && npm run build:server && electron-builder --win",
+    "icons": "node scripts/build-icons.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",
