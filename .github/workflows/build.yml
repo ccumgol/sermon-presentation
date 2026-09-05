@@ -1,0 +1,65 @@
+# 맥·윈도우 설치 파일을 함께 만든다.
+#
+# ## 왜 CI 인가
+#
+# 윈도우 설치 파일(NSIS)은 윈도우나 Wine 이 있어야 만들 수 있다. 개발용 맥에는
+# Wine 이 없어 여기서는 못 만든다 — GitHub 의 윈도우 러너가 대신 만든다.
+#
+# ## 자료는 들어가지 않는다
+#
+# 가사·성경·악보는 저작권 자료라 git 에 없다(`data/` 는 gitignore). 그래서 이
+# 빌드에도 들어가지 않는다 — **프로그램만** 만들어진다. 자료는 설정 탭의
+# '자료 가져오기' 로 각 PC 에 넣는다.
+#
+# ## 언제 도는가
+#
+# 손으로 돌리거나(`workflow_dispatch`), `v*` 태그를 밀면 돈다. 매 커밋마다 돌리면
+# 20분씩 걸리고 얻는 것이 없다.
+name: 설치 파일 빌드
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      # 한쪽이 실패해도 다른 쪽은 끝까지 만든다 — 둘 다 잃지 않게
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: dist:mac
+            artifact: mac
+          - os: windows-latest
+            target: dist:win
+            artifact: windows
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # electron 의 설치 스크립트(바이너리 내려받기)가 필요하다
+      - run: npm ci
+
+      # 셋 다 통과해야 포장한다 — 깨진 것을 배포하지 않는다
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npm run ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sermon-presentation-${{ matrix.artifact }}
+          # 설치 파일만 올린다. release/ 안의 풀린 앱 폴더까지 올리면 몇 GB 가 된다
+          path: |
+            release/*.dmg
+            release/*.exe
+          if-no-files-found: error
+          retention-days: 30

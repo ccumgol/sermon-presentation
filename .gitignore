@@ -28,3 +28,7 @@ coverage/
 
 # Claude Code 개인 설정 (launch.json 은 프로젝트 공용이라 커밋한다)
 .claude/settings.local.json
+
+# 포장 산출물 (Phase 6)
+dist-server/
+release/

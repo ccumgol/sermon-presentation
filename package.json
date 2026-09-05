@@ -35,7 +35,12 @@
     "misc:import": "node scripts/import-misc-lyrics.ts",
     "song:retitle": "node scripts/retitle-with-alt.ts",
     "sheets:convert": "node scripts/convert-sheets.ts",
-    "sheets:detect": "node scripts/detect-staff.ts"
+    "sheets:detect": "node scripts/detect-staff.ts",
+    "build:server": "tsc -p tsconfig.build.json",
+    "electron": "npm run app:build && npm run build:server && electron .",
+    "dist": "npm run app:build && npm run build:server && electron-builder",
+    "dist:mac": "npm run app:build && npm run build:server && electron-builder --mac",
+    "dist:win": "npm run app:build && npm run build:server && electron-builder --win"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",
@@ -54,9 +59,12 @@
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.10",
     "concurrently": "^10.0.4",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
     "jsqr": "^1.4.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
-  }
+  },
+  "main": "electron/main.cjs"
 }

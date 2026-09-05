@@ -1,0 +1,79 @@
+# 맥·윈도우 배포 포장 (Phase 6).
+#
+# ## 무엇이 앱 안에 들어가는가
+#
+# 코드와 화면만 들어간다. **가사·성경·악보는 들어가지 않는다** — 저작권 자료라
+# git 에 없고(`data/` 는 gitignore), 앱에 넣으면 배포판이 그것을 나르게 된다.
+# 봉사자 PC 에는 설정 탭의 '자료 가져오기' 로 넘긴다.
+#
+# ## `asar: false` 인 이유
+#
+# 서버가 `public/` 의 파일을 정적으로 서빙한다. asar 로 묶으면 그 경로가 가상
+# 파일시스템이 되어 `@fastify/static` 이 읽지 못한다. 압축을 포기하는 대신
+# 구조가 단순해지고, 문제가 생겼을 때 앱 안을 직접 열어 볼 수 있다.
+appId: org.jiwumission.sermon-presentation
+
+# ## 왜 이름이 영문인가 — 겪은 것 (2026-09-05)
+#
+# `productName` 은 **파일·번들 이름**이 된다 — `.app`, 실행 파일, 그리고
+# **Helper 앱들**(`<이름> Helper.app`). Electron 은 뜰 때 그 이름으로 Helper 를
+# 찾는데, 한글·공백이 든 이름(`예배 프레젠테이션`)이면 찾지 못하고
+# `FATAL ... Unable to find helper app` 으로 죽는다.
+#
+# 겉으로는 **창도 로그도 없이 종료 코드 133(SIGTRAP)** 만 남아 원인을 찾기 어려웠다.
+# 최소 코드로도 죽는 것을 보고 번들 문제로 좁혔고, 이름을 영문으로 바꿔 확인했다.
+#
+# 사람이 보는 이름은 아래 `CFBundleDisplayName` 이 정한다 — Finder·독에는 한글로
+# 보이고, 파일 이름만 영문이다.
+productName: SermonPresentation
+copyright: Copyright © 2026 지우선교회
+
+directories:
+  output: release
+  buildResources: build
+
+# asar 을 쓰지 않으므로 남아 있는 무결성 항목을 빌드 뒤에 지운다 —
+# 그것이 없는 파일을 가리켜 앱이 뜨자마자 죽는다 (electron/after-pack.cjs 머리말).
+asar: false
+afterPack: electron/after-pack.cjs
+
+# `resources/app/` 아래로 그대로 복사된다. electron/main.js 의 APP_ROOT 와 짝이다 —
+# 한쪽만 바꾸면 앱이 자기 파일을 찾지 못한다.
+extraResources:
+  - from: dist-server
+    to: app/dist-server
+  - from: public
+    to: app/public
+  - from: package.json
+    to: app/package.json
+
+files:
+  - electron/**/*
+  - package.json
+
+mac:
+  category: public.app-category.productivity
+  # Finder·독에 보이는 이름. **`CFBundleName` 은 건드리지 않는다** —
+  # Electron 이 그 이름으로 Helper 앱을 찾는다. 덮어쓰면
+  # 'Unable to find helper app' 으로 앱이 뜨지 않는다 (실제로 겪었다).
+  extendInfo:
+    CFBundleDisplayName: 예배 프레젠테이션
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # 서명하지 않는다 — Apple 개발자 계정이 있어야 한다. 받는 사람은 처음 한 번
+  # '마우스 오른쪽 → 열기' 로 열어야 한다 (README 에 적었다).
+  identity: null
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  # 관리자 권한 없이 설치할 수 있게 한다. 교회 PC 는 관리자 계정이 아닐 때가 많다
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: 예배 프레젠테이션

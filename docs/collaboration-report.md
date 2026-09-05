@@ -226,7 +226,7 @@ README 에 **'자료 반입·정리 스크립트'** 표를 새로 만들어 전�
 | **최우선** | **S-11 배경 그림·반복 동영상** (템플릿별 · 폴더+업로드) | 🟢 완료 | Agent J (2026-08-15) |
 | 높음 | **S-12 예배 전 안내** (구분 단위 자동 진행 8초·순환) | 🟢 완료 | Agent J (2026-08-15) |
 | 높음 | **S-13 OBS 없이 쓰기** — 전체화면은 이미 가능(README). 전용 앱 창은 Phase 6 과 함께 | ⚪ 보류 | 사용자 결정 유보 (2026-08-15) |
-| 높음 | **Phase 6 — Electron 패키징·배포** | 🔴 미착수 | — |
+| 높음 | **Phase 6 — Electron 패키징·배포** | 🟢 **완료** | Agent C (2026-09-05) · 맥 .dmg 실측 · 윈도우는 CI · [PACKAGING](PACKAGING.md) |
 | 중간 | 언어별 실제 사용 폰트 경고 표시 | 🟢 완료 | Agent J (2026-08-15) · 3.12 |
 | 중간 | **열 너비를 마우스로 조절** | 🟢 완료 | Agent C (2026-09-04) · 사용자 요청 |
 | 낮음 | 예배 순서 프리셋 저장 | 🔴 미착수 | — |
@@ -408,7 +408,7 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
-- [시작 2026-09-05 / Agent C] Phase 6 — 맥·윈도우 배포 (사용자 요청)
+- [완료 2026-09-05 / Agent C] Phase 6 — 맥·윈도우 배포 (사용자 요청)
   사용자 결정 셋: ① 윈도우는 GitHub Actions 로 빌드 (이 맥에 Wine 이 없다)
                   ② 사전 설치는 '점검 + 명령 한 줄' (자동 설치 아님, 확인받고 실행)
                   ③ '데이터 폴더 바로가기' 는 설정 탭
@@ -425,7 +425,26 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
         EnvSetupCard.tsx. 설치 명령은 **흰 목록과 글자까지 같을 때만** 돈다 —
         이 앱은 LAN 에도 열리므로 화면이 보낸 문자열을 그대로 실행하면 구멍이 된다.
         막는 자리를 둘로 뒀다(LAN 암호 미들웨어 + 라우트 자신의 루프백 판정).
-  다음 단계: ③ tsconfig.build.json 과 electron/main 을 만든다
+  ③④ 완료: tsconfig.build.json · electron/main.cjs · electron/after-pack.cjs ·
+        electron-builder.yml · .github/workflows/build.yml · docs/PACKAGING.md
+  **맥 .dmg 두 개를 실제로 만들고 실행해 확인했다** (arm64 126MB · x64 130MB).
+        포장한 앱이 7778 에 서버를 띄우고 조작·출력·프로젝터·강사 화면이 모두 200.
+        데이터는 ~/Library/Application Support/sermon-presentation/data.
+  겪은 함정 셋 (전부 docs/PACKAGING.md 에 적었다):
+    · **한글 앱 이름** — productName 이 Helper 앱 이름이 되는데, Electron 이
+      한글 이름의 Helper 를 못 찾아 'Unable to find helper app' 으로 죽는다.
+      겉으로는 창도 로그도 없이 종료 코드 133(SIGTRAP) 만 남아 원인을 찾기
+      어려웠다. 최소 코드로도 죽는 것을 보고 번들 문제로 좁혔다.
+      → productName 은 영문, 보이는 이름은 CFBundleDisplayName.
+      **CFBundleName 은 덮어쓰면 안 된다** (그것도 Helper 를 찾는 데 쓰인다).
+    · asar:false 인데 Info.plist 에 없는 asar 의 무결성 항목이 남아 죽는다
+      → after-pack 에서 지운다. 안 지워지면 빌드를 실패시킨다.
+    · 포장하면 public/ 이 dist-server/ 옆에 없어 조작 화면이 404
+      → SERMON_APP_ROOT 로 알려 준다.
+  윈도우: GitHub Actions 로 만든다 (이 맥에 Wine 이 없다). Actions 탭에서
+        '설치 파일 빌드' 를 손으로 돌리거나 v* 태그를 밀면 맥·윈도우가 함께 나온다.
+  남은 것: 아이콘이 없다(Electron 기본). 맥 서명·공증도 안 했다(개발자 계정 필요) —
+        받는 사람은 처음 한 번 오른쪽 클릭 → 열기 해야 한다.
 - [완료 2026-09-05 / Agent C] 데이터 이전이 예배 순서의 곡 연결을 끊는다 (실측 재현)
   '집에서 준비하고 교회에서 실행하려면' 질문을 확인하다 나왔다.
   재현: 집 서버에 곡 3개 → 2번 삭제(id 에 구멍) → '셋째곡'(id 3) 을 담은 순서 작성

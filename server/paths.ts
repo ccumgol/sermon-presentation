@@ -11,8 +11,18 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** 소스 트리 루트 (server/ 의 부모) */
-export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/**
+ * 앱 루트 — `public/`(출력·프로젝터 페이지)과 `README` 가 있는 곳.
+ *
+ * 개발 중에는 `server/` 의 부모다. **포장하면 달라진다**: 서버는 `dist-server/`
+ * 아래의 JS 로 도는데 `public/` 은 거기 없다. 그래서 Electron 이
+ * `SERMON_APP_ROOT` 로 진짜 자리를 알려 준다.
+ *
+ * 이것이 없으면 포장한 앱에서 조작 화면이 404 가 된다 (실제로 겪었다).
+ */
+export const APP_ROOT = process.env.SERMON_APP_ROOT
+  ? path.resolve(process.env.SERMON_APP_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * 쓰기 가능한 사용자 데이터 디렉터리.

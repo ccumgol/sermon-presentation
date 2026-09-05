@@ -1,0 +1,20 @@
+{
+  // 포장(Electron)할 때만 쓴다.
+  //
+  // 개발 중에는 Node 가 server/*.ts 를 그대로 실행한다(타입 스트리핑). 하지만
+  // Electron 의 Node 가 그것을 해 준다는 보장이 없어, 포장할 때는 **평범한 JS 로
+  // 뽑아** 어느 Node 에서나 돌게 한다.
+  //
+  // `rewriteRelativeImportExtensions` 가 핵심이다 — `./app.ts` 를 `./app.js` 로
+  // 바꿔 준다. 이것이 없으면 뽑은 JS 가 없는 .ts 파일을 찾는다.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rewriteRelativeImportExtensions": true,
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "sourceMap": false,
+    "declaration": false
+  },
+  "include": ["server/**/*.ts", "lib/**/*.ts", "shared/**/*.ts"]
+}

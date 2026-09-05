@@ -11,6 +11,7 @@ import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
 import { closeSongsDb } from './db/songs.ts';
 import { onSameDevice } from './db/snapshot.ts';
+import { listenWithFallback } from './listen.ts';
 import { paths } from './paths.ts';
 import { createWsHub, type WsHub } from './ws.ts';
 
@@ -76,27 +77,12 @@ if (IS_LAN_OPEN && !hasPassword()) {
   process.exit(1);
 }
 
-/**
- * 포트를 순차 탐색해 바인딩한다.
- * 다른 PC 에서 7777 이 이미 쓰이고 있어도 앱이 죽지 않아야 한다 (계획서 D1 제약 2).
- */
-async function listenWithFallback(): Promise<number> {
-  let lastError: unknown;
-  for (let port = DEFAULT_PORT; port < DEFAULT_PORT + PORT_SCAN_RANGE; port++) {
-    try {
-      await app.listen({ port, host: HOST });
-      return port;
-    } catch (err) {
-      const code = (err as { code?: string }).code;
-      if (code !== 'EADDRINUSE') throw err;
-      lastError = err;
-      app.log.warn(`포트 ${port} 사용 중 — 다음 포트를 시도합니다`);
-    }
-  }
-  throw lastError ?? new Error('사용 가능한 포트를 찾지 못했습니다');
-}
-
-actualPort = await listenWithFallback();
+actualPort = await listenWithFallback(app, {
+  firstPort: DEFAULT_PORT,
+  range: PORT_SCAN_RANGE,
+  host: HOST,
+  onBusy: (port) => app.log.warn(`포트 ${port} 사용 중 — 다음 포트를 시도합니다`),
+});
 
 // WebSocket 허브는 HTTP 서버가 뜬 뒤에 붙인다
 hub = createWsHub(app.server, {
