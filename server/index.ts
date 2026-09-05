@@ -9,6 +9,7 @@ import { hasPassword } from './auth.ts';
 import { DEFAULT_PORT, HOST, IS_LAN_OPEN, PORT_SCAN_RANGE } from './config.ts';
 import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
+import { closeSongsDb } from './db/songs.ts';
 import { onSameDevice } from './db/snapshot.ts';
 import { paths } from './paths.ts';
 import { createWsHub, type WsHub } from './ws.ts';
@@ -153,6 +154,16 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     void app.close().then(() => {
       closeBibleDb();
       closeAppDb();
+      /*
+       * **곡 DB 도 닫는다.** 닫아야 SQLite 가 WAL 을 본체에 합치고 `-wal`·`-shm` 을
+       * 지운다.
+       *
+       * 빠뜨렸을 때 실측(2026-09-04): 정상 종료 뒤에도 `songs.sqlite` 4KB +
+       * `-wal` 234KB 가 남고, 그 한 파일만 복사해 열면 `no such table: songs` —
+       * **빈 DB** 였다. 평소에는 다음에 열 때 WAL 을 읽어 탈이 없지만,
+       * 파일을 복사하거나 클라우드로 동기화하면 그대로 빈 DB 가 따라간다.
+       */
+      closeSongsDb();
       process.exit(0);
     });
   });

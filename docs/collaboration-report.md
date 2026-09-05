@@ -408,6 +408,21 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
+- [완료 2026-09-04 / Agent C] 종료할 때 songs.sqlite 를 닫지 않는다 (실측으로 발견)
+  '데이터 폴더를 드랍박스에 두면 되지 않느냐' 는 질문을 확인하다 나왔다.
+  실측: 격리 서버에 곡 하나 만들고 SIGINT → app.sqlite 는 32KB 로 정리되는데
+        songs.sqlite 는 **4KB + WAL 234KB** 가 남는다. 그 파일만 복사해 열면
+        `no such table: songs` — **빈 DB** 다.
+  원인: server/index.ts 의 종료 처리가 closeBibleDb·closeAppDb 만 부른다.
+        closeSongsDb 는 만들어 두고 아무도 안 부른다.
+  왜 중요한가: 평소에는 탈이 없다(다음에 열 때 SQLite 가 WAL 을 읽는다). 하지만
+        · 파일을 복사·동기화하면 빈 DB 가 따라간다 (CLAUDE.md 가 경고하는 그 함정)
+        · 클라우드 동기화는 세 파일을 따로 올려 더 위험하다
+  조치: server/index.ts 종료 처리에 closeSongsDb() 를 넣었다.
+  고친 뒤 같은 시험: songs.sqlite **98KB · -wal/-shm 없음** · 한 파일만 복사해
+        열어도 곡 1개가 보인다.
+  검증: tsc · vitest 1,271개 · vite build.
+
 - [완료 2026-09-04 / Agent C] 악보를 조작 화면에서 켜고 끈다 (사용자 요청)
   사용자 보고 셋:
     ① 악보가 아직 불완전하다 → **기본을 가사로** 바꿔야 한다 (지금은 악보가 기본)
