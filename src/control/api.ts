@@ -1,5 +1,7 @@
 /** 컨트롤 패널의 REST 호출. 모든 오류를 명시적으로 다룬다. */
 
+import type { SheetSummary } from '../../lib/sheet-attach.ts';
+
 import type {
   ApiResponse, BookMeta, Deck, LangCode, Passage, ParseResult, PlanKind, ReviewQueue,
   SearchResult, ServicePlan, Song, Songbook, SongEntry, SongSearchHit, SongSearchResult,
@@ -162,7 +164,8 @@ export const api = {
     }>('POST', `/api/songbooks/${encodeURIComponent(id)}/import`, { text, mode }),
   setSongEntries: (songId: number, entries: Array<{ songbookId: string; number?: number | null }>) =>
     send<Song>('PUT', `/api/songs/${songId}/entries`, { entries }),
-  song: (id: number) => get<{ song: Song; availableLangs: LangCode[] }>(`/api/songs/${id}`),
+  song: (id: number) =>
+    get<{ song: Song; availableLangs: LangCode[]; sheet?: SheetSummary }>(`/api/songs/${id}`),
   songDeck: (
     id: number,
     langs: LangCode[],

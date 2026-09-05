@@ -9,7 +9,8 @@ import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { parseLyrics } from '../../lib/lyrics-parser.ts';
-import { attachSheets } from '../../lib/sheet-attach.ts';
+import { attachSheets, isUncertain, type SheetSummary } from '../../lib/sheet-attach.ts';
+import { guessLayout } from '../../lib/sheet-match.ts';
 import * as sheets from '../db/sheets.ts';
 import {
   availableLangs,
@@ -117,10 +118,41 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
+  /**
+   * 이 곡의 악보 상태 — 조작 화면이 **곡을 열자마자** 알아야 한다.
+   *
+   * 덱을 만들 때까지 기다리면 '악보가 왜 안 나오지?' 를 송출하고 나서야 알게 된다.
+   * 판정은 `attachSheets` 와 **같은 함수**를 쓴다 — 두 곳에 적으면 화면은 '괜찮다'
+   * 는데 실제로는 어긋나는 일이 생긴다.
+   *
+   * 여러 곡집에 실린 곡은 **악보가 있는 첫 수록**을 쓴다 (덱 라우트와 같은 규칙).
+   */
+  function sheetSummaryFor(song: Song): SheetSummary | undefined {
+    const sectionLines = [...song.sections]
+      .sort((a, b) => a.position - b.position)
+      .map((section) => new Set(section.lines.map((line) => line.lineIndex)).size);
+
+    for (const entry of song.entries) {
+      if (entry.number === undefined) continue;
+      const sheet = sheets.getSheet(store.conn(), entry.songbookId, entry.number);
+      if (!sheet || sheet.systems.length === 0) continue;
+      const layout = guessLayout(sectionLines, sheet.systems.length);
+      return {
+        songbookId: sheet.songbookId,
+        number: sheet.number,
+        systemCount: sheet.systems.length,
+        layout,
+        uncertain: isUncertain(sectionLines, sheet.systems.length, layout),
+        needsReview: sheet.needsReview,
+      };
+    }
+    return undefined;
+  }
+
   app.get<{ Params: { id: string } }>('/api/songs/:id', async (request, reply) => {
     const song = store.getSong(Number(request.params.id));
     if (!song) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
-    return ok({ song, availableLangs: availableLangs(song) });
+    return ok({ song, availableLangs: availableLangs(song), sheet: sheetSummaryFor(song) });
   });
 
   /**

@@ -2583,3 +2583,24 @@ button.link-inline {
 /* 고칠 수 없는 칩 (수록 목록) — 누를 것이 없으니 손 모양도 주지 않는다 */
 .link-chip.static { cursor: default; }
 .link-chip.static .link-inline { color: var(--fg); }
+
+/*
+ * 슬라이드 목록의 악보 단 표시 (`♪3`).
+ *
+ * 라벨 옆에 작게 붙는다 — 가사를 읽는 데 방해가 되면 안 되지만, 배분이 어긋난 것을
+ * 알아채려면 눈에 들어와야 한다. 흔들리는 곡은 물음표와 함께 경고색으로.
+ */
+.sheet-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--dim);
+  font: 11px/1.6 ui-monospace, monospace;
+  vertical-align: middle;
+}
+.sheet-tag.uncertain {
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn);
+}

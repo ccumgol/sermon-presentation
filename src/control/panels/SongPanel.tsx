@@ -13,6 +13,7 @@ import type {
 import { buildSongDeck, isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import { formatLyrics, parseLyrics } from '../../../lib/lyrics-parser.ts';
 import { shortEntryLabel } from '../../../lib/plan-item-view.ts';
+import type { SheetSummary } from '../../../lib/sheet-attach.ts';
 import { api, ApiError } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
@@ -64,6 +65,12 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    * 곡이 여기 있고, '최근' 은 목록이 매주 흔들린다.
    */
   const [quickMode, setQuickMode] = useState<QuickMode>('favorite');
+  /**
+   * 이 곡의 악보 상태 — 곡을 여는 순간 받는다.
+   *
+   * 덱을 만들 때까지 기다리면 '악보가 왜 안 나오지?' 를 **송출하고 나서야** 알게 된다.
+   */
+  const [sheet, setSheet] = useState<SheetSummary | undefined>(undefined);
   /**
    * 대응곡을 붙이는 중이면 검색어. `null` 이면 닫혀 있다.
    *
@@ -223,8 +230,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     setLinking(null);
     setEntryDraft(null);
     try {
-      const { song: loaded, availableLangs } = await api.song(id);
+      const { song: loaded, availableLangs, sheet: found } = await api.song(id);
       setSong(loaded);
+      setSheet(found);
       setLangs(availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
       setDraftLyrics(formatLyrics(loaded.sections));
     } catch (err) {
@@ -298,8 +306,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setError(null);
       setNotice(null);
       try {
-        const { song: loaded, availableLangs } = await api.song(id);
+        const { song: loaded, availableLangs, sheet: found } = await api.song(id);
         setSong(loaded);
+        setSheet(found);
         setDraftLyrics(formatLyrics(loaded.sections));
 
         // 이 곡이 가진 언어로 맞춘다 — 없는 언어를 켠 채 보내면 화면이 빈다
@@ -677,6 +686,48 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
             />
 
             {/*
+              **악보 상태.** 프로젝터에 악보가 나가는지, 배분이 흔들리는 곡인지
+              조작자가 알아야 한다 — 예배 중에 '악보가 왜 안 나오지?' 를 화면에서
+              알 수 없으면 곤란하다.
+            */}
+            <p className="hintline muted song-links">
+              <span>악보</span>
+              {sheet ? (
+                <>
+                  <span className="link-chip static">
+                    <span className="link-inline">
+                      {shortEntryLabel(song.entries.filter((e) => e.songbookId === sheet.songbookId)) ||
+                        `${sheet.songbookId} ${sheet.number}`}
+                      {' · '}
+                      {sheet.systemCount}단
+                    </span>
+                  </span>
+                  <span className="dim">
+                    {sheet.layout === 'shared' ? '절이 겹쳐 적힘' : '절이 이어 적힘'}
+                  </span>
+                  <span className="dim">프로젝터에 나갑니다 (그 창에서 S 로 끔)</span>
+                </>
+              ) : (
+                <span className="dim">없습니다 — 프로젝터에도 가사가 나갑니다</span>
+              )}
+            </p>
+
+            {sheet?.uncertain && (
+              <p className="hintline warn">
+                <b>악보 줄맞춤이 흔들릴 수 있습니다.</b> 가사 줄 수와 악보 단 수가 어긋나
+                ({song.sections.length}개 섹션 · 악보 {sheet.systemCount}단), 슬라이드에 딸린 단이
+                실제와 다를 수 있습니다. 아래 슬라이드 목록의 <b>단 번호</b>를 악보와 견줘 보세요.
+              </p>
+            )}
+
+            {sheet?.needsReview && (
+              <p className="hintline warn">
+                이 악보는 <b>단을 자동으로 찾다가 이상한 곳</b>이 있었습니다 (오선이 5줄이 아닌 단).
+                잘린 자리가 어긋났을 수 있습니다.
+              </p>
+            )}
+
+            {/*
               이 탭은 순서를 벗어나 급히 띄우는 자리다 — 예배 중 곡이 갑자기 바뀔 때 쓴다.
               그때 화면 모양을 정할 길이 없었다(지금 활성 템플릿이 무엇이든 그대로 나갔다).
             */}
@@ -828,6 +879,24 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 <span className="label">
                   {!preview && index === currentIndex ? '▶ ' : ''}
                   {labels[index] || index + 1}
+                  {/*
+                    이 줄이 악보의 몇 번째 단인지. **배분이 맞는지 눈으로 확인하는 유일한
+                    자리다** — 퍼센트만으로는 셀 수 없어 숫자로 적는다.
+                    편집 미리보기에는 붙지 않는다 (아직 서버가 만든 덱이 아니다).
+                  */}
+                  {slide.kind === 'song' && slide.sheet && (
+                    <span
+                      className={`sheet-tag${slide.sheet.uncertain ? ' uncertain' : ''}`}
+                      title={
+                        slide.sheet.uncertain
+                          ? `악보 ${slide.sheet.system}/${slide.sheet.systemCount}단 — 줄맞춤이 흔들릴 수 있습니다`
+                          : `악보 ${slide.sheet.system}/${slide.sheet.systemCount}단`
+                      }
+                    >
+                      ♪{slide.sheet.system}
+                      {slide.sheet.uncertain ? '?' : ''}
+                    </span>
+                  )}
                 </span>
                 <span className="text">
                   {slide.kind === 'song'

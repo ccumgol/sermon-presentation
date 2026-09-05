@@ -43,6 +43,38 @@ export function toPercentCrop(from: number, to: number, height: number): { top: 
   return bottom - top < 0.1 ? { top, bottom: Math.min(100, top + 0.1) } : { top, bottom };
 }
 
+/**
+ * 배분이 **흔들릴 수 있는가** — 짐작한 모양의 '한 번 지나가는 줄 수' 와 단 수를 견준다.
+ *
+ * 붙일 때와 조작 화면에 알릴 때가 **같은 것을 써야** 한다. 두 곳에 따로 적으면
+ * 화면은 '괜찮다' 는데 실제로는 어긋나는 일이 생긴다.
+ *
+ * 실측(2,061곡): 맞는 곡 1,525(74.0%) · 어긋나는 곡 536(26.0%).
+ */
+export function isUncertain(
+  sectionLines: readonly number[],
+  systemCount: number,
+  layout: SheetLayout,
+): boolean {
+  if (sectionLines.length === 0 || systemCount <= 0) return false;
+  const total = sectionLines.reduce((sum, lines) => sum + lines, 0);
+  const expected = layout === 'shared' ? Math.max(...sectionLines) : total;
+  if (expected <= 0) return false;
+  return Math.abs(systemCount - expected) > Math.max(1, expected * 0.25);
+}
+
+/** 조작 화면이 '이 곡에 악보가 어떤 상태인지' 를 보여 주는 데 쓰는 요약 */
+export interface SheetSummary {
+  songbookId: string;
+  number: number;
+  systemCount: number;
+  layout: SheetLayout;
+  /** 배분이 흔들릴 수 있다 — 화면이 알려야 한다 */
+  uncertain: boolean;
+  /** 단 줄 수가 5가 아닌 단이 있어 사람이 봐야 하는 장 */
+  needsReview: boolean;
+}
+
 export interface AttachOptions {
   /** 슬라이드마다 몇 번째 섹션의 것인지 */
   slideSections: readonly number[];
@@ -69,14 +101,8 @@ export function attachSheets(slides: readonly SlidePayload[], options: AttachOpt
   const layout = options.layout ?? guessLayout(sectionLines, systemCount);
   const matched = matchSlidesToSystems(slideSections, sectionLines, systemCount, layout);
 
-  /*
-   * 짐작이 믿을 만한가 — '한 번 지나가는 줄 수' 와 단 수를 견준다.
-   * 어긋나면 어느 단인지 틀릴 수 있다. 화면을 막지는 않고 표시만 한다.
-   */
-  const total = sectionLines.reduce((sum, lines) => sum + lines, 0);
-  const expected = layout === 'shared' ? Math.max(...sectionLines, 0) : total;
-  const uncertain = expected > 0 && Math.abs(systemCount - expected) > Math.max(1, expected * 0.25);
-
+  // 어긋나면 어느 단인지 틀릴 수 있다. 화면을 막지는 않고 표시만 한다
+  const uncertain = isUncertain(sectionLines, systemCount, layout);
   const src = sheetSrc(sheet.songbookId, sheet.number);
 
   return slides.map((slide, index) => {
@@ -87,6 +113,8 @@ export function attachSheets(slides: readonly SlidePayload[], options: AttachOpt
     const ref: SheetRef = {
       src,
       crop: toPercentCrop(system.from, system.to, sheet.height),
+      system: (matched[index] ?? 0) + 1,
+      systemCount,
       ...(uncertain ? { uncertain: true } : {}),
     };
     return { ...slide, sheet: ref };
