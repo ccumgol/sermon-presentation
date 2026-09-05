@@ -282,6 +282,19 @@ export const api = {
       `/api/backgrounds/slideshow?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(folder)}`,
     ),
 
+  /**
+   * 악보 모양을 사람이 정한다. `null` 이면 **자동 짐작으로 되돌린다.**
+   *
+   * 곡이 아니라 **악보**(곡집·번호)에 붙는다 — 같은 악보를 여러 곡이 가리킬 수 있고,
+   * 모양은 악보가 어떻게 인쇄됐는지의 성질이다.
+   */
+  setSheetLayout: (songbookId: string, number: number, layout: 'shared' | 'sequential' | null) =>
+    send<{ songbookId: string; number: number; layout: 'shared' | 'sequential' | null }>(
+      'PUT',
+      `/api/sheets/${encodeURIComponent(songbookId)}/${number}/layout`,
+      { layout },
+    ),
+
   templates: () => get<Template[]>('/api/templates'),
   createTemplate: (template: Partial<Template>) => send<Template>('POST', '/api/templates', template),
   currentTemplate: () => get<Template>('/api/template/current'),

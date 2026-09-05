@@ -2604,3 +2604,12 @@ button.link-inline {
   background: color-mix(in srgb, var(--warn) 18%, transparent);
   color: var(--warn);
 }
+
+/* 악보 모양 고르기 — 안내 줄(hintline) 안에 들어가므로 버튼을 한 치수 줄인다.
+   줄 높이가 튀면 그 아래 '절이 겹쳐 적힘' 설명과 눈높이가 어긋난다. */
+.sheet-layout { vertical-align: middle; }
+.sheet-layout .toggle {
+  min-height: 22px;
+  padding: 1px 8px;
+  font-size: 0.78rem;
+}

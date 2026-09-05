@@ -8,7 +8,16 @@
 import { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { countSheets, getSheet, listSheets, putSheet, SCHEMA, type SheetSystem } from '../../server/db/sheets.ts';
+import {
+  addLayoutColumn,
+  countSheets,
+  getSheet,
+  listSheets,
+  putSheet,
+  SCHEMA,
+  setSheetLayout,
+  type SheetSystem,
+} from '../../server/db/sheets.ts';
 
 let db: DatabaseSync;
 
@@ -145,5 +154,98 @@ describe('깨진 값', () => {
   it('빈 배열은 정상이다 — 단을 못 찾은 장도 기록으로 남긴다', () => {
     forceRaw('[]');
     expect(getSheet(db, 'chanmi2000', 1)!.systems).toEqual([]);
+  });
+});
+
+/**
+ * 악보 모양은 **사람이 정한 것만** 남는다.
+ *
+ * 검출이 짐작한 값을 적어 두면 사람이 고친 것과 구별할 수 없어져, 짐작 규칙을
+ * 고쳐도 옛 값이 그대로 남는다 (`lines_source` 에서 겪은 함정).
+ */
+describe('악보 모양 고르기', () => {
+  beforeEach(() => {
+    putSheet(db, { songbookId: 'chanmi2000', number: 7, width: 9, height: 9, systems, needsReview: false });
+  });
+
+  it('처음에는 비어 있다 — 자동 짐작을 쓴다는 뜻', () => {
+    expect(getSheet(db, 'chanmi2000', 7)!.layout).toBeUndefined();
+  });
+
+  it('정한 값이 남는다', () => {
+    expect(setSheetLayout(db, 'chanmi2000', 7, 'sequential')).toBe(true);
+    expect(getSheet(db, 'chanmi2000', 7)!.layout).toBe('sequential');
+  });
+
+  it('undefined 를 주면 자동으로 되돌아간다 — 잘못 고른 것을 물릴 수 있어야 한다', () => {
+    setSheetLayout(db, 'chanmi2000', 7, 'shared');
+    expect(setSheetLayout(db, 'chanmi2000', 7, undefined)).toBe(true);
+    expect(getSheet(db, 'chanmi2000', 7)!.layout).toBeUndefined();
+  });
+
+  /** 이것이 이 기능의 핵심이다 — 검출을 다시 돌려도 손본 것이 날아가지 않아야 한다 */
+  it('다시 검출해도 사람이 정한 모양은 남는다', () => {
+    setSheetLayout(db, 'chanmi2000', 7, 'sequential');
+    putSheet(db, {
+      songbookId: 'chanmi2000',
+      number: 7,
+      width: 100,
+      height: 200,
+      systems: [{ from: 1, to: 2, lineCount: 5 }],
+      needsReview: true,
+    });
+
+    const row = getSheet(db, 'chanmi2000', 7)!;
+    expect(row.width).toBe(100);          // 검출 결과는 갱신되고
+    expect(row.layout).toBe('sequential'); // 사람이 정한 것은 그대로다
+  });
+
+  it('없는 악보에는 아무 일도 하지 않는다', () => {
+    expect(setSheetLayout(db, 'chanmi2000', 999, 'shared')).toBe(false);
+  });
+
+  it('모르는 값이 들어 있으면 자동으로 떨어뜨린다 (옛 값·손댄 DB)', () => {
+    db.prepare("UPDATE song_sheets SET layout = 'wobbly' WHERE number = 7").run();
+    expect(getSheet(db, 'chanmi2000', 7)!.layout).toBeUndefined();
+  });
+});
+
+/**
+ * 검출을 2,061장 넣어 둔 뒤에 `layout` 칸이 생겼다. 지우고 다시 만들면 검출을
+ * 처음부터 돌려야 하므로 컬럼만 더한다.
+ */
+describe('옛 표에 칸 더하기', () => {
+  function oldTable(): DatabaseSync {
+    const old = new DatabaseSync(':memory:');
+    old.exec(`CREATE TABLE song_sheets (
+      songbook_id TEXT NOT NULL, number INTEGER NOT NULL, width INTEGER NOT NULL,
+      height INTEGER NOT NULL, systems TEXT NOT NULL, needs_review INTEGER NOT NULL DEFAULT 0,
+      detected_at TEXT NOT NULL, PRIMARY KEY (songbook_id, number))`);
+    return old;
+  }
+
+  it('칸이 없으면 더한다 — 있던 줄은 그대로 있다', () => {
+    const old = oldTable();
+    putSheet(old, { songbookId: 'chanmi2000', number: 1, width: 9, height: 9, systems, needsReview: false });
+
+    addLayoutColumn(old);
+
+    expect(getSheet(old, 'chanmi2000', 1)!.layout).toBeUndefined();
+    expect(setSheetLayout(old, 'chanmi2000', 1, 'shared')).toBe(true);
+    expect(getSheet(old, 'chanmi2000', 1)!.layout).toBe('shared');
+  });
+
+  it('두 번 불러도 탈이 없다 — 서버는 뜰 때마다 부른다', () => {
+    const old = oldTable();
+    addLayoutColumn(old);
+    setSheetLayout(old, 'chanmi2000', 1, 'shared');
+    expect(() => addLayoutColumn(old)).not.toThrow();
+  });
+
+  it('이미 칸이 있으면 건드리지 않는다 (정한 값이 지워지면 안 된다)', () => {
+    putSheet(db, { songbookId: 'chanmi2000', number: 1, width: 9, height: 9, systems, needsReview: false });
+    setSheetLayout(db, 'chanmi2000', 1, 'sequential');
+    addLayoutColumn(db);
+    expect(getSheet(db, 'chanmi2000', 1)!.layout).toBe('sequential');
   });
 });

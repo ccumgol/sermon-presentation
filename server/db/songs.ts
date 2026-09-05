@@ -101,6 +101,7 @@ export function initSongsDb(): void {
   db.exec(SONG_SCHEMA);
   db.exec(songbooks.SCHEMA);
   db.exec(sheets.SCHEMA);
+  sheets.addLayoutColumn(db);
   addUsageColumns(db);
   addLinesSourceColumn(db);
   // 기존 hymnal/hymn_number 컬럼이 있으면 곡집 구조로 옮긴다 (한 번만 동작)

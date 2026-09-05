@@ -69,6 +69,13 @@ export interface SheetSummary {
   number: number;
   systemCount: number;
   layout: SheetLayout;
+  /**
+   * 위 `layout` 이 **사람이 정한 것**인가 (아니면 짐작).
+   *
+   * 화면이 '자동' 과 '내가 골랐다' 를 구별해 보여 줘야 한다 — 구별이 없으면 고쳐 둔
+   * 곡을 다시 만지게 되고, 되돌릴 수 있다는 것도 모른다.
+   */
+  chosen: boolean;
   /** 배분이 흔들릴 수 있다 — 화면이 알려야 한다 */
   uncertain: boolean;
   /** 단 줄 수가 5가 아닌 단이 있어 사람이 봐야 하는 장 */

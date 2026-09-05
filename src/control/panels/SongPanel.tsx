@@ -37,6 +37,17 @@ const RECENT_SLOTS = 6;
 /** 빠른 칩 줄이 무엇을 보여 주는가 */
 type QuickMode = 'favorite' | 'recent';
 
+/**
+ * 악보 모양 고르기 — 이름·설명을 한 곳에 둔다.
+ *
+ * '자동' 이 맨 앞이다: 대부분의 곡은 짐작이 맞고(실측 74%), 고칠 곡만 손댄다.
+ */
+const SHEET_LAYOUT_CHOICES: ReadonlyArray<readonly ['auto' | 'shared' | 'sequential', string, string]> = [
+  ['auto', '자동', '가사 줄 수와 단 수를 견줘 스스로 정합니다'],
+  ['shared', '겹쳐', '한 단 아래 1절·2절 가사가 겹쳐 적힌 악보'],
+  ['sequential', '이어', '1절이 끝나야 2절이 시작하는 악보'],
+];
+
 const LINE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: '1', label: '1줄씩' },
   { value: '2', label: '2줄씩' },
@@ -239,6 +250,34 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setError(err instanceof ApiError ? err.message : '곡을 불러오지 못했습니다');
     }
   }, []);
+
+  /**
+   * 악보 모양(겹쳐/이어)을 사람이 고른다. `null` 이면 자동 짐작으로 되돌린다.
+   *
+   * **송출을 다시 하지 않는다.** 지금 화면에 떠 있는 덱을 다시 보내면 첫 슬라이드로
+   * 되돌아간다 — 예배 중에 3절을 부르다 1절로 튀는 것보다, 다음에 띄울 때 반영되는
+   * 편이 안전하다. 그래서 안내 문구로 알린다.
+   */
+  const chooseSheetLayout = useCallback(
+    async (layout: 'shared' | 'sequential' | null) => {
+      if (!sheet || !song) return;
+      setError(null);
+      setNotice(null);
+      try {
+        await api.setSheetLayout(sheet.songbookId, sheet.number, layout);
+        const { sheet: found } = await api.song(song.id);
+        setSheet(found);
+        setNotice(
+          layout === null
+            ? '악보 모양을 자동으로 되돌렸습니다 — 다음 송출부터 반영됩니다'
+            : '악보 모양을 바꿨습니다 — 다음 송출부터 반영됩니다',
+        );
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : '악보 모양을 바꾸지 못했습니다');
+      }
+    },
+    [sheet, song],
+  );
 
   /**
    * 이 탭의 프리셋·폰트를 얹어 보낸다.
@@ -702,8 +741,27 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                       {sheet.systemCount}단
                     </span>
                   </span>
+                  {/*
+                    짐작이 틀리는 곡이 26% 다 (lib/sheet-match.ts 실측). 사람이 보고
+                    고칠 수 있어야 한다 — '자동' 을 따로 둔 이유는 잘못 고른 것을
+                    되돌리기 위해서다.
+                  */}
+                  <span className="toggle-row sheet-layout">
+                    {SHEET_LAYOUT_CHOICES.map(([key, label, hint]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`toggle${(sheet.chosen ? sheet.layout : 'auto') === key ? ' active' : ''}`}
+                        title={hint}
+                        onClick={() => void chooseSheetLayout(key === 'auto' ? null : key)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </span>
                   <span className="dim">
                     {sheet.layout === 'shared' ? '절이 겹쳐 적힘' : '절이 이어 적힘'}
+                    {sheet.chosen ? '' : ' (짐작)'}
                   </span>
                   <span className="dim">프로젝터에 나갑니다 (그 창에서 S 로 끔)</span>
                 </>

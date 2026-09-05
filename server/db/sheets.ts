@@ -19,6 +19,8 @@
 
 import type { DatabaseSync } from 'node:sqlite';
 
+import type { SheetLayout } from '../../lib/sheet-match.ts';
+
 /** 한 단이 그림에서 차지하는 세로 범위 (양끝 포함, 픽셀) */
 export interface SheetSystem {
   from: number;
@@ -41,6 +43,15 @@ export interface SheetRow {
   systems: SheetSystem[];
   /** 줄 수가 5가 아닌 단이 하나라도 있는가 */
   needsReview: boolean;
+  /**
+   * 사람이 정해 둔 악보 모양. **없으면 자동 짐작**을 쓴다.
+   *
+   * `null` 을 기본으로 두는 이유: 자료가 손봐지거나 짐작 규칙이 나아지면 자동이
+   * 따라가야 한다. 검출할 때마다 짐작한 값을 적어 두면 사람이 고친 것과 구별할 수
+   * 없어져, 규칙을 고쳐도 옛 짐작이 그대로 남는다 (`lines_source` 에서 겪은 것과
+   * 같은 함정이다).
+   */
+  layout?: SheetLayout;
   detectedAt: string;
 }
 
@@ -52,12 +63,28 @@ CREATE TABLE IF NOT EXISTS song_sheets (
   height       INTEGER NOT NULL,
   systems      TEXT NOT NULL,      -- JSON: [{ from, to, lineCount }, ...]
   needs_review INTEGER NOT NULL DEFAULT 0,
+  layout       TEXT,               -- NULL = 자동 짐작. 'shared' | 'sequential'
   detected_at  TEXT NOT NULL,
   PRIMARY KEY (songbook_id, number)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sheets_review ON song_sheets(needs_review);
 `;
+
+/**
+ * 이미 만들어진 표에 `layout` 을 붙인다 (2026-09-04).
+ *
+ * 검출을 먼저 돌려 2,061장을 넣어 둔 뒤에 이 칸이 생겼다. 지우고 다시 만들면 검출을
+ * 처음부터 돌려야 하므로 컬럼만 더한다.
+ */
+export function addLayoutColumn(db: DatabaseSync): void {
+  const names = new Set(
+    (db.prepare("SELECT name FROM pragma_table_info('song_sheets')").all() as unknown as Array<{
+      name: string;
+    }>).map((row) => row.name),
+  );
+  if (!names.has('layout')) db.exec('ALTER TABLE song_sheets ADD COLUMN layout TEXT');
+}
 
 interface Row {
   songbook_id: string;
@@ -66,7 +93,13 @@ interface Row {
   height: number;
   systems: string;
   needs_review: number;
+  layout: string | null;
   detected_at: string;
+}
+
+/** 저장된 값이 아는 모양일 때만 쓴다 — 모르는 값은 자동 짐작으로 떨어뜨린다 */
+function readLayout(raw: string | null): SheetLayout | undefined {
+  return raw === 'shared' || raw === 'sequential' ? raw : undefined;
 }
 
 /**
@@ -103,6 +136,7 @@ function toRow(row: Row): SheetRow | undefined {
     height: row.height,
     systems,
     needsReview: row.needs_review === 1,
+    ...(readLayout(row.layout) ? { layout: readLayout(row.layout)! } : {}),
     detectedAt: row.detected_at,
   };
 }
@@ -125,8 +159,13 @@ export function listSheets(db: DatabaseSync, songbookId?: string): SheetRow[] {
   return rows.map(toRow).filter((one): one is SheetRow => one !== undefined);
 }
 
-/** 넣거나 덮어쓴다. 검출을 다시 돌리면 같은 자리를 갱신한다 */
-export function putSheet(db: DatabaseSync, sheet: Omit<SheetRow, 'detectedAt'> & { detectedAt?: string }): void {
+/**
+ * 넣거나 덮어쓴다. 검출을 다시 돌리면 같은 자리를 갱신한다.
+ *
+ * **`layout` 은 건드리지 않는다.** 사람이 정해 둔 모양을 검출이 지우면, 다시 돌릴
+ * 때마다 손본 것이 조용히 날아간다.
+ */
+export function putSheet(db: DatabaseSync, sheet: Omit<SheetRow, 'detectedAt' | 'layout'> & { detectedAt?: string }): void {
   db.prepare(
     `INSERT INTO song_sheets (songbook_id, number, width, height, systems, needs_review, detected_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -142,6 +181,26 @@ export function putSheet(db: DatabaseSync, sheet: Omit<SheetRow, 'detectedAt'> &
     sheet.needsReview ? 1 : 0,
     sheet.detectedAt ?? new Date().toISOString(),
   );
+}
+
+/**
+ * 악보 모양을 사람이 정한다. `undefined` 를 주면 **자동 짐작으로 되돌린다.**
+ *
+ * 되돌릴 길을 두는 이유: 잘못 골랐을 때 원래대로 갈 수 있어야 하고, 규칙이 나아지면
+ * 자동이 그 곡도 맞힐 수 있다.
+ *
+ * 없는 악보에는 아무 일도 하지 않는다 — 단 경계가 없으면 모양을 정할 것도 없다.
+ */
+export function setSheetLayout(
+  db: DatabaseSync,
+  songbookId: string,
+  number: number,
+  layout: SheetLayout | undefined,
+): boolean {
+  const result = db
+    .prepare('UPDATE song_sheets SET layout = ? WHERE songbook_id = ? AND number = ?')
+    .run(layout ?? null, songbookId, number);
+  return result.changes > 0;
 }
 
 export function countSheets(db: DatabaseSync): { total: number; needsReview: number } {

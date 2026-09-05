@@ -136,12 +136,14 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       if (entry.number === undefined) continue;
       const sheet = sheets.getSheet(store.conn(), entry.songbookId, entry.number);
       if (!sheet || sheet.systems.length === 0) continue;
-      const layout = guessLayout(sectionLines, sheet.systems.length);
+      // 사람이 정해 둔 것이 있으면 그것이 이긴다. 없으면 짐작한다
+      const layout = sheet.layout ?? guessLayout(sectionLines, sheet.systems.length);
       return {
         songbookId: sheet.songbookId,
         number: sheet.number,
         systemCount: sheet.systems.length,
         layout,
+        chosen: sheet.layout !== undefined,
         uncertain: isUncertain(sectionLines, sheet.systems.length, layout),
         needsReview: sheet.needsReview,
       };
@@ -246,6 +248,8 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       withSheets = attachSheets(slides, {
         slideSections,
         sectionLines,
+        // 사람이 정해 둔 모양이 있으면 짐작하지 않는다 (요약 라우트와 같은 규칙)
+        ...(sheet.layout ? { layout: sheet.layout } : {}),
         sheet: {
           songbookId: sheet.songbookId,
           number: sheet.number,
@@ -343,6 +347,33 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
         linesSource: 'manual',
       });
       return ok(store.getSong(id));
+    },
+  );
+
+  /**
+   * 악보 모양을 사람이 정한다 — `shared`(절이 겹쳐 적힘) · `sequential`(이어 적힘).
+   *
+   * `layout` 을 주지 않으면 **자동 짐작으로 되돌린다.** 잘못 골랐을 때 원래대로 갈 수
+   * 있어야 하고, 짐작 규칙이 나아지면 그 곡도 자동이 맞힐 수 있다.
+   *
+   * 곡이 아니라 **악보**에 붙는다 (곡집·번호). 같은 악보를 여러 곡이 가리킬 수 있고,
+   * 모양은 악보가 어떻게 인쇄됐는지의 성질이지 곡의 성질이 아니다.
+   */
+  app.put<{ Params: { songbookId: string; number: string }; Body: { layout?: unknown } }>(
+    '/api/sheets/:songbookId/:number/layout',
+    async (request, reply) => {
+      // `null` 도 '되돌린다' 로 본다 — JSON.stringify 가 undefined 키를 지워 버려서
+      // 화면이 '자동으로' 를 보낼 방법이 null 뿐인 경우가 있다 (lineGapPx 에서 겪은 것)
+      const raw = request.body?.layout ?? undefined;
+      if (raw !== undefined && raw !== 'shared' && raw !== 'sequential') {
+        return reply.code(400).send(fail("layout 은 'shared' · 'sequential' · null 중 하나여야 합니다"));
+      }
+      const number = Number(request.params.number);
+      if (!Number.isInteger(number)) return reply.code(400).send(fail('번호가 올바르지 않습니다'));
+
+      const changed = sheets.setSheetLayout(store.conn(), request.params.songbookId, number, raw);
+      if (!changed) return reply.code(404).send(fail('악보를 찾을 수 없습니다'));
+      return ok({ songbookId: request.params.songbookId, number, layout: raw ?? null });
     },
   );
 
