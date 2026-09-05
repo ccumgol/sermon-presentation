@@ -27,6 +27,7 @@
     invert: document.getElementById('invert'),
     full: document.getElementById('full'),
     overflow: document.getElementById('overflow'),
+    sheet: document.getElementById('sheet'),
     hint: document.getElementById('hint'),
   };
 
@@ -41,9 +42,6 @@
    * 첫 키 입력**에 얹어 줄 수는 있다 — 매주 F 를 찾아 누르지 않아도 된다.
    */
   var FULL_KEY = 'sermon.projector.fullscreen';
-
-  /** 악보 보기 — 이 창에서만, 다음에 열 때도 그대로 (`S` 로 끄고 켠다) */
-  var SHEET_KEY = 'sermon.projector.sheet';
 
   /** localStorage 는 없거나 막혀 있을 수 있다. 그때도 화면은 떠야 한다 */
   function save(key, value) {
@@ -270,17 +268,28 @@
 
   // ── 가사 대신 악보 ───────────────────────────────────────────
   /*
-   * 곡 슬라이드가 악보 조각(`sheet`)을 함께 들고 온다. 프로젝터는 그것을 그리고,
-   * OBS 화면과 강사 모니터는 가사를 그대로 그린다 (사용자 결정: 강사 모니터에는
+   * 곡 슬라이드가 악보 조각(`sheet`)을 **들고 왔을 때만** 악보를 그린다.
+   * OBS 화면과 강사 모니터는 언제나 가사다 (사용자 결정: 강사 모니터에는
    * 가사가 나가야 한다).
    *
-   * **서버가 골라 주지 않고 여기서 고른다.** 서버가 화면마다 다른 슬라이드를 보내면
-   * 덱이 갈라져 진행 위치가 어긋난다. 한 슬라이드가 둘을 들고 다니면 끄고 켜는 것도
-   * 이 창에서 바로 된다 — 예배 중에 조작 화면까지 가지 않아도 된다.
+   * ## 주인은 조작 화면이다 (2026-09-04 에 바뀌었다)
    *
-   * 기본은 **켬**. 악보가 없는 곡·성경·광고는 자동으로 가사가 나간다.
+   * 악보로 낼지는 **조작 화면**이 항목마다 정하고, 서버가 그 결정대로 `sheet` 를
+   * 싣거나 뺀다. 여기서는 실려 온 것을 그릴 뿐이다.
+   *
+   * 전에는 이 창의 `S` 키가 주인이었는데 두 가지가 나빴다:
+   *   · 프로젝터 창은 대개 다른 화면에 있어 손이 닿지 않는다
+   *   · **보이지 않는 스위치**라 한 번 끄면 되돌리는 법을 알 수 없었다
+   *     (사용자 보고 — 실제로 그렇게 막혔다)
+   *
+   * ## 그래도 이 창에 끄는 길을 남긴다
+   *
+   * 악보가 이상하게 잘려 나갈 때 **가장 빠른 탈출구**가 여기다. 다만
+   * **저장하지 않는다** — 다음에 창을 열면 다시 조작 화면을 따른다. 지난주에
+   * 꺼 둔 것이 이번 주에도 꺼져 있으면 그게 바로 사용자가 겪은 함정이다.
+   * 그리고 막대에 **보이는 단추**로 둔다 (아래 syncSheetButton).
    */
-  var sheetOn = load(SHEET_KEY) !== '0';
+  var sheetOn = true;
 
   window.SermonSlideFilter = function (slide) {
     if (!sheetOn || !slide || slide.kind !== 'song' || !slide.sheet) return slide;
@@ -292,13 +301,41 @@
     };
   };
 
+  /**
+   * 지금 화면에 악보를 낼 수 있는가 — 슬라이드가 악보를 들고 왔는가.
+   * 낼 수 없으면 단추를 흐리게 한다. 눌러도 아무 일이 없으면 고장으로 보인다.
+   */
+  function sheetAvailable() {
+    var api = window.SermonOutput;
+    var slide = api && typeof api.currentSlide === 'function' ? api.currentSlide() : null;
+    return !!(slide && slide.kind === 'song' && slide.sheet);
+  }
+
+  function syncSheetButton() {
+    if (!el.sheet) return;
+    var can = sheetAvailable();
+    var showing = sheetOn && can;
+    el.sheet.disabled = !can;
+    // 글자는 **지금 나가고 있는 것**이다. 악보가 실려 오지 않은 화면에서 '악보' 라고
+    // 적혀 있으면, 악보가 나가는 줄 알고 벽을 다시 쳐다보게 된다
+    el.sheet.textContent = showing ? '악보' : '가사';
+    el.sheet.classList.toggle('on', showing);
+    el.sheet.title = can
+      ? sheetOn
+        ? '지금 악보가 나갑니다 — 누르면 가사로 바뀝니다 (S)'
+        : '지금 가사가 나갑니다 — 누르면 악보로 돌아갑니다 (S)'
+      : '이 화면에는 악보가 없습니다 (조작 화면의 찬양 항목에서 켭니다)';
+  }
+
   /** 지금 화면을 새 설정으로 다시 그린다 — 다음 슬라이드까지 기다리지 않게 */
-  function applySheet(next, remember) {
+  function applySheet(next) {
     sheetOn = next;
-    if (remember) save(SHEET_KEY, next ? '1' : '0');
     var api = window.SermonOutput;
     if (api && typeof api.redraw === 'function') api.redraw();
+    syncSheetButton();
   }
+
+  if (el.sheet) el.sheet.addEventListener('click', function () { applySheet(!sheetOn); });
 
   window.addEventListener('keydown', function (event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -310,7 +347,7 @@
     else if (key === '0') applyZoom(1, true);
     else if (key === 'i' || key === 'I') applyInvert(!inverted, true);
     else if (key === 'f' || key === 'F') toggleFull();
-    else if (key === 's' || key === 'S') applySheet(!sheetOn, true);
+    else if (key === 's' || key === 'S') applySheet(!sheetOn);
     else return;
     event.preventDefault();
     showBar();
@@ -330,6 +367,7 @@
   applyZoom(parseFloat(load(ZOOM_KEY) || '1'), false);
   applyInvert(load(INVERT_KEY) === '1', false);
   syncFullLabel();
+  syncSheetButton();
 
   /*
    * 처음 열었을 때 막대를 잠깐 보여 준다. 이것이 없으면 **아무것도 없는 검은 화면**이
@@ -347,6 +385,8 @@
     if (blocks) {
       new MutationObserver(function () {
         checkOverflow();
+        // 새 슬라이드에 악보가 있는지 없는지에 따라 단추가 살거나 흐려진다
+        syncSheetButton();
       }).observe(blocks, { childList: true, subtree: true, characterData: true });
     }
   }

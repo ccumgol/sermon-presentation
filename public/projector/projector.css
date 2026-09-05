@@ -195,6 +195,31 @@ body.projector .rhythm-char {
   transform: translateY(1px);
 }
 
+/*
+ * 가사 ↔ 악보 단추.
+ *
+ * **지금 무엇이 나가는지**를 색으로도 보인다 — 글자만으로는 '가사' 가 지금
+ * 상태인지 누르면 될 상태인지 헷갈린다. 켜져 있을 때(악보) 만 물들인다.
+ */
+#sheet {
+  min-width: 52px;
+}
+
+#sheet.on {
+  border-color: rgba(120, 190, 255, 0.7);
+  background: rgba(120, 190, 255, 0.28);
+}
+
+/* 악보가 없는 화면에서는 누를 것이 없다 — 눌러도 아무 일이 없으면 고장으로 보인다 */
+#sheet:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#sheet:disabled:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 #zoom-value {
   min-width: 52px;
   text-align: center;

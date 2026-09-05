@@ -844,6 +844,15 @@
       lastSlide = filtered(incoming);
       render(lastSlide);
     },
+    /**
+     * 거르기 **전**의 슬라이드 — 받은 그대로.
+     *
+     * 프로젝터가 '이 화면에 악보를 낼 수 있는가' 를 물을 때 쓴다. 거른 뒤를 주면
+     * 악보를 끈 상태에서는 늘 가사 슬라이드라, 악보가 있는지 알 수 없다.
+     */
+    currentSlide: function () {
+      return incoming;
+    },
     applyStylePatch: applyStylePatch,
     applyAnchor: applyAnchor,
     measure: measure,

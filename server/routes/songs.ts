@@ -207,6 +207,13 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       credit?: string;
       /** 표시 한 행의 최대 글자 수 — 템플릿의 값을 그대로 넘긴다 */
       maxChars?: string;
+      /**
+       * `1` 이면 프로젝터에 **악보**를 낸다. 없으면 가사다.
+       *
+       * **기본이 가사인 이유**(2026-09-04 사용자 결정): 악보 자동 검출이 아직
+       * 불완전하다. 틀린 자리가 벽에 걸리는 것보다 가사가 낫다 — 가사는 늘 맞다.
+       */
+      sheet?: string;
     };
   }>('/api/songs/:id/deck', async (request, reply) => {
     const song = store.getSong(Number(request.params.id));
@@ -231,17 +238,28 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
     });
 
     /*
-     * 악보가 있으면 슬라이드마다 **어느 단인지**를 실어 보낸다.
+     * 악보를 **요청했을 때만** 슬라이드에 싣는다.
      *
-     * 여기서 붙이는 이유: 덱은 한 번 만들어져 여러 화면으로 간다. 화면마다 따로
-     * 계산하면 프로젝터와 조작 화면이 다른 단을 가리킬 수 있다.
+     * ## 왜 붙일지 말지를 서버가 정하는가
+     *
+     * 프로젝터는 `deck` 을 받지 않는다 — `state.slide` **한 장**만 본다.
+     * 그래서 '이 곡은 악보로 낸다' 는 결정이 슬라이드에 실려 있어야 하고,
+     * 실어 보내지 않으면 프로젝터는 가사를 그린다. 조작 화면이 주인이 된다.
+     *
+     * ## 왜 기본이 가사인가 (2026-09-04 사용자 결정)
+     *
+     * 단 경계 자동 검출이 아직 불완전하다. 틀린 자리가 벽에 걸리는 것보다
+     * 가사가 낫다 — **가사는 늘 맞다.**
+     *
+     * 붙일 때는 슬라이드마다 어느 단인지까지 함께 싣는다. 화면마다 따로 계산하면
+     * 프로젝터와 조작 화면이 다른 단을 가리킬 수 있다.
      *
      * 곡이 여러 곡집에 실렸으면 **악보가 있는 첫 수록**을 쓴다. 같은 곡의 악보는
      * 어느 곡집 것이든 같은 가락이라 아무거나 쓰면 되고, 없는 것을 찾아 헤매느니
      * 있는 것을 바로 쓰는 편이 낫다.
      */
     let withSheets = slides;
-    for (const entry of song.entries) {
+    for (const entry of request.query.sheet === '1' ? song.entries : []) {
       if (entry.number === undefined) continue;
       const sheet = sheets.getSheet(store.conn(), entry.songbookId, entry.number);
       if (!sheet || sheet.systems.length === 0) continue;

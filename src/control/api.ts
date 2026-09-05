@@ -192,11 +192,14 @@ export const api = {
     sectionId?: number,
     /** 템플릿이 지정한 표시 행 폭 — 운율 행을 이 폭에 맞춰 묶는다 */
     maxChars?: number,
+    /** 프로젝터에 악보를 낸다. 기본은 가사다 (검출이 아직 불완전하다) */
+    sheet?: boolean,
   ) =>
     get<{ deck: Deck; langs: LangCode[]; availableLangs: LangCode[]; missingLangs: LangCode[] }>(
       `/api/songs/${id}/deck?langs=${encodeURIComponent(langs.join(','))}&lines=${lines}` +
         (sectionId !== undefined ? `&section=${sectionId}` : '') +
-        (maxChars !== undefined ? `&maxChars=${maxChars}` : ''),
+        (maxChars !== undefined ? `&maxChars=${maxChars}` : '') +
+        (sheet ? '&sheet=1' : ''),
     ),
   favorites: (limit = 5) => get<SongSearchHit[]>(`/api/songs/favorites?limit=${limit}`),
   toggleFavorite: (id: number, value: boolean) =>

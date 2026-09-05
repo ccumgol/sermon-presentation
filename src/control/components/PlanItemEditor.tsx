@@ -14,6 +14,7 @@
 import type React from 'react';
 
 import { describeItem, itemsInGroup, splitOrderText, type PlanRow } from '../../../lib/plan-deck.ts';
+import { ProjectorSheetToggle } from './ProjectorSheetToggle.tsx';
 import { LANG_LABELS, MAX_LANGS, langChoices, toggleLang } from '../../../lib/lang-select.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE, DEFAULT_LITURGY_VERSION, LITURGY_TEXTS, findLiturgy, liturgyLines,
@@ -49,7 +50,7 @@ export interface PlanItemEditorProps {
   readingBook: ReadingBook;
   liturgyDraft: { id: string; text: string } | null;
   setLiturgyDraft: React.Dispatch<React.SetStateAction<{ id: string; text: string } | null>>;
-  songLangs: { id: number; available: string[] } | null;
+  songInfo: { id: number; available: string[]; hasSheet: boolean } | null;
   liveItemId: string | null;
   liveItemIndex: number;
   liveViaPlanDeck: boolean;
@@ -67,7 +68,7 @@ export interface PlanItemEditorProps {
 export function PlanItemEditor({
   plan, current, currentRow, items, rows, translations, connected,
   detailOpen, setDetailOpen, auto, bgFiles, bgLibrary, readingBook,
-  liturgyDraft, setLiturgyDraft, songLangs, liveItemId, liveItemIndex, liveViaPlanDeck,
+  liturgyDraft, setLiturgyDraft, songInfo, liveItemId, liveItemIndex, liveViaPlanDeck,
   patchItems, itemTemplateFor, baseFontSizeFor, sendItem, refreshLive, refreshQuotePreview,
   restoreBefore, before,
 }: PlanItemEditorProps): React.JSX.Element {
@@ -183,9 +184,9 @@ export function PlanItemEditor({
               */}
               <label title="누른 순서대로 위에서 아래로 놓입니다">표시 언어 (최대 {MAX_LANGS})</label>
               <span className="candidates">
-                {langChoices(songLangs?.id === current.songId ? (songLangs.available as LangCode[]) : []).map((lang) => {
+                {langChoices(songInfo?.id === current.songId ? (songInfo.available as LangCode[]) : []).map((lang) => {
                   const active = current.langs.includes(lang);
-                  const has = songLangs?.id === current.songId ? songLangs.available.includes(lang) : true;
+                  const has = songInfo?.id === current.songId ? songInfo.available.includes(lang) : true;
                   return (
                     <button
                       key={lang}
@@ -274,6 +275,32 @@ export function PlanItemEditor({
                 <option value="4">4줄씩</option>
                 <option value="section">섹션 전체</option>
               </select>
+
+              {/*
+                프로젝터에 가사를 낼지 악보를 낼지.
+
+                **기본은 가사다**(2026-09-04 사용자 결정) — 단 경계 자동 검출이
+                아직 불완전해서, 틀린 자리가 벽에 걸리는 것보다 가사가 낫다.
+
+                여기 두는 이유: 전에는 프로젝터 창에서 `S` 를 눌러야 했는데,
+                그 창은 대개 다른 화면에 띄워 두고 손이 닿지 않는다. 게다가
+                보이지 않는 스위치라 **되돌리는 법을 알 수 없었다**(사용자 보고).
+              */}
+              <label>프로젝터</label>
+              <ProjectorSheetToggle
+                value={current.sheet === true}
+                hasSheet={songInfo?.id === current.songId ? songInfo.hasSheet : undefined}
+                onChange={(sheet) => {
+                  const next = items.map((i) =>
+                    i.id === current.id && i.type === 'song'
+                      ? { ...i, ...(sheet ? { sheet: true } : { sheet: undefined }) }
+                      : i,
+                  );
+                  patchItems(next);
+                  const updated = next.find((i) => i.id === current.id);
+                  if (updated) refreshLive(updated);
+                }}
+              />
             </div>
           )}
 
@@ -701,3 +728,5 @@ export function PlanItemEditor({
         </div>
   );
 }
+
+

@@ -226,6 +226,9 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
             : {}),
           langs: Array.isArray(song.langs) ? song.langs.filter((l) => typeof l === 'string').slice(0, MAX_LANGS) : ['ko'],
           ...(typeof song.lines === 'string' ? { lines: song.lines } : {}),
+          // 켠 것만 담는다. 기본(가사)은 값이 없는 상태다 — false 를 적어 두면
+          // 나중에 기본을 바꿔도 옛 순서표가 옛 기본에 묶인다
+          ...(song.sheet === true ? { sheet: true } : {}),
           ...(() => {
             const display = readItemDisplay(fields.display);
             return display ? { display } : {};

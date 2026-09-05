@@ -6,6 +6,7 @@ import {
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
 import { SongMetaRows } from '../components/SongMetaRows.tsx';
+import { ProjectorSheetToggle } from '../components/ProjectorSheetToggle.tsx';
 
 import type {
   ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
@@ -84,6 +85,15 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    * 덱을 만들 때까지 기다리면 '악보가 왜 안 나오지?' 를 **송출하고 나서야** 알게 된다.
    */
   const [sheet, setSheet] = useState<SheetSummary | undefined>(undefined);
+
+  /**
+   * 이 탭에서 띄울 때 프로젝터에 악보를 낼지. **기본은 가사**다 (사용자 결정
+   * 2026-09-04 — 단 경계 검출이 아직 불완전하다).
+   *
+   * 곡을 바꾸면 꺼진다. 앞 곡에서 켜 둔 것이 남으면, 검토가 안 된 다음 곡의
+   * 악보가 예고 없이 벽에 걸린다.
+   */
+  const [useSheet, setUseSheet] = useState(false);
 
   /** 왼쪽 '곡집·검색' 열 너비. 곡을 훑을 때와 가사를 고칠 때 원하는 폭이 다르다 */
   const split = useColumnSplit('song', { edge: 'start', min: 260, minNeighbor: 320, label: '곡 목록' });
@@ -249,6 +259,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       const { song: loaded, availableLangs, sheet: found } = await api.song(id);
       setSong(loaded);
       setSheet(found);
+      setUseSheet(false);
       setLangs(availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
       setDraftLyrics(formatLyrics(loaded.sections));
     } catch (err) {
@@ -318,7 +329,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setBusy(true);
       setError(null);
       try {
-        const deckResult = await api.songDeck(song.id, langs, lines, sectionId, maxChars);
+        const deckResult = await api.songDeck(song.id, langs, lines, sectionId, maxChars, useSheet);
         if (deckResult.deck.slides.length === 0) {
           setError('표시할 가사가 없습니다');
           return;
@@ -335,7 +346,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         setBusy(false);
       }
     },
-    [song, langs, lines, sendWithStyle, loadQuickPicks],
+    [song, langs, lines, maxChars, useSheet, sendWithStyle, loadQuickPicks],
   );
 
   /**
@@ -353,6 +364,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         const { song: loaded, availableLangs, sheet: found } = await api.song(id);
         setSong(loaded);
         setSheet(found);
+        setUseSheet(false);
         setDraftLyrics(formatLyrics(loaded.sections));
 
         // 이 곡이 가진 언어로 맞춘다 — 없는 언어를 켠 채 보내면 화면이 빈다
@@ -360,7 +372,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         const useLangs = nextLangs.length > 0 ? nextLangs : availableLangs.slice(0, 1);
         setLangs(useLangs);
 
-        const deckResult = await api.songDeck(id, useLangs, lines, undefined, maxChars);
+        // 번호로 바로 띄우는 길 — 곡을 새로 여는 것이므로 늘 가사다
+        const deckResult = await api.songDeck(id, useLangs, lines, undefined, maxChars, false);
         if (deckResult.deck.slides.length === 0) {
           setError(`'${loaded.title}' 에 표시할 가사가 없습니다`);
           return;
@@ -770,11 +783,27 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                     {sheet.layout === 'shared' ? '절이 겹쳐 적힘' : '절이 이어 적힘'}
                     {sheet.chosen ? '' : ' (짐작)'}
                   </span>
-                  <span className="dim">프로젝터에 나갑니다 (그 창에서 S 로 끔)</span>
                 </>
               ) : (
                 <span className="dim">없습니다 — 프로젝터에도 가사가 나갑니다</span>
               )}
+            </p>
+
+            {/*
+              프로젝터에 무엇을 낼지. **기본은 가사**다 — 단 경계 검출이 아직
+              불완전해서, 틀린 자리가 벽에 걸리는 것보다 가사가 낫다.
+              OBS 화면과 강사 모니터는 이 값과 무관하게 언제나 가사다.
+            */}
+            <p className="hintline muted song-links">
+              <span>프로젝터</span>
+              <ProjectorSheetToggle
+                value={useSheet}
+                hasSheet={sheet !== undefined}
+                onChange={setUseSheet}
+              />
+              <span className="dim">
+                {useSheet ? '지금 부르는 줄의 악보 단이 나갑니다' : 'OBS 화면과 같은 가사가 나갑니다'}
+              </span>
             </p>
 
             {sheet?.uncertain && (

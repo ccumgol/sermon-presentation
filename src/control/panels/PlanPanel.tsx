@@ -175,7 +175,8 @@ export function PlanPanel({
    * 없는 언어를 켜 놓고 '왜 영어가 안 나오지' 가 되지 않게 흐리게 표시한다
    * (찬양 탭과 같은 규칙). 항목을 고를 때 한 번만 읽는다.
    */
-  const [songLangs, setSongLangs] = useState<{ id: number; available: string[] } | null>(null);
+  /** 고른 찬양 항목의 곡 정보 — 언어 버튼을 흐리게 하고, 악보가 있는지 알린다 */
+  const [songInfo, setSongInfo] = useState<{ id: number; available: string[]; hasSheet: boolean } | null>(null);
 
   /** 교독문 검색 결과 — 입력에 따라 좁혀진다 */
   const [readingHits, setReadingHits] = useState<ReadingSummary[]>([]);
@@ -576,7 +577,10 @@ export function PlanPanel({
       }
 
       if (item.type === 'song') {
-        const songDeck = await api.songDeck(item.songId, item.langs, item.lines ?? '2', undefined, maxChars);
+        // 악보는 항목이 켠 것만 — 기본은 가사다 (2026-09-04 사용자 결정)
+        const songDeck = await api.songDeck(
+          item.songId, item.langs, item.lines ?? '2', undefined, maxChars, item.sheet === true,
+        );
         const slides =
           item.display === undefined && item.style === undefined
             ? songDeck.deck.slides
@@ -837,7 +841,7 @@ export function PlanPanel({
     [],
   );
 
-  // 고른 항목이 찬양이면 그 곡이 가진 언어를 읽어 둔다 (버튼을 흐리게 하는 데 쓴다)
+  // 고른 항목이 찬양이면 그 곡의 언어와 **악보 유무**를 읽어 둔다
   const currentSongId = (() => {
     const item = items.find((i) => i.id === expandedId) ?? items[cursor];
     return item && item.type === 'song' ? item.songId : null;
@@ -845,20 +849,26 @@ export function PlanPanel({
 
   useEffect(() => {
     if (currentSongId === null) return;
-    if (songLangs?.id === currentSongId) return;
+    if (songInfo?.id === currentSongId) return;
     let alive = true;
     void api
       .song(currentSongId)
       .then((loaded) => {
         // 읽는 사이에 다른 항목으로 옮겼으면 버린다 — 늦게 온 응답이 덮지 않게
-        if (alive) setSongLangs({ id: currentSongId, available: loaded.availableLangs });
+        if (alive) {
+          setSongInfo({
+            id: currentSongId,
+            available: loaded.availableLangs,
+            hasSheet: loaded.sheet !== undefined,
+          });
+        }
       })
       // 못 읽어도 순서표 작업은 계속돼야 한다 — 버튼이 흐려지지 않을 뿐이다
       .catch(() => undefined);
     return () => {
       alive = false;
     };
-  }, [currentSongId, songLangs?.id]);
+  }, [currentSongId, songInfo?.id]);
 
   /**
    * 항목 제목 한 줄을 띄운다 — 회중이 다음을 준비하도록.
@@ -2512,7 +2522,7 @@ export function PlanPanel({
           readingBook={readingBook}
           liturgyDraft={liturgyDraft}
           setLiturgyDraft={setLiturgyDraft}
-          songLangs={songLangs}
+          songInfo={songInfo}
           liveItemId={liveItemId}
           liveItemIndex={liveItemIndex}
           liveViaPlanDeck={liveViaPlanDeck}

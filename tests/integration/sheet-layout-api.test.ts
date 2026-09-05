@@ -80,9 +80,15 @@ async function summary(): Promise<{ layout: string; chosen: boolean; uncertain: 
   return body.data!.sheet!;
 }
 
-/** 슬라이드마다 몇 번째 단이 붙었는지 */
-async function systemsOfDeck(): Promise<Array<number | undefined>> {
-  const res = await app.inject({ method: 'GET', url: `/api/songs/${songId}/deck?langs=ko&lines=1` });
+/**
+ * 슬라이드마다 몇 번째 단이 붙었는지.
+ *
+ * `sheet=1` 을 붙인다 — **악보는 요청해야 실린다**(2026-09-04 사용자 결정).
+ * 기본은 가사다.
+ */
+async function systemsOfDeck(sheet = true): Promise<Array<number | undefined>> {
+  const query = `langs=ko&lines=1${sheet ? '&sheet=1' : ''}`;
+  const res = await app.inject({ method: 'GET', url: `/api/songs/${songId}/deck?${query}` });
   const body = res.json() as ApiResponse<{ deck: Deck }>;
   return body.data!.deck.slides.map((slide) => (slide.kind === 'song' ? slide.sheet?.system : undefined));
 }
@@ -112,6 +118,15 @@ describe('악보 모양 고르기', () => {
    * 이 검사가 이 기능의 값어치다 — 저장만 되고 덱이 안 바뀌면 사용자에게는
    * 아무 일도 일어나지 않은 것과 같다.
    */
+  /**
+   * **기본은 가사다.** 단 경계 자동 검출이 아직 불완전해, 틀린 자리가 벽에 걸리는
+   * 것보다 가사가 낫다 (2026-09-04 사용자 결정). 이 규칙이 깨지면 아무도 켜지
+   * 않은 악보가 예배 중에 나간다.
+   */
+  it('요청하지 않으면 악보를 싣지 않는다', async () => {
+    expect(await systemsOfDeck(false)).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
+  });
+
   it('고르면 슬라이드에 붙는 단이 실제로 달라진다', async () => {
     // 이어 적힘: 여섯 슬라이드가 여섯 단에 하나씩
     expect(await systemsOfDeck()).toEqual([1, 2, 3, 4, 5, 6]);

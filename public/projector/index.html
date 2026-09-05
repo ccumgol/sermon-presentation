@@ -67,6 +67,13 @@
 
       <span class="bar-sep" aria-hidden="true"></span>
 
+      <!--
+        가사 ↔ 악보. **보이는 스위치여야 한다** — 전에는 `S` 키에만 있어서,
+        한 번 끈 사용자가 되돌리는 법을 찾지 못했다 (2026-09-04 보고).
+        무엇이 나가고 있는지를 글자로 보여 주고, 악보가 없는 화면에서는 흐려진다.
+      -->
+      <button type="button" id="sheet" title="가사와 악보를 바꾼다 (S)">가사</button>
+
       <button type="button" id="invert" title="글자색과 배경색을 뒤집는다 (I)">반전</button>
       <button type="button" id="full" title="전체 화면 — 브라우저 주소줄까지 사라진다 (F)">
         전체 화면
@@ -87,7 +94,7 @@
     -->
     <p id="hint">
       <b>화면을 클릭하면 전체 화면</b>이 됩니다 (주소줄·제목줄이 사라집니다) ·
-      <b>+ −</b> 글자 크기 · <b>I</b> 색 반전 · <b>Esc</b> 창으로
+      <b>+ −</b> 글자 크기 · <b>I</b> 색 반전 · <b>S</b> 가사↔악보 · <b>Esc</b> 창으로
     </p>
 
     <script src="/output/output.js"></script>

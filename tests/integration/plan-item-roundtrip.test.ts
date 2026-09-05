@@ -106,6 +106,7 @@ describe('찬양', () => {
     songLabel: '새찬송가 305장',
     langs: ['ko', 'en'],
     lines: '2',
+    sheet: true,
     display: { verseNumbers: false },
     style: STYLE,
     templateId: -3,
@@ -114,6 +115,20 @@ describe('찬양', () => {
 
   it('모든 필드가 살아남는다', () => {
     expect(roundTrip(item)).toEqual(item);
+  });
+
+  /**
+   * **기본(가사)은 값이 없는 상태다.** `false` 를 적어 두면 나중에 기본을 바꿔도
+   * 옛 순서표가 옛 기본에 묶인다 — 항목마다 끄고 켠 흔적과 구별되지 않는다.
+   */
+  it('악보를 켜지 않으면 값을 남기지 않는다', () => {
+    const after = roundTrip({ ...item, sheet: false });
+    if (after.type !== 'song') throw new Error('song 이어야 한다');
+    expect(after.sheet).toBeUndefined();
+
+    const never = roundTrip({ ...item, sheet: undefined });
+    if (never.type !== 'song') throw new Error('song 이어야 한다');
+    expect(never.sheet).toBeUndefined();
   });
 });
 
