@@ -408,6 +408,24 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
+- [시작 2026-09-05 / Agent C] Phase 6 — 맥·윈도우 배포 (사용자 요청)
+  사용자 결정 셋: ① 윈도우는 GitHub Actions 로 빌드 (이 맥에 Wine 이 없다)
+                  ② 사전 설치는 '점검 + 명령 한 줄' (자동 설치 아님, 확인받고 실행)
+                  ③ '데이터 폴더 바로가기' 는 설정 탭
+  먼저 푼 것: **Electron 이 .ts 를 읽을 수 있는가** — 기댈 필요가 없다.
+        tsc 의 `rewriteRelativeImportExtensions` 로 `./app.ts` → `./app.js` 까지
+        바꿔 그냥 JS 로 뽑힌다(실측 확인). 로더 마법 없이 어느 Node 에서나 돈다.
+        개발은 지금처럼 .ts 직접 실행 그대로 두고, **포장할 때만** 빌드한다.
+  순서(각 단계마다 커밋):
+        ① 설정 탭 '데이터 폴더 열기' — 라우트 + 단추. Electron 이 없어도 동작해야 한다
+        ② 환경 점검 카드 — OBS·폰트 확인, 빠진 것은 명령 한 줄 (실행 전 확인)
+        ③ tsconfig.build.json + electron/main + electron-builder + npm 스크립트
+        ④ .github/workflows — 맥·윈도우 동시 빌드
+  ①② 완료 (커밋함): server/routes/system.ts · lib/env-check.ts ·
+        EnvSetupCard.tsx. 설치 명령은 **흰 목록과 글자까지 같을 때만** 돈다 —
+        이 앱은 LAN 에도 열리므로 화면이 보낸 문자열을 그대로 실행하면 구멍이 된다.
+        막는 자리를 둘로 뒀다(LAN 암호 미들웨어 + 라우트 자신의 루프백 판정).
+  다음 단계: ③ tsconfig.build.json 과 electron/main 을 만든다
 - [완료 2026-09-05 / Agent C] 데이터 이전이 예배 순서의 곡 연결을 끊는다 (실측 재현)
   '집에서 준비하고 교회에서 실행하려면' 질문을 확인하다 나왔다.
   재현: 집 서버에 곡 3개 → 2번 삭제(id 에 구멍) → '셋째곡'(id 3) 을 담은 순서 작성

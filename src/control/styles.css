@@ -2759,3 +2759,89 @@ button.link-inline {
   background: color-mix(in srgb, var(--ok) 20%, transparent);
   color: var(--ok);
 }
+
+/* ── 이 PC 준비 상태 (설정 탭) ────────────────────────────────────
+   처음 설치한 사람이 **위에서 아래로 읽으며** 빠진 것을 채우는 자리다.
+   무엇이 왜 필요한지가 한 줄로 보여야 한다. */
+
+.env-list {
+  margin: 10px 0 14px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.env-list li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--row-flat);
+}
+
+/* 없으면 안 되는 것만 눈에 띄게 한다 — 다 칠하면 아무것도 안 보인다 */
+.env-list li.missing {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+
+.env-list .mark {
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.5;
+}
+.env-list li.done .mark { color: var(--ok); }
+.env-list li.missing .mark { color: var(--warn); }
+
+.env-list .body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.env-list .title { font-weight: 600; }
+.env-list .why { font-size: 0.82rem; color: var(--muted); }
+
+/* 실행할 명령을 그대로 보여 준다 — 무엇이 돌아가는지 모르고 누르게 하지 않는다 */
+.env-list .cmd {
+  margin-top: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  font-size: 0.76rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.env-list .actions { white-space: nowrap; }
+
+.button-link {
+  display: inline-block;
+  min-height: var(--ctl-h);
+  padding: var(--ctl-pad-y) var(--ctl-pad-x);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: inherit;
+  text-decoration: none;
+  line-height: 1.6;
+}
+
+.data-dir-row { align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* 단추가 안 먹는 환경에서도 어디를 찾아갈지는 알아야 한다 */
+.data-dir-row .path {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  min-width: 0;
+}

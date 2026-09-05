@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, ApiError, type ServerInfo } from '../api.ts';
+import { EnvSetupCard } from '../components/EnvSetupCard.tsx';
 import { FontSetupCard } from '../components/FontSetupCard.tsx';
 import { TabletAccessCard } from '../components/TabletAccessCard.tsx';
 
@@ -195,6 +196,12 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
 
   return (
     <>
+      {/*
+        준비 상태를 **맨 위**에 둔다. 처음 설치한 사람이 위에서 아래로 읽는데,
+        OBS 가 아직 없는 상태에서 'OBS 브라우저 소스 URL' 부터 읽어도 할 일이 없다.
+      */}
+      <EnvSetupCard dataDir={info.dataDir} />
+
       <div className="card">
         <h2>OBS 브라우저 소스 URL</h2>
         <CopyRow value={info.outputUrl} />

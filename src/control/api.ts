@@ -1,5 +1,6 @@
 /** 컨트롤 패널의 REST 호출. 모든 오류를 명시적으로 다룬다. */
 
+import type { EnvStatus } from '../../lib/env-check.ts';
 import type { SheetSummary } from '../../lib/sheet-attach.ts';
 
 
@@ -256,6 +257,17 @@ export const api = {
   duplicatePlan: (id: number, name?: string) =>
     send<ServicePlan>('POST', `/api/plans/${id}/duplicate`, name === undefined ? {} : { name }),
   deletePlan: (id: number) => send<{ deleted: number }>('DELETE', `/api/plans/${id}`),
+
+  /** 데이터 폴더를 이 PC 의 파일 탐색기에서 연다 */
+  openDataDir: () => send<{ path: string }>('POST', '/api/system/open-data-dir', {}),
+
+  /** 예배를 진행하려면 이 PC 에 무엇이 더 있어야 하는가 */
+  envCheck: () =>
+    get<{ platform: 'mac' | 'win' | 'other'; dataDir: string; items: EnvStatus[] }>('/api/system/env'),
+
+  /** 목록에 적힌 설치 명령을 돌린다 (다른 명령은 서버가 거절한다) */
+  installEnvItem: (command: string) =>
+    send<{ command: string; output: string }>('POST', '/api/system/install', { command }),
 
   backupSummary: () =>
     get<{ songs: number; templates: number; plans: number; settings: number; fonts: string[]; approximateBytes: number }>(

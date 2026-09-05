@@ -34,6 +34,7 @@ import { registerPlanRoutes } from './routes/plans.ts';
 import { registerReadingRoutes } from './routes/readings.ts';
 import { registerSongbookRoutes } from './routes/songbooks.ts';
 import { registerSongRoutes } from './routes/songs.ts';
+import { registerSystemRoutes } from './routes/system.ts';
 import { registerTemplateRoutes } from './routes/templates.ts';
 import { getState, initState } from './state.ts';
 import type { Template } from '../shared/types.ts';
@@ -260,6 +261,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   }));
 
   registerLoginRoutes(app);
+  registerSystemRoutes(app);
   registerTabletRoutes(app, options.getPort);
   await registerSongRoutes(app);
   await registerSongbookRoutes(app);
