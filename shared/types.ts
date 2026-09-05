@@ -196,6 +196,31 @@ export interface Songbook {
  * 그림은 한 장(곡 전체)이고 `crop` 이 그중 어느 단인지를 가리킨다 — 슬라이드마다
  * 파일을 따로 만들지 않는다.
  */
+/** 한 단(staff system)이 그림에서 차지하는 세로 범위 (양끝 포함, 픽셀) */
+export interface SheetSystem {
+  from: number;
+  to: number;
+  /**
+   * 이 단에서 찾은 오선 줄 수. 5 가 아니면 사람이 봐야 한다.
+   *
+   * 값을 버리지 않고 남기는 이유: 검토 화면이 '무엇이 이상한지' 를 보여 줄 수 있어야
+   * 한다. 참/거짓만 두면 4줄인지 6줄인지 알 수 없어 눈으로 다시 세야 한다.
+   */
+  lineCount: number;
+}
+
+/**
+ * 사람이 악보를 보고 내린 판정.
+ *
+ * 기계의 `needsReview`('봐야 한다') 와 다르다 — 이쪽은 사람이 '봤다' 고 답한 것이다.
+ * 한 칸에 뭉치면 둘을 구별할 수 없어져 같은 장을 몇 번이고 다시 보게 된다.
+ */
+export type SheetReviewState =
+  /** 잘 잡혔다 — 그대로 쓴다 */
+  | 'ok'
+  /** 잘못 잡혔다 — 다시 봐야 한다 */
+  | 'bad';
+
 export interface SheetRef {
   /** 출력 페이지가 그대로 쓰는 주소 (`/sheets/chanmi2000/0305.webp`) */
   src: string;

@@ -20,19 +20,11 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { SheetLayout } from '../../lib/sheet-match.ts';
+// 단 경계와 판정은 **화면까지 그대로 건너간다** — 조작 화면이 그림 위에 겹쳐 그리고
+// 승인 단추를 붙인다. 그래서 서버 안쪽이 아니라 shared 에 둔다.
+import type { SheetReviewState, SheetSystem } from '../../shared/types.ts';
 
-/** 한 단이 그림에서 차지하는 세로 범위 (양끝 포함, 픽셀) */
-export interface SheetSystem {
-  from: number;
-  to: number;
-  /**
-   * 이 단에서 찾은 오선 줄 수. 5 가 아니면 사람이 봐야 한다.
-   *
-   * 값을 버리지 않고 남기는 이유: 검토 화면이 '무엇이 이상한지' 를 보여 줄 수 있어야
-   * 한다. 참/거짓만 두면 4줄인지 6줄인지 알 수 없어 눈으로 다시 세야 한다.
-   */
-  lineCount: number;
-}
+export type { SheetReviewState, SheetSystem };
 
 export interface SheetRow {
   songbookId: string;
@@ -52,6 +44,14 @@ export interface SheetRow {
    * 같은 함정이다).
    */
   layout?: SheetLayout;
+  /**
+   * 사람이 이 장을 보고 내린 판정. **없으면 아직 안 본 것이다.**
+   *
+   * `needsReview` 와 다르다 — 그쪽은 기계가 '봐야 한다' 고 든 손이고, 이쪽은
+   * 사람이 '봤다' 고 답한 것이다. 한 칸에 뭉치면 사람이 괜찮다고 한 장과
+   * 기계가 못 미더워한 장을 구별할 수 없어져 몇 번이고 다시 보게 된다.
+   */
+  reviewState?: SheetReviewState;
   detectedAt: string;
 }
 
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS song_sheets (
   systems      TEXT NOT NULL,      -- JSON: [{ from, to, lineCount }, ...]
   needs_review INTEGER NOT NULL DEFAULT 0,
   layout       TEXT,               -- NULL = 자동 짐작. 'shared' | 'sequential'
+  review_state TEXT,               -- NULL = 아직 안 봄. 'ok' | 'bad'
   detected_at  TEXT NOT NULL,
   PRIMARY KEY (songbook_id, number)
 );
@@ -72,10 +73,12 @@ CREATE INDEX IF NOT EXISTS idx_sheets_review ON song_sheets(needs_review);
 `;
 
 /**
- * 이미 만들어진 표에 `layout` 을 붙인다 (2026-09-04).
+ * 이미 만들어진 표에 나중에 생긴 칸들을 붙인다 (2026-09-04).
  *
- * 검출을 먼저 돌려 2,061장을 넣어 둔 뒤에 이 칸이 생겼다. 지우고 다시 만들면 검출을
- * 처음부터 돌려야 하므로 컬럼만 더한다.
+ * 검출을 먼저 돌려 2,061장을 넣어 둔 뒤에 `layout`·`review_state` 가 생겼다.
+ * 지우고 다시 만들면 검출을 처음부터 돌려야 하므로 컬럼만 더한다.
+ *
+ * 서버가 뜰 때마다 불린다 — **여러 번 불러도 탈이 없어야 한다.**
  */
 export function addLayoutColumn(db: DatabaseSync): void {
   const names = new Set(
@@ -84,6 +87,7 @@ export function addLayoutColumn(db: DatabaseSync): void {
     }>).map((row) => row.name),
   );
   if (!names.has('layout')) db.exec('ALTER TABLE song_sheets ADD COLUMN layout TEXT');
+  if (!names.has('review_state')) db.exec('ALTER TABLE song_sheets ADD COLUMN review_state TEXT');
 }
 
 interface Row {
@@ -94,12 +98,18 @@ interface Row {
   systems: string;
   needs_review: number;
   layout: string | null;
+  review_state: string | null;
   detected_at: string;
 }
 
 /** 저장된 값이 아는 모양일 때만 쓴다 — 모르는 값은 자동 짐작으로 떨어뜨린다 */
 function readLayout(raw: string | null): SheetLayout | undefined {
   return raw === 'shared' || raw === 'sequential' ? raw : undefined;
+}
+
+/** 모르는 값은 **안 본 것**으로 본다 — 잘못 읽은 값 때문에 검토를 건너뛰면 안 된다 */
+function readReviewState(raw: string | null): SheetReviewState | undefined {
+  return raw === 'ok' || raw === 'bad' ? raw : undefined;
 }
 
 /**
@@ -137,6 +147,7 @@ function toRow(row: Row): SheetRow | undefined {
     systems,
     needsReview: row.needs_review === 1,
     ...(readLayout(row.layout) ? { layout: readLayout(row.layout)! } : {}),
+    ...(readReviewState(row.review_state) ? { reviewState: readReviewState(row.review_state)! } : {}),
     detectedAt: row.detected_at,
   };
 }
@@ -162,10 +173,14 @@ export function listSheets(db: DatabaseSync, songbookId?: string): SheetRow[] {
 /**
  * 넣거나 덮어쓴다. 검출을 다시 돌리면 같은 자리를 갱신한다.
  *
- * **`layout` 은 건드리지 않는다.** 사람이 정해 둔 모양을 검출이 지우면, 다시 돌릴
- * 때마다 손본 것이 조용히 날아간다.
+ * **사람이 남긴 것(`layout`·`reviewState`)은 건드리지 않는다.** 검출이 지우면
+ * 다시 돌릴 때마다 손본 것이 조용히 날아간다. 그래서 인자 타입에서 아예 뺐다 —
+ * 실수로 넘길 수조차 없게.
  */
-export function putSheet(db: DatabaseSync, sheet: Omit<SheetRow, 'detectedAt' | 'layout'> & { detectedAt?: string }): void {
+export function putSheet(
+  db: DatabaseSync,
+  sheet: Omit<SheetRow, 'detectedAt' | 'layout' | 'reviewState'> & { detectedAt?: string },
+): void {
   db.prepare(
     `INSERT INTO song_sheets (songbook_id, number, width, height, systems, needs_review, detected_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -203,9 +218,53 @@ export function setSheetLayout(
   return result.changes > 0;
 }
 
-export function countSheets(db: DatabaseSync): { total: number; needsReview: number } {
+/**
+ * 사람의 판정을 남긴다. `undefined` 면 **안 본 것으로 되돌린다.**
+ *
+ * 잘못 눌렀을 때 물릴 길이 있어야 한다 — 155장을 훑는 중에 한 번 잘못 누르면
+ * 그 장을 다시 만날 방법이 없어진다.
+ */
+export function setSheetReview(
+  db: DatabaseSync,
+  songbookId: string,
+  number: number,
+  state: SheetReviewState | undefined,
+): boolean {
+  const result = db
+    .prepare('UPDATE song_sheets SET review_state = ? WHERE songbook_id = ? AND number = ?')
+    .run(state ?? null, songbookId, number);
+  return result.changes > 0;
+}
+
+/**
+ * 사람이 봐야 하는 장 목록 — 기계가 손든 것(`needs_review`) 전부다.
+ *
+ * **이미 본 장도 함께 준다.** 빼 버리면 방금 누른 것이 목록에서 사라져 잘못
+ * 눌렀는지 확인할 수 없다 (가사 검토 탭의 '미확인만' 과 같은 규칙이다).
+ * 안 본 것을 앞에 세워, 남은 일이 위에서부터 보이게 한다.
+ */
+export function listSheetsToReview(db: DatabaseSync, songbookId?: string): SheetRow[] {
+  const where = songbookId ? 'WHERE needs_review = 1 AND songbook_id = ?' : 'WHERE needs_review = 1';
+  const sql = `SELECT * FROM song_sheets ${where}
+     ORDER BY (review_state IS NOT NULL), songbook_id, number`;
+  const rows = (songbookId ? db.prepare(sql).all(songbookId) : db.prepare(sql).all()) as unknown as Row[];
+  return rows.map(toRow).filter((one): one is SheetRow => one !== undefined);
+}
+
+/**
+ * 진행 상황. `reviewed` 는 **봐야 하는 장 중 사람이 답한 수**다.
+ *
+ * `sum()` 은 한 줄도 없으면 `null` 을 준다 — 그대로 새어 나가면 화면이
+ * '남음 null곡' 을 그린다. 여기서 0 으로 막는다.
+ */
+export function countSheets(db: DatabaseSync): { total: number; needsReview: number; reviewed: number } {
   const row = db
-    .prepare('SELECT count(*) AS total, sum(needs_review) AS review FROM song_sheets')
-    .get() as { total: number; review: number | null };
-  return { total: row.total, needsReview: row.review ?? 0 };
+    .prepare(
+      `SELECT count(*) AS total,
+              sum(needs_review) AS review,
+              sum(needs_review = 1 AND review_state IS NOT NULL) AS reviewed
+         FROM song_sheets`,
+    )
+    .get() as { total: number; review: number | null; reviewed: number | null };
+  return { total: row.total, needsReview: row.review ?? 0, reviewed: row.reviewed ?? 0 };
 }

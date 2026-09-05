@@ -13,9 +13,11 @@ import {
   countSheets,
   getSheet,
   listSheets,
+  listSheetsToReview,
   putSheet,
   SCHEMA,
   setSheetLayout,
+  setSheetReview,
   type SheetSystem,
 } from '../../server/db/sheets.ts';
 
@@ -81,11 +83,19 @@ describe('사람이 봐야 하는 표시', () => {
     putSheet(db, { songbookId: 'chanmi2000', number: 2, width: 9, height: 9, systems, needsReview: true });
     putSheet(db, { songbookId: 'chanmi2000', number: 3, width: 9, height: 9, systems, needsReview: true });
 
-    expect(countSheets(db)).toEqual({ total: 3, needsReview: 2 });
+    expect(countSheets(db)).toEqual({ total: 3, needsReview: 2, reviewed: 0 });
+
+    // 사람이 답하면 '본 수' 가 오른다 — 검토 화면의 진행 막대가 이걸 쓴다
+    setSheetReview(db, 'chanmi2000', 2, 'ok');
+    expect(countSheets(db)).toEqual({ total: 3, needsReview: 2, reviewed: 1 });
+
+    // 봐야 할 장이 아니면 세지 않는다 (1번은 needs_review 가 아니다)
+    setSheetReview(db, 'chanmi2000', 1, 'ok');
+    expect(countSheets(db).reviewed).toBe(1);
   });
 
   it('하나도 없어도 0 을 준다 (null 이 새어 나오면 안 된다)', () => {
-    expect(countSheets(db)).toEqual({ total: 0, needsReview: 0 });
+    expect(countSheets(db)).toEqual({ total: 0, needsReview: 0, reviewed: 0 });
   });
 
   /**
@@ -247,5 +257,71 @@ describe('옛 표에 칸 더하기', () => {
     setSheetLayout(db, 'chanmi2000', 1, 'sequential');
     addLayoutColumn(db);
     expect(getSheet(db, 'chanmi2000', 1)!.layout).toBe('sequential');
+  });
+});
+
+
+/**
+ * 악보 검토 — 155장(2,061장의 7.5%)을 사람이 훑는 자리가 쓰는 것들.
+ *
+ * `needs_review`(기계가 '봐야 한다' 고 든 손)와 `review_state`(사람이 '봤다' 고 답한 것)를
+ * 따로 두는 것이 요점이다. 한 칸에 뭉치면 둘을 구별할 수 없어 같은 장을 다시 보게 된다.
+ */
+describe('악보 검토', () => {
+  beforeEach(() => {
+    // 1·2번은 봐야 하는 장, 3번은 멀쩡한 장
+    putSheet(db, { songbookId: 'chanmi2000', number: 1, width: 9, height: 9, systems, needsReview: true });
+    putSheet(db, { songbookId: 'chanmi2000', number: 2, width: 9, height: 9, systems, needsReview: true });
+    putSheet(db, { songbookId: 'chanmi2000', number: 3, width: 9, height: 9, systems, needsReview: false });
+    putSheet(db, { songbookId: 'hymn_new', number: 9, width: 9, height: 9, systems, needsReview: true });
+  });
+
+  it('봐야 하는 장만 준다', () => {
+    expect(listSheetsToReview(db).map((one) => `${one.songbookId}${one.number}`)).toEqual([
+      'chanmi20001', 'chanmi20002', 'hymn_new9',
+    ]);
+  });
+
+  it('곡집으로 좁힐 수 있다', () => {
+    expect(listSheetsToReview(db, 'hymn_new')).toHaveLength(1);
+  });
+
+  /** 뺐다면 방금 누른 것이 사라져 잘못 눌렀는지 확인할 수 없다 */
+  it('이미 본 장도 목록에 남되 뒤로 간다', () => {
+    setSheetReview(db, 'chanmi2000', 1, 'ok');
+    expect(listSheetsToReview(db).map((one) => one.number)).toEqual([2, 9, 1]);
+  });
+
+  it('판정이 남는다', () => {
+    expect(setSheetReview(db, 'chanmi2000', 1, 'bad')).toBe(true);
+    expect(getSheet(db, 'chanmi2000', 1)!.reviewState).toBe('bad');
+  });
+
+  /** 155장을 훑다 한 번 잘못 누르면 그 장을 다시 만날 방법이 없어진다 */
+  it('undefined 로 되돌릴 수 있다', () => {
+    setSheetReview(db, 'chanmi2000', 1, 'ok');
+    expect(setSheetReview(db, 'chanmi2000', 1, undefined)).toBe(true);
+    expect(getSheet(db, 'chanmi2000', 1)!.reviewState).toBeUndefined();
+  });
+
+  it('없는 악보에는 아무 일도 하지 않는다', () => {
+    expect(setSheetReview(db, 'chanmi2000', 999, 'ok')).toBe(false);
+  });
+
+  it('모르는 값이 들어 있으면 안 본 것으로 본다', () => {
+    db.prepare("UPDATE song_sheets SET review_state = '글쎄' WHERE number = 1").run();
+    expect(getSheet(db, 'chanmi2000', 1)!.reviewState).toBeUndefined();
+  });
+
+  /** ⑦ 의 layout 과 같은 규칙 — 검출이 사람의 판정을 지우면 안 된다 */
+  it('다시 검출해도 사람의 판정은 남는다', () => {
+    setSheetReview(db, 'chanmi2000', 1, 'ok');
+    setSheetLayout(db, 'chanmi2000', 1, 'sequential');
+    putSheet(db, { songbookId: 'chanmi2000', number: 1, width: 77, height: 9, systems, needsReview: true });
+
+    const row = getSheet(db, 'chanmi2000', 1)!;
+    expect(row.width).toBe(77);
+    expect(row.reviewState).toBe('ok');
+    expect(row.layout).toBe('sequential');
   });
 });

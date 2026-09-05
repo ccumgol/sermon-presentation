@@ -9,7 +9,7 @@ import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { parseLyrics } from '../../lib/lyrics-parser.ts';
-import { attachSheets, isUncertain, type SheetSummary } from '../../lib/sheet-attach.ts';
+import { attachSheets, isUncertain, sheetSrc, type SheetSummary } from '../../lib/sheet-attach.ts';
 import { guessLayout } from '../../lib/sheet-match.ts';
 import * as sheets from '../db/sheets.ts';
 import {
@@ -374,6 +374,56 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       const changed = sheets.setSheetLayout(store.conn(), request.params.songbookId, number, raw);
       if (!changed) return reply.code(404).send(fail('악보를 찾을 수 없습니다'));
       return ok({ songbookId: request.params.songbookId, number, layout: raw ?? null });
+    },
+  );
+
+  /**
+   * 사람이 봐야 하는 악보 목록 — 오선이 5줄로 잡히지 않은 장들.
+   *
+   * **곡 제목을 함께 준다.** 번호만 있으면 '이게 무슨 곡이지' 를 다른 탭에서
+   * 찾아봐야 해서, 155장을 훑는 동안 손이 계속 끊긴다.
+   *
+   * 이미 본 장도 함께 준다 — 빼면 방금 누른 것이 사라져 잘못 눌렀는지 알 수 없다.
+   */
+  app.get<{ Querystring: { book?: string } }>('/api/sheets/review', async (request) => {
+    const db = store.conn();
+    const rows = sheets.listSheetsToReview(db, request.query.book);
+    const titles = store.titlesByEntry(request.query.book);
+
+    return ok({
+      counts: sheets.countSheets(db),
+      items: rows.map((sheet) => ({
+        songbookId: sheet.songbookId,
+        number: sheet.number,
+        src: sheetSrc(sheet.songbookId, sheet.number),
+        width: sheet.width,
+        height: sheet.height,
+        systems: sheet.systems,
+        titles: titles.get(`${sheet.songbookId}:${sheet.number}`) ?? [],
+        ...(sheet.reviewState ? { reviewState: sheet.reviewState } : {}),
+      })),
+    });
+  });
+
+  /**
+   * 한 장에 대한 사람의 판정. `state` 가 없으면 **안 본 것으로 되돌린다.**
+   *
+   * 155장을 훑는 중에 한 번 잘못 누르면 그 장을 다시 만날 방법이 없어지므로,
+   * 물릴 길을 반드시 둔다.
+   */
+  app.put<{ Params: { songbookId: string; number: string }; Body: { state?: unknown } }>(
+    '/api/sheets/:songbookId/:number/review',
+    async (request, reply) => {
+      const raw = request.body?.state ?? undefined;
+      if (raw !== undefined && raw !== 'ok' && raw !== 'bad') {
+        return reply.code(400).send(fail("state 는 'ok' · 'bad' · null 중 하나여야 합니다"));
+      }
+      const number = Number(request.params.number);
+      if (!Number.isInteger(number)) return reply.code(400).send(fail('번호가 올바르지 않습니다'));
+
+      const changed = sheets.setSheetReview(store.conn(), request.params.songbookId, number, raw);
+      if (!changed) return reply.code(404).send(fail('악보를 찾을 수 없습니다'));
+      return ok({ songbookId: request.params.songbookId, number, state: raw ?? null });
     },
   );
 

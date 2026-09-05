@@ -15,6 +15,7 @@ import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type { ClientMsg, ReviewItem, Song, Songbook, Template } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { ColumnResizer } from '../components/ColumnResizer.tsx';
+import { SheetReview } from '../components/SheetReview.tsx';
 import { useColumnSplit } from '../hooks/useColumnSplit.ts';
 
 interface Props {
@@ -65,6 +66,9 @@ export function ReviewPanel({ connected, template, send }: Props): React.JSX.Ele
   const [notice, setNotice] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
+
+  /** 무엇을 검토하는가 — 가사 줄나눔이 기본이다 (곡 4,529개 대 악보 155장) */
+  const [mode, setMode] = useState<ReviewMode>('lyrics');
 
   /** 왼쪽 목록 열 너비 — 제목이 긴 곡집을 볼 때와 가사를 볼 때가 다르다 */
   const split = useColumnSplit('review', { edge: 'start', min: 240, minNeighbor: 320, label: '검토 목록' });
@@ -262,8 +266,23 @@ export function ReviewPanel({ connected, template, send }: Props): React.JSX.Ele
   const remaining = pendingOnly ? total : Math.max(0, grandTotal - confirmedCount);
   const percent = grandTotal > 0 ? Math.round((confirmedCount / grandTotal) * 100) : 0;
 
+  /**
+   * 이 탭은 **자동 결과를 사람이 승인하는 자리**다. 가사 줄나눔과 악보 단 경계는
+   * 성격이 같아 여기에 함께 둔다 — 탭을 하나 더 만들면 위 줄이 빽빽해지고,
+   * 예배 준비 중에 자주 가는 곳도 아니다.
+   */
+  if (mode === 'sheet') {
+    return (
+      <div className="review-panel">
+        <ReviewModeBar mode={mode} onChange={setMode} />
+        <SheetReview />
+      </div>
+    );
+  }
+
   return (
     <div className="review-panel">
+      <ReviewModeBar mode={mode} onChange={setMode} />
       {error && (
         <div className="banner error">
           <button type="button" className="close" onClick={() => setError(null)}>닫기</button>
@@ -454,6 +473,35 @@ export function ReviewPanel({ connected, template, send }: Props): React.JSX.Ele
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+type ReviewMode = 'lyrics' | 'sheet';
+
+const MODES: ReadonlyArray<readonly [ReviewMode, string, string]> = [
+  ['lyrics', '가사 줄나눔', '자동 정렬이 제안한 줄 나눔을 승인합니다'],
+  ['sheet', '악보 단 경계', '오선을 다섯 줄 찾지 못한 악보를 확인합니다'],
+];
+
+/** 두 검토를 오가는 막대. 무엇을 보고 있는지가 **늘 보여야** 한다 */
+function ReviewModeBar({ mode, onChange }: { mode: ReviewMode; onChange: (next: ReviewMode) => void }): React.JSX.Element {
+  return (
+    <div className="review-modes">
+      <div className="toggle-row">
+        {MODES.map(([key, label, hint]) => (
+          <button
+            key={key}
+            type="button"
+            className={`toggle${mode === key ? ' active' : ''}`}
+            title={hint}
+            onClick={() => onChange(key)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );

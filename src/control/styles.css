@@ -2689,3 +2689,73 @@ button.link-inline {
 .app > .body > .col-resizer {
   margin-right: -1px;
 }
+
+/* ── 악보 단 경계 검토 (D-6 ⑥) ───────────────────────────────────
+   자동으로 잡은 단이 맞는지 **눈으로** 본다. 숫자만으로는 판단할 수 없어
+   그림 위에 잘리는 자리를 겹쳐 그린다. */
+
+.review-modes {
+  flex: 0 0 auto;
+}
+
+.sheet-detail {
+  overflow-y: auto;
+}
+
+.sheet-canvas {
+  position: relative;
+  margin-top: 12px;
+  /* 악보는 흰 종이다 — 다크 모드에서 바탕이 어두우면 가장자리가 어디인지 모른다 */
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.sheet-canvas img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/*
+ * 잘리는 자리. **채우지 않고 테두리만** 그린다 — 반투명으로 덮으면 그 안의
+ * 오선과 가사가 흐려져, 정작 봐야 할 것이 안 보인다.
+ */
+.sheet-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border: 2px solid rgba(31, 111, 235, 0.75);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* 줄 수가 5가 아닌 단 — 여기부터 보라는 표시다 */
+.sheet-band.odd {
+  border-color: rgba(212, 42, 31, 0.85);
+  border-style: dashed;
+}
+
+.sheet-band .tag {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: rgba(31, 111, 235, 0.85);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sheet-band.odd .tag {
+  background: rgba(212, 42, 31, 0.9);
+}
+
+/* 사람이 '괜찮다' 고 한 줄 — 승인한 곡과 같은 초록 칩을 쓴다 */
+.warn-chip.ok {
+  background: color-mix(in srgb, var(--ok) 20%, transparent);
+  color: var(--ok);
+}

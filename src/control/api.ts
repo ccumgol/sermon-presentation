@@ -2,10 +2,29 @@
 
 import type { SheetSummary } from '../../lib/sheet-attach.ts';
 
+
+/** 검토 목록 한 줄 — 그림 주소와 잡힌 단 경계가 함께 온다 */
+export interface SheetReviewItem {
+  songbookId: string;
+  number: number;
+  src: string;
+  width: number;
+  height: number;
+  systems: SheetSystem[];
+  /** 이 번호를 가진 곡 제목들. 같은 번호를 두 곡이 가질 수 있다 */
+  titles: string[];
+  reviewState?: SheetReviewState;
+}
+
+export interface SheetReviewList {
+  counts: { total: number; needsReview: number; reviewed: number };
+  items: SheetReviewItem[];
+}
+
 import type {
   ApiResponse, BookMeta, Deck, LangCode, Passage, ParseResult, PlanKind, ReviewQueue,
-  SearchResult, ServicePlan, Song, Songbook, SongEntry, SongSearchHit, SongSearchResult,
-  Template, Testament, Translation,
+  SearchResult, ServicePlan, SheetReviewState, SheetSystem, Song, Songbook, SongEntry,
+  SongSearchHit, SongSearchResult, Template, Testament, Translation,
 } from '../../shared/types.ts';
 
 /** 태블릿 연결 — QR 과 상태 (`/api/tablet-access`) */
@@ -280,6 +299,18 @@ export const api = {
   slideshow: (source: 'library' | 'data', folder: string) =>
     get<{ source: string; folder: string; files: BackgroundFile[] }>(
       `/api/backgrounds/slideshow?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(folder)}`,
+    ),
+
+  /** 사람이 봐야 하는 악보 목록 — 오선이 5줄로 잡히지 않은 장들 */
+  sheetsToReview: (book?: string) =>
+    get<SheetReviewList>(`/api/sheets/review${book ? `?book=${encodeURIComponent(book)}` : ''}`),
+
+  /** 한 장에 대한 판정. `null` 이면 '아직 안 봄' 으로 되돌린다 */
+  setSheetReview: (songbookId: string, number: number, state: SheetReviewState | null) =>
+    send<{ songbookId: string; number: number; state: SheetReviewState | null }>(
+      'PUT',
+      `/api/sheets/${encodeURIComponent(songbookId)}/${number}/review`,
+      { state },
     ),
 
   /**
