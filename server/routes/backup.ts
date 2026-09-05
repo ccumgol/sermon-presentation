@@ -15,6 +15,7 @@ import path from 'node:path';
 
 import type { FastifyInstance } from 'fastify';
 
+import { buildIdentityIndex, findExisting } from '../../lib/song-identity.ts';
 import type { ApiResponse, Song, Template } from '../../shared/types.ts';
 import { getConnection } from '../db/app.ts';
 import { snapshotDatabases } from '../db/snapshot.ts';
@@ -118,6 +119,13 @@ export interface ImportResult {
   /** replace 로 지우기 전에 뜬 백업 파일 (merge 면 없다) */
   backupFiles?: string[];
   fonts: number;
+  /**
+   * merge 에서 **이미 있어 건너뛴** 곡 수.
+   *
+   * `skipped` 에 넣지 않는 이유: 곡 4,531개를 두 번째로 가져오면 목록이 4,531줄이
+   * 되어 정작 봐야 할 오류가 묻힌다. 이건 오류가 아니라 정상 동작이다.
+   */
+  songsExisting: number;
   /** 건너뛴 항목 — 조용히 넘기지 않고 알린다 */
   skipped: string[];
 }
@@ -141,7 +149,7 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
     throw new Error(`지원하지 않는 버전입니다 (${String(bundle.version)}). 앱을 업데이트하세요.`);
   }
 
-  const result: ImportResult = { songs: 0, templates: 0, plans: 0, settings: 0, fonts: 0, skipped: [] };
+  const result: ImportResult = { songs: 0, templates: 0, plans: 0, settings: 0, fonts: 0, songsExisting: 0, skipped: [] };
 
   if (mode === 'replace') {
     // 지우기 **전에** 스냅샷을 남긴다.
@@ -169,13 +177,51 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
     for (const plan of plans.listPlans()) plans.deletePlan(plan.id);
   }
 
+  /*
+   * **번들의 곡 id → 이 PC 의 곡 id.**
+   *
+   * 곡을 새로 만들면 id 가 새로 매겨지는데, 예배 순서 항목은 `songId` 로 곡을
+   * 가리킨다. 이어 주지 않으면 순서에 제목은 보이는데 누르면 '곡을 찾을 수
+   * 없습니다' 가 된다 — **예배 중에** 만나는 오류다 (2026-09-05 실측 재현).
+   *
+   * 짐작할 필요가 없다: 옛 id 와 새 id 가 모두 이 번들 안에 있다.
+   */
+  const songIdMap = new Map<number, number>();
+
+  /*
+   * merge 에서 이미 있는 곡을 알아보기 위한 색인.
+   *
+   * 없으면 같은 번들을 두 번 가져올 때 곡이 통째로 복제된다. replace 는 앞에서
+   * 다 지웠으므로 만들 필요가 없다.
+   */
+  const identityIndex =
+    mode === 'merge'
+      ? buildIdentityIndex(
+          songs.listSongs(100000).flatMap((hit) => {
+            const found = songs.getSong(hit.id);
+            return found ? [{ id: found.id, title: found.title, entries: found.entries }] : [];
+          }),
+        )
+      : new Map<string, number>();
+
   for (const song of bundle.songs ?? []) {
     if (typeof song?.title !== 'string' || !Array.isArray(song.sections)) {
       result.skipped.push(`곡 '${String(song?.title ?? '?')}': 형식 오류`);
       continue;
     }
+
+    // 이미 있으면 만들지 않고 **그 곡으로 이어 준다** — 순서가 그 곡을 가리켜야 한다
+    if (mode === 'merge') {
+      const existing = findExisting(identityIndex, { title: song.title, entries: song.entries ?? [] });
+      if (existing !== undefined) {
+        if (typeof song.id === 'number') songIdMap.set(song.id, existing);
+        result.songsExisting++;
+        continue;
+      }
+    }
+
     try {
-      songs.createSong({
+      const newId = songs.createSong({
         title: song.title,
         ...(song.titleAlt ? { titleAlt: song.titleAlt } : {}),
         ...(song.author ? { author: song.author } : {}),
@@ -196,6 +242,7 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
           lines: section.lines,
         })),
       });
+      if (typeof song.id === 'number') songIdMap.set(song.id, newId);
       result.songs++;
     } catch (err) {
       result.skipped.push(`곡 '${song.title}': ${err instanceof Error ? err.message : '저장 실패'}`);
@@ -235,10 +282,30 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
         name: plan.name,
         ...(plan.serviceDate ? { serviceDate: plan.serviceDate } : {}),
         // 항목 id 를 새로 발급한다 — 다른 PC 의 id 를 그대로 쓰면 재배치가 꼬인다
-        items: (Array.isArray(plan.items) ? plan.items : []).map((item) => ({
-          ...(item as Record<string, unknown>),
-          id: plans.newItemId(),
-        })) as never,
+        items: (Array.isArray(plan.items) ? plan.items : []).map((raw) => {
+          const item: Record<string, unknown> = {
+            ...(raw as Record<string, unknown>),
+            id: plans.newItemId(),
+          };
+          if (item.type !== 'song' || typeof item.songId !== 'number') return item;
+
+          // 이 PC 에서 그 곡이 받은 id 로 바꿔 준다
+          const mapped = songIdMap.get(item.songId);
+          if (mapped !== undefined) {
+            item.songId = mapped;
+            return item;
+          }
+          /*
+           * 이을 곳이 없다 — 번들에 그 곡이 없거나 만들다 실패했다.
+           *
+           * **조용히 넘기지 않는다.** 순서에는 제목이 남아 멀쩡해 보이는데
+           * 누르면 안 나가므로, 예배 전에 알아야 고칠 수 있다.
+           */
+          result.skipped.push(
+            `예배 순서 '${plan.name}': '${String(item.songTitle ?? '제목 없음')}' 곡을 찾지 못해 연결이 끊겼습니다`,
+          );
+          return item;
+        }) as never,
       });
       result.plans++;
     } catch (err) {

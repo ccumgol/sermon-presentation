@@ -208,25 +208,36 @@ describe('데이터 이전', () => {
     // 송출 상태는 담기지 않는다 (다른 PC 에서 복원하면 엉뚱한 화면이 뜬다)
     expect(Object.keys(exported.settings as object)).not.toContain('live_state');
 
-    // 같은 서버에 다시 가져오기 (merge) — 사본이 늘어야 한다
+    /*
+     * 같은 서버에 다시 가져오기 (merge).
+     *
+     * **곡이 늘면 안 된다.** 전에는 무조건 새로 만들어서, 같은 번들을 두 번
+     * 넣으면 4,531곡이 통째로 복제됐다 (2026-09-05 에 고쳤다).
+     */
     const beforeSongs = songStore.countSongs();
-    const { body } = await send<{ songs: number; templates: number; plans: number; skipped: string[] }>(
-      'POST',
-      '/api/backup/import',
-      { bundle: exported, mode: 'merge' },
-    );
+    const { body } = await send<{
+      songs: number; templates: number; plans: number; songsExisting: number; skipped: string[];
+    }>('POST', '/api/backup/import', { bundle: exported, mode: 'merge' });
 
-    expect(body.data!.songs).toBeGreaterThan(0);
+    expect(body.data!.songs).toBe(0);
+    expect(body.data!.songsExisting).toBeGreaterThan(0);
     expect(body.data!.plans).toBeGreaterThan(0);
-    expect(body.data!.skipped).toEqual([]);
-    expect(songStore.countSongs()).toBeGreaterThan(beforeSongs);
+    /*
+     * 곡·템플릿을 저장하다 실패한 것이 없어야 한다.
+     *
+     * '연결이 끊겼습니다' 는 걸러 낸다 — 이 파일의 다른 검사들이 실제로 없는
+     * 곡(`songId: 1`)을 가리키는 순서를 만들어 두기 때문이다. 그 경고는 **맞는
+     * 경고**이고, 끊긴 연결을 알리는 것이 이 기능의 일이다.
+     */
+    expect(body.data!.skipped.filter((one) => !one.includes('연결이 끊겼습니다'))).toEqual([]);
+    expect(songStore.countSongs()).toBe(beforeSongs);
 
-    // 가져온 곡의 2언어 페어링이 살아 있는지
+    // 곡 자체는 그대로 있고, 2언어 페어링도 살아 있다
     const restored = songStore
       .searchSongs('왕복 테스트 곡')
       .hits.map((hit) => songStore.getSong(hit.id))
       .filter((s): s is NonNullable<typeof s> => s !== undefined);
-    expect(restored.length).toBeGreaterThanOrEqual(2);
+    expect(restored.length).toBeGreaterThanOrEqual(1);
     for (const song of restored) {
       expect(song!.langs.sort()).toEqual(['en', 'ko']);
       expect(song!.copyright).toBe('© 테스트');
