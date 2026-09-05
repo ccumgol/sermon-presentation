@@ -8,6 +8,41 @@
 
 ---
 
+## 2026-09-05 — 다른 맥에서 '손상되었기 때문에 열 수 없습니다'
+
+만든 맥에서는 잘 되는데 DMG 를 다른 맥에 옮기면 실행이 막혔다.
+
+**손상된 것이 아니었다.** 파일을 옮길 때 macOS 가 격리 표시
+(`com.apple.quarantine`)를 붙이고 서명을 검사하는데, 앱에 **번들 서명이 아예
+없어서** '손상됐다' 고 말한 것이다. 만든 맥에는 그 표시가 없어 그냥 열린다 —
+그래서 만든 사람은 끝까지 모른다.
+
+실측 진단:
+
+| | 고치기 전 | 고친 뒤 |
+|---|---|---|
+| `codesign -dvv` | `Identifier=Electron` · linker-signed | `Identifier=org.jiwumission.…` · adhoc |
+| `spctl` | `code has no resources but signature indicates they must be present` | `rejected` (공증 안 함) |
+| 옮긴 맥에서 | **'손상됨'** — 되돌릴 길이 안 보인다 | '확인할 수 없음' — 설정에서 열 수 있다 |
+
+`electron/after-pack.cjs` 가 빌드 뒤에 **깊은 곳부터 바깥으로** 애드혹 서명한다.
+`--deep` 은 쓰지 않는다 — Electron 에서 깨진다. 순서를 지키지 않으면
+`In subcomponent: .../chrome_crashpad_handler` 로 실패한다(x64 빌드가 실제로 그랬다).
+서명 뒤 검증에 실패하면 **빌드를 실패시킨다.**
+
+**받는 쪽은 한 줄이면 된다** (응용 프로그램에 복사한 뒤):
+
+```bash
+xattr -dr com.apple.quarantine /Applications/SermonPresentation.app
+```
+
+문서에 적어 두었던 **'오른쪽 클릭 → 열기' 는 이 경우에 듣지 않는다** — 그것은
+'확인되지 않은 개발자' 일 때 쓰는 방법이다. [PACKAGING](PACKAGING.md) 을 고쳤다.
+
+완전히 없애려면 Apple 개발자 계정으로 공증해야 한다.
+
+---
+
 ## 2026-09-05 — 설치한 앱이 성경 DB 를 못 찾던 것
 
 사용자가 자료를 데이터 폴더에 제대로 넣었는데도 **'성경 DB 가 없습니다'** 가 떴다.
