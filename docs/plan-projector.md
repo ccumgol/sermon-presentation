@@ -101,9 +101,11 @@ public/projector/index.html   →  /output/output.css + /output/output.js 를 �
 ### 아이콘을 코드로 그렸다
 
 '앱으로 설치' 를 크롬이 제안하려면 매니페스트에 **192·512 PNG** 가 있어야 한다.
-그림 파일을 저장소에 넣는 대신 `scripts/make-projector-icons.ts` 가 `node:zlib` 만으로
-그린다 — 이미지 도구를 깔지 않아도 되고, **무엇을 그렸는지 읽어서 알 수 있다**
-(바이너리는 diff 가 되지 않는다). 검은 바탕에 흰 가로 막대 셋 — 벽에 비친 글줄이다.
+아이콘은 `scripts/build-icons.ts`(`npm run icons`)가 **앱 아이콘과 같은 원본**
+(`build-resources/icon.svg`)에서 만든다. 전에는 `make-projector-icons.ts` 가
+`node:zlib` 만으로 따로 그렸는데(도구를 안 깔아도 되게), 앱 아이콘이 생기면서
+**같은 파일을 둘이 만들게 되어** 어느 쪽이 원본인지 알 수 없었다 — 하나로 합쳤다.
+홈 화면에 추가한 프로젝터와 독의 앱이 달라 보이면 안 된다 (2026-09-05).
 
 > 순서: 프로젝터 버튼 → 창을 프로젝터 화면으로 드래그 → **화면 클릭**
 > (매주 쓰면 한 번 **앱으로 설치**)

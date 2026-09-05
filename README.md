@@ -365,7 +365,7 @@ sermon-presentation/
 │   ├── realign-lyrics.ts    가사 줄나눔 재정렬 (미리보기 기본)
 │   ├── migrate-template-ids.ts   템플릿 id 이관·사본 정리
 │   ├── remove-text-quotes.ts     옛 자유 글자 인용구 정리
-│   ├── make-projector-icons.ts   프로젝터 앱 아이콘 생성 (node:zlib)
+│   ├── build-icons.ts           앱·프로젝터 아이콘 생성 (npm run icons)
 │   ├── check-praise-folder.ts    찬양 자료 폴더 점검 (읽기 전용)
 │   └── measure-meter-ranking.ts  순위 규칙 비교 측정 (쓰지 않음)
 ├── tests/

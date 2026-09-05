@@ -429,6 +429,10 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
       큰 그림도 틈을 40 → 58 로 넓혔다(32px 에서 갈라져 보이게).
     · `.gitignore` 가 `build/` 를 산출물로 보고 무시한다. 아이콘은 **저장소에
       있어야** CI(윈도우 빌드)가 쓴다 → 폴더를 `build-resources/` 로 나눴다.
+  함께 정리: scripts/make-projector-icons.ts 를 지웠다. 같은 두 파일
+        (public/projector/icon-{192,512}.png)을 새 스크립트도 만들게 되어
+        **원본이 둘**이 됐다 — 옛것을 돌리면 프로젝터 아이콘만 옛 모양으로
+        되돌아가 앱 아이콘과 어긋난다.
   검증: tsc · vitest 1,309개 · vite build · **맥 앱을 다시 빌드해 확인** —
         'default Electron icon is used' 경고가 사라졌고, 앱 안 icon.icns 의
         해시가 원본과 같다. 밝은 바탕·어두운 바탕 양쪽에서 눈으로 봤다.
