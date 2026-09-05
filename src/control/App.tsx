@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { Translation } from '../../shared/types.ts';
 import { api, type ServerInfo } from './api.ts';
+import { ColumnResizer } from './components/ColumnResizer.tsx';
 import { ControlBar } from './components/ControlBar.tsx';
 import { LivePreview } from './components/LivePreview.tsx';
 import { NextUp } from './components/NextUp.tsx';
+import { useColumnSplit } from './hooks/useColumnSplit.ts';
 import { useLiveState } from './hooks/useLiveState.ts';
 import { BiblePanel } from './panels/BiblePanel.tsx';
 import { PlanPanel } from './panels/PlanPanel.tsx';
@@ -134,6 +136,12 @@ export function App(): React.JSX.Element {
   const live = Boolean(state?.slide) && !(state?.blank ?? false);
   const theme = useTheme();
 
+  /**
+   * 오른쪽 열(미리보기 + 송출 제어) 너비. **모든 탭이 함께 쓴다** —
+   * 탭마다 따로 두면 탭을 옮길 때마다 화면이 흔들려 어디를 보던 중인지 놓친다.
+   */
+  const split = useColumnSplit('side', { edge: 'end', min: 300, minNeighbor: 420, label: '오른쪽 열' });
+
   return (
     <div className="app">
       <header className="topbar">
@@ -242,7 +250,7 @@ export function App(): React.JSX.Element {
         </div>
       </header>
 
-      <div className="body">
+      <div className="body" style={split.style}>
         <main className="main">
           {bootError && <div className="banner error">{bootError}</div>}
 
@@ -338,6 +346,8 @@ export function App(): React.JSX.Element {
           전에는 제어 버튼이 화면 전체 폭 아래에 있었고 이 열 아래는 비어 있었다.
           제어를 여기로 내리면 왼쪽 순서 목록이 그 높이를 되찾는다.
         */}
+        <ColumnResizer {...split.resizer} />
+
         <aside className="side">
           <LivePreview state={state} deck={deck} />
 

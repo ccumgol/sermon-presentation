@@ -15,6 +15,8 @@ import { formatLyrics, parseLyrics } from '../../../lib/lyrics-parser.ts';
 import { shortEntryLabel } from '../../../lib/plan-item-view.ts';
 import type { SheetSummary } from '../../../lib/sheet-attach.ts';
 import { api, ApiError } from '../api.ts';
+import { ColumnResizer } from '../components/ColumnResizer.tsx';
+import { useColumnSplit } from '../hooks/useColumnSplit.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
 import { SongbookManager } from './SongbookManager.tsx';
@@ -82,6 +84,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    * 덱을 만들 때까지 기다리면 '악보가 왜 안 나오지?' 를 **송출하고 나서야** 알게 된다.
    */
   const [sheet, setSheet] = useState<SheetSummary | undefined>(undefined);
+
+  /** 왼쪽 '곡집·검색' 열 너비. 곡을 훑을 때와 가사를 고칠 때 원하는 폭이 다르다 */
+  const split = useColumnSplit('song', { edge: 'start', min: 260, minNeighbor: 320, label: '곡 목록' });
   /**
    * 대응곡을 붙이는 중이면 검색어. `null` 이면 닫혀 있다.
    *
@@ -507,7 +512,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         </div>
       )}
 
-      <div className="song-split">
+      <div className="song-split" style={split.style}>
         <div className="card song-browse">
         <h2>곡집</h2>
         <SongbookBar
@@ -671,6 +676,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           )}
         </div>
         </div>
+
+        <ColumnResizer {...split.resizer} />
 
         <div className="song-detail">
       {!song && <p className="card hintline muted">왼쪽에서 곡을 고르면 여기에 표시 설정이 나옵니다.</p>}

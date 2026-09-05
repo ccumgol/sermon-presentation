@@ -291,9 +291,17 @@ select:focus {
   }
 }
 
-.body {
+/*
+ * `.body` 는 **줄 안쪽 칸에도 쓰이는 이름**이다 (`.cue-row .body`, `.review-row .body`
+ * 등). 그쪽이 `display: flex` 로 덮고 있어 지금까지는 탈이 없었지만, 열 너비를
+ * `--split` 변수로 물려주게 되면서 그 값이 안쪽까지 흘러가게 됐다. 껍데기 규칙은
+ * **바로 아래 자식으로 못 박아** 안쪽 줄이 실수로 물려받는 길을 끊는다.
+ */
+.app > .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  /* 가운데는 잡이(.col-resizer) 자리다. --split 은 사람이 끌어 정한 값이고,
+     없으면 380px — 미리보기와 송출 단추가 나란히 들어가는 최소 폭이다. */
+  grid-template-columns: minmax(0, 1fr) auto var(--split-side, 380px);
   min-height: 0;
 }
 
@@ -984,9 +992,14 @@ dl.meta dd {
  * 예배 중 손을 쓸 수 없게 된다. 미리보기만 감추고 제어는 남긴다.
  */
 @media (max-width: 900px) {
-  .body {
+  .app > .body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
+  }
+  /* 위아래로 쌓이면 세로 잡이가 뜻을 잃는다 (가로 잡이가 되어야 하는데
+     그 화면에서는 조절할 여유 자체가 없다) */
+  .col-resizer {
+    display: none;
   }
   .side {
     grid-template-rows: auto;
@@ -1489,8 +1502,8 @@ button.link-inline {
 
 .review-split {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
-  gap: 16px;
+  grid-template-columns: var(--split-review, minmax(280px, 1fr)) auto minmax(320px, 1.2fr);
+  gap: 5px;
   align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
@@ -1638,8 +1651,9 @@ button.link-inline {
 
 .song-split {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(340px, 1.1fr);
-  gap: 16px;
+  grid-template-columns: var(--split-song, minmax(320px, 1fr)) auto minmax(340px, 1.1fr);
+  /* 잡이(6px) 양옆에 5px 씩 — 다 합쳐 전과 같은 16px 이다 */
+  gap: 5px;
   align-items: stretch;
   height: 100%;
   min-height: 0;
@@ -2612,4 +2626,66 @@ button.link-inline {
   min-height: 22px;
   padding: 1px 8px;
   font-size: 0.78rem;
+}
+
+
+/* ── 열 잡이 ─────────────────────────────────────────────────────
+   두 열 사이를 끌어 너비를 정한다 (사용자 요청 2026-09-04).
+
+   **격자의 한 칸으로 둔다.** 열 위에 겹쳐 띄우면 그 아래 단추를 가려,
+   예배 중에 눌리지 않는 자리가 생긴다.
+
+   보이는 선은 얇아야 하지만 6px 을 겨냥해 마우스를 놓기는 어렵다 —
+   `::before` 로 좌우를 넘겨 **잡는 폭만** 키운다(자리는 그대로 6px). */
+
+.col-resizer {
+  position: relative;
+  width: 6px;
+  align-self: stretch;
+  border-radius: 3px;
+  background: transparent;
+  cursor: col-resize;
+  /* 태블릿에서 손가락으로 끌 때 화면이 함께 스크롤되지 않게 한다 */
+  touch-action: none;
+}
+
+.col-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0 -5px;
+}
+
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+  background: var(--line-strong);
+  opacity: 0.55;
+}
+
+.col-resizer:hover,
+.col-resizer:focus-visible {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: none;
+}
+
+.col-resizer:hover::after,
+.col-resizer:focus-visible::after {
+  background: var(--accent);
+  opacity: 1;
+}
+
+/* 키보드로 왔을 때는 어디에 있는지 분명해야 한다 */
+.col-resizer:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* .body 의 잡이는 오른쪽 열 테두리와 맞닿는다 — 선이 겹쳐 두 줄로 보이지 않게 */
+.app > .body > .col-resizer {
+  margin-right: -1px;
 }

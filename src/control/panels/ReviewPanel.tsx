@@ -14,6 +14,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import type { ClientMsg, ReviewItem, Song, Songbook, Template } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
+import { ColumnResizer } from '../components/ColumnResizer.tsx';
+import { useColumnSplit } from '../hooks/useColumnSplit.ts';
 
 interface Props {
   connected: boolean;
@@ -63,6 +65,9 @@ export function ReviewPanel({ connected, template, send }: Props): React.JSX.Ele
   const [notice, setNotice] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
+
+  /** 왼쪽 목록 열 너비 — 제목이 긴 곡집을 볼 때와 가사를 볼 때가 다르다 */
+  const split = useColumnSplit('review', { edge: 'start', min: 240, minNeighbor: 320, label: '검토 목록' });
 
   useEffect(() => {
     void api.songbooks().then(setSongbooks).catch(() => setSongbooks([]));
@@ -312,7 +317,7 @@ export function ReviewPanel({ connected, template, send }: Props): React.JSX.Ele
         </p>
       </div>
 
-      <div className="review-split">
+      <div className="review-split" style={split.style}>
         <div className="card review-list" ref={listRef}>
           <h2>목록 {total > 0 && `(${offset + 1}–${Math.min(offset + items.length, offset + PAGE_SIZE)} / ${total})`}</h2>
 
@@ -359,6 +364,8 @@ export function ReviewPanel({ connected, template, send }: Props): React.JSX.Ele
             </div>
           )}
         </div>
+
+        <ColumnResizer {...split.resizer} />
 
         <div className="card review-detail">
           {!current && <p className="hintline muted">왼쪽에서 곡을 고르세요.</p>}
