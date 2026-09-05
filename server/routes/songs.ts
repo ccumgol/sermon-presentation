@@ -9,6 +9,8 @@ import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { parseLyrics } from '../../lib/lyrics-parser.ts';
+import { attachSheets } from '../../lib/sheet-attach.ts';
+import * as sheets from '../db/sheets.ts';
 import {
   availableLangs,
   buildSongDeck,
@@ -186,7 +188,7 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
     const sequence =
       sectionId !== null && song.sections.some((s) => s.id === sectionId) ? [sectionId] : undefined;
 
-    const { slides, labels } = buildSongDeck(song, {
+    const { slides, labels, slideSections, sectionLines } = buildSongDeck(song, {
       langs,
       linesPerSlide,
       includeCredit,
@@ -194,15 +196,43 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       ...(sequence ? { sequence } : {}),
     });
 
+    /*
+     * 악보가 있으면 슬라이드마다 **어느 단인지**를 실어 보낸다.
+     *
+     * 여기서 붙이는 이유: 덱은 한 번 만들어져 여러 화면으로 간다. 화면마다 따로
+     * 계산하면 프로젝터와 조작 화면이 다른 단을 가리킬 수 있다.
+     *
+     * 곡이 여러 곡집에 실렸으면 **악보가 있는 첫 수록**을 쓴다. 같은 곡의 악보는
+     * 어느 곡집 것이든 같은 가락이라 아무거나 쓰면 되고, 없는 것을 찾아 헤매느니
+     * 있는 것을 바로 쓰는 편이 낫다.
+     */
+    let withSheets = slides;
+    for (const entry of song.entries) {
+      if (entry.number === undefined) continue;
+      const sheet = sheets.getSheet(store.conn(), entry.songbookId, entry.number);
+      if (!sheet || sheet.systems.length === 0) continue;
+      withSheets = attachSheets(slides, {
+        slideSections,
+        sectionLines,
+        sheet: {
+          songbookId: sheet.songbookId,
+          number: sheet.number,
+          height: sheet.height,
+          systems: sheet.systems,
+        },
+      });
+      break;
+    }
+
     const deck: Deck = {
       reference: deckReference(song),
-      slides,
+      slides: withSheets,
       labels,
       index: 0,
     };
 
     // 덱을 만들어 준 시점을 '사용'으로 본다 — 최근 목록의 근거가 된다
-    if (slides.length > 0) store.markUsed(song.id);
+    if (withSheets.length > 0) store.markUsed(song.id);
 
     // 요청한 언어 중 이 곡에 없는 것을 조용히 넘기지 않고 알린다
     const missingLangs = langs.filter((lang) => !song.langs.includes(lang));

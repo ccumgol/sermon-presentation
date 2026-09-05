@@ -190,6 +190,26 @@ export interface Songbook {
   songCount: number;
 }
 
+/**
+ * 가사 한 슬라이드에 대응하는 **악보 조각**.
+ *
+ * 그림은 한 장(곡 전체)이고 `crop` 이 그중 어느 단인지를 가리킨다 — 슬라이드마다
+ * 파일을 따로 만들지 않는다.
+ */
+export interface SheetRef {
+  /** 출력 페이지가 그대로 쓰는 주소 (`/sheets/chanmi2000/0305.webp`) */
+  src: string;
+  /** 원본의 세로 몇 %부터 몇 %까지 (0~100) — `image` 슬라이드의 `crop` 과 같은 규격 */
+  crop: { top: number; bottom: number };
+  /**
+   * 배분이 흔들릴 수 있는 곡인가.
+   *
+   * 줄 수와 단 수가 어긋나면(전체의 26%) 어느 단인지 짐작이 틀릴 수 있다.
+   * 화면에는 영향을 주지 않고 **조작 화면이 알려 주는 데** 쓴다.
+   */
+  uncertain?: boolean;
+}
+
 /** 곡이 어느 곡집 몇 번으로 실렸는지 */
 export interface SongEntry {
   songbookId: string;
@@ -868,6 +888,14 @@ export type SlidePayload =
       display?: ItemDisplay;
       /** 항목이 정한 폰트 (없으면 템플릿 따름) */
       style?: ItemTextStyle;
+      /**
+       * 이 줄에 해당하는 **악보 조각**. 있으면 프로젝터가 가사 대신 이것을 그린다.
+       *
+       * 가사 슬라이드에 실어 보내는 이유: 화면마다 다른 것을 보여 줘야 하는데
+       * (프로젝터는 악보, OBS·강사 모니터는 가사) 슬라이드를 두 벌 만들면 진행 위치가
+       * 갈라진다. 한 슬라이드에 둘 다 담고 **보는 쪽이 고른다.**
+       */
+      sheet?: SheetRef;
     }
   /** `background`·`style` 은 전례문(주기도문·사도신경)이 실어 보낼 때만 찬다 */
   | { kind: 'text'; lines: string[]; background?: ItemBackground; style?: ItemTextStyle }

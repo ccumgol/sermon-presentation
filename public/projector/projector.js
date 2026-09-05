@@ -42,6 +42,9 @@
    */
   var FULL_KEY = 'sermon.projector.fullscreen';
 
+  /** 악보 보기 — 이 창에서만, 다음에 열 때도 그대로 (`S` 로 끄고 켠다) */
+  var SHEET_KEY = 'sermon.projector.sheet';
+
   /** localStorage 는 없거나 막혀 있을 수 있다. 그때도 화면은 떠야 한다 */
   function save(key, value) {
     try {
@@ -265,6 +268,38 @@
     enterFull();
   });
 
+  // ── 가사 대신 악보 ───────────────────────────────────────────
+  /*
+   * 곡 슬라이드가 악보 조각(`sheet`)을 함께 들고 온다. 프로젝터는 그것을 그리고,
+   * OBS 화면과 강사 모니터는 가사를 그대로 그린다 (사용자 결정: 강사 모니터에는
+   * 가사가 나가야 한다).
+   *
+   * **서버가 골라 주지 않고 여기서 고른다.** 서버가 화면마다 다른 슬라이드를 보내면
+   * 덱이 갈라져 진행 위치가 어긋난다. 한 슬라이드가 둘을 들고 다니면 끄고 켜는 것도
+   * 이 창에서 바로 된다 — 예배 중에 조작 화면까지 가지 않아도 된다.
+   *
+   * 기본은 **켬**. 악보가 없는 곡·성경·광고는 자동으로 가사가 나간다.
+   */
+  var sheetOn = load(SHEET_KEY) !== '0';
+
+  window.SermonSlideFilter = function (slide) {
+    if (!sheetOn || !slide || slide.kind !== 'song' || !slide.sheet) return slide;
+    return {
+      kind: 'image',
+      src: slide.sheet.src,
+      alt: (slide.title || '') + ' ' + (slide.sectionLabel || ''),
+      crop: slide.sheet.crop,
+    };
+  };
+
+  /** 지금 화면을 새 설정으로 다시 그린다 — 다음 슬라이드까지 기다리지 않게 */
+  function applySheet(next, remember) {
+    sheetOn = next;
+    if (remember) save(SHEET_KEY, next ? '1' : '0');
+    var api = window.SermonOutput;
+    if (api && typeof api.redraw === 'function') api.redraw();
+  }
+
   window.addEventListener('keydown', function (event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     // 지난번에 전체 화면이었다면 아무 키에서든 들어간다 (아래 처리보다 먼저)
@@ -275,6 +310,7 @@
     else if (key === '0') applyZoom(1, true);
     else if (key === 'i' || key === 'I') applyInvert(!inverted, true);
     else if (key === 'f' || key === 'F') toggleFull();
+    else if (key === 's' || key === 'S') applySheet(!sheetOn, true);
     else return;
     event.preventDefault();
     showBar();

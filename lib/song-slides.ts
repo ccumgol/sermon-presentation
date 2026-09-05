@@ -233,6 +233,21 @@ export function describeSongSlide(slide: SlidePayload, indexInSection: number, t
   return totalInSection > 1 ? `${slide.sectionLabel} ${indexInSection + 1}/${totalInSection}` : slide.sectionLabel;
 }
 
+export interface SongDeck {
+  slides: SlidePayload[];
+  labels: string[];
+  /**
+   * 슬라이드마다 **몇 번째 섹션**의 것인지 (`sequence` 를 준 경우 그 순서 기준).
+   *
+   * 악보 맞추기가 이걸 쓴다 — 절이 바뀌는 자리를 알아야 악보의 어느 단인지 정할 수
+   * 있다. 슬라이드의 `sectionLabel` 로는 안 된다: 라벨이 같은 섹션이 둘인 곡이 있다
+   * (실제 자료에 `1절 2절 2절` 이 있다).
+   */
+  slideSections: number[];
+  /** 섹션마다 줄이 몇 개인지 — `slideSections` 와 같은 순서·기준이다 */
+  sectionLines: number[];
+}
+
 /**
  * 곡 전체 슬라이드에 라벨을 붙인다.
  * 섹션 안에서 몇 번째인지 표시해야 오퍼레이터가 위치를 알 수 있다.
@@ -240,7 +255,7 @@ export function describeSongSlide(slide: SlidePayload, indexInSection: number, t
 export function buildSongDeck(
   song: Song,
   options: SongSlideOptions & { sequence?: number[] },
-): { slides: SlidePayload[]; labels: string[] } {
+): SongDeck {
   const order = options.sequence
     ? options.sequence.flatMap((id) => {
         const section = song.sections.find((s) => s.id === id);
@@ -250,16 +265,23 @@ export function buildSongDeck(
 
   const slides: SlidePayload[] = [];
   const labels: string[] = [];
+  const slideSections: number[] = [];
 
-  for (const section of order) {
+  for (const [sectionIndex, section] of order.entries()) {
     const sectionSlides = buildSectionSlides(song, section, options);
     for (const [index, slide] of sectionSlides.entries()) {
       slides.push(slide);
       labels.push(describeSongSlide(slide, index, sectionSlides.length));
+      slideSections.push(sectionIndex);
     }
   }
 
-  return { slides, labels };
+  return {
+    slides,
+    labels,
+    slideSections,
+    sectionLines: order.map((section) => new Set(section.lines.map((line) => line.lineIndex)).size),
+  };
 }
 
 /** 곡이 실제로 가진 언어 목록에서 표시 가능한 조합을 추린다 */

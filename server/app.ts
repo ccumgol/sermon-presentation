@@ -158,6 +158,28 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   });
 
   /**
+   * 악보 그림 (`data/sheets/<곡집>/NNNN.webp`).
+   *
+   * 배경과 같은 이유로 따로 붙인다 — `data/` 안이라 `public` 밖이다.
+   *
+   * **배경과 다른 점: 캐시를 길게 준다.** 악보는 `npm run sheets:convert` 로 한 번
+   * 만들고 나면 바뀌지 않고, 한 장이 20~40KB 인데 예배 중 슬라이드를 넘길 때마다
+   * 같은 그림을 다시 받으면 프로젝터가 깜박인다. 다시 변환하면 파일이 바뀌므로
+   * 그때는 `--force` 뒤 브라우저 새로고침이 필요하다.
+   */
+  if (existsSync(paths.sheetsDir)) {
+    await app.register(fastifyStatic, {
+      root: paths.sheetsDir,
+      prefix: '/sheets/',
+      decorateReply: false,
+      index: false,
+      setHeaders(res) {
+        res.header('Cache-Control', 'public, max-age=86400');
+      },
+    });
+  }
+
+  /**
    * 사용자가 모아 둔 배경 그림 폴더 (`~/Desktop/Data/Background`).
    *
    * **읽기만 한다** — 올리기·삭제·총량 상한은 `data/backgrounds/` 쪽 얘기다.

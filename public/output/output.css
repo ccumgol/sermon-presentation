@@ -407,12 +407,50 @@ body.blanked .slide {
  * 상자가 넘치는 부분을 가리고, 그림을 키워 위로 밀어 올린다. 그림을 여러 장으로
  * 잘라 두지 않아도 되는 이유가 이것이다.
  */
-.image-slide.cropped { align-items: flex-start; }
-.image-slide.cropped img { width: 100%; max-width: 100%; max-height: none; object-fit: fill; }
+/*
+ * 자르기 — 창(`.crop-window`)이 보이는 띠와 같은 비를 갖고, 그림이 그 안에서
+ * 위로 밀려 올라간다. 창을 화면 안에 `contain` 시키면 늘어나지 않는다.
+ */
+.image-slide.cropped { align-items: center; }
+.image-slide.cropped .crop-window {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  /* aspect-ratio 는 그림이 받아진 뒤 output.js 가 넣는다 (원본 크기를 알아야 한다) */
+}
+/*
+ * 선택자를 길게 쓴다 — 위의 `.image-slide img.fit-contain` 이 `max-height: 100%` 로
+ * 그림을 창 높이에 눌러 붙여서 띠가 안 보였다 (2026-09-04 실측). 우선순위를 넘겨야 한다.
+ */
+.image-slide.cropped .crop-window img {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+}
 
 /*
  * 그림 슬라이드일 때만 무대 여백을 없앤다 — 안내 그림·악보는 화면을 꽉 써야 한다.
  * 글자 슬라이드로 돌아가면 여백이 되살아난다 (render 가 클래스를 끈다).
  */
 body.full-bleed .stage { padding: 0; }
-body.full-bleed .slide { max-width: none; }
+
+/*
+ * 그림 슬라이드는 **화면 높이를 그대로 물려받아야** 한다.
+ *
+ * `.stage` 는 grid 이고 `align-items` 가 템플릿의 세로 정렬(대개 `center`)이라
+ * `.slide` 가 내용 크기로 잡힌다. 그런데 `.image-slide` 는 `height: 100%` 라
+ * 부모 높이를 물어보고, 부모는 자식 크기를 물어보아 **서로를 기다리다 0 이 된다.**
+ * 그러면 `overflow: hidden` 이 그림을 통째로 가려 화면이 새까맣게 나간다
+ * (2026-09-04 프로젝터에서 실측 — 상자 0px, 그림은 화면 밖 -1009px).
+ *
+ * 그림일 때만 `stretch` 로 바꿔 높이를 정해 준다. 글자 슬라이드는 그대로 가운데
+ * 정렬을 쓴다 — 본문은 화면을 채우는 것이 아니라 가운데 놓이는 것이 맞다.
+ */
+body.full-bleed .stage { align-items: stretch; justify-items: stretch; }
+body.full-bleed .slide { max-width: none; max-height: none; height: 100%; }
+body.full-bleed .blocks { flex: 1; min-height: 0; }

@@ -177,6 +177,8 @@ export function createWsHub(server: Server, log: Logger): WsHub {
     for (const client of clients.values()) sendTemplate(client.socket, templateFor(client, template));
   }
 
+
+
   /**
    * 접속 수를 컨트롤 패널에 알린다. 폴링 대신 변화 시점에만 보낸다 —
    * 3초마다 REST 를 찌르면 예배 중 로그와 CPU 를 낭비한다.
