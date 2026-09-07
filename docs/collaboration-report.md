@@ -522,6 +522,17 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
         `vitest run --coverage` 통과
   다음 단계: PlanPanel.tsx(2,549줄)이 남은 가장 큰 빚이다. **R-4 훅 분리 뒤에**
         붙이는 편이 낫다 — 예배를 진행하는 화면이라 기계적으로 밀어붙이지 않는다.
+- [시작 2026-09-07 / Agent C] R-4 이어서 — usePlanAdd · usePlanStorage (사용자 요청)
+  왜: 앞의 셋(plan-item-template · usePlanPreview · usePlanSend)과 같은 방식이 통한다.
+      남은 로직 덩이가 이 둘이다. JSX 재설계는 별건이라 이번에도 손대지 않는다.
+  계획:
+    · usePlanAdd    — 614~931 (찬양·교독문 검색 디바운스 · 항목 추가 열두 종류)
+    · usePlanStorage — 206~495 (유형·회차 읽기 · 저장 · 삭제 · 이름 바 · 초안)
+  안전 규칙: 앞과 같다. **동작을 바꾸지 않는다.** 결합을 먼저 실측해 얇은 자리를 고르고,
+      훅 하나 옮길 때마다 tsc + vitest + build, 그리고 브라우저로 실제로 눌러 본다.
+      순서표 저장은 **사용자 데이터를 쓰는 길**이라 격리 서버에서만 확인한다.
+  다음 단계: 두 덩이의 공유 식별자를 먼저 센다 — 추가 쪽이 rows/cursor 를 만지므로
+      usePlanSend 보다 결합이 셀 수 있다.
 - [완료 2026-09-07 / Agent C] R-4 PlanPanel 훅 분리 → 검사 (사용자 요청, 순서 지정)
   결과: 9f14df0(usePlanPreview) · 83f2eaf(버그 + lib 순수 함수) ·
         afa5079(usePlanSend + 죽은 import) · 23b92f7(검사 78개).

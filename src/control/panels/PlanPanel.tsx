@@ -28,13 +28,13 @@ import { verseQuotes } from '../../../lib/verse-quotes.ts';
 import { PlanItemEditor } from '../components/PlanItemEditor.tsx';
 import { BackgroundSelect } from '../components/BackgroundSelect.tsx';
 import {
-  ADD_KINDS, DEFAULT_GROUPS, MAX_SECONDARY, ORDER_PRESETS,
+  ADD_KINDS, MAX_SECONDARY, ORDER_PRESETS,
   itemIcon, itemMeta, slideSummary, songLabelOf, today, type AddKind,
 } from '../../../lib/plan-item-view.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
   type ClientMsg, type CueItem, type Deck, type LangCode,
-  type PlanDefaults, type PlanKind, type ServicePlan,
+  type PlanDefaults,
   type Template, type Translation,
 } from '../../../shared/types.ts';
 import {
@@ -42,10 +42,11 @@ import {
   type BackgroundFile, type ReadingBook, type ReadingSummary,
 } from '../api.ts';
 import { isComposing } from '../ime.ts';
-import { clearPlanDraft, readPlanDraft, writePlanDraft } from './plan-draft.ts';
 import { DEFAULT_LITURGY_VERSION, LITURGY_TEXTS } from '../../../lib/liturgy-texts.ts';
+import { usePlanDraft } from '../hooks/usePlanDraft.ts';
 import { usePlanPreview } from '../hooks/usePlanPreview.ts';
 import { usePlanSend } from '../hooks/usePlanSend.ts';
+import { usePlanStorage } from '../hooks/usePlanStorage.ts';
 
 /**
  * 찬양 검색에서 한 번에 보여 줄 곡 수. '찬양' 탭(60)보다 적은 이유는
@@ -71,29 +72,16 @@ interface Props {
 export function PlanPanel({
   deck, currentIndex, connected, template, translations, defaultTranslation, send,
 }: Props): React.JSX.Element {
-  /** 예배 유형(주일예배·수요예배 …) — 매주 고쳐 쓰는 원본 */
-  const [templates, setTemplates] = useState<ServicePlan[]>([]);
-  /** 저장해 둔 회차 — 지난주 순서를 다시 열 때 */
-  const [saved, setSaved] = useState<ServicePlan[]>([]);
   /**
-   * 탭을 옮겼다 돌아온 것이면 편집 중이던 초안을 되살린다.
-   *
-   * `useState(() => …)` 로 **첫 렌더에** 넣는 것이 중요하다. effect 로 나중에 넣으면
-   * 그 사이에 '아무것도 열지 않았으면 첫 유형을 연다' 규칙이 먼저 돌아 기본 유형이
-   * 들어차고, 초안이 그것을 덮어써 화면이 한 번 튄다.
+   * 편집 중인 것 — 이 화면의 척추다 (usePlanDraft, 2026-09-07 R-4).
+   * 읽기·저장과 항목 추가가 둘 다 이것을 붙잡으므로 먼저 떼어냈다.
    */
-  const [restored] = useState(readPlanDraft);
+  const draft = usePlanDraft();
+  const {
+    plan, setPlan, items, setItems, dirty, setDirty,
+    cursor, setCursor, expandedId, setExpandedId, patchItems,
+  } = draft;
 
-  /** 지금 편집 중인 것이 어디서 왔는지 */
-  const [plan, setPlan] = useState<ServicePlan | null>(restored?.plan ?? null);
-  const [items, setItems] = useState<CueItem[]>(restored?.items ?? []);
-
-  /** 이름을 받아야 하는 저장 동작 (유형 만들기 / 순서 저장하기) */
-  const [nameBar, setNameBar] = useState<{ kind: PlanKind; value: string; renameId?: number } | null>(
-    null,
-  );
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const [loadOpen, setLoadOpen] = useState(false);
   /** 기본 설정 패널을 펼쳤는지 */
   const [defaultsOpen, setDefaultsOpen] = useState(false);
   /**
@@ -104,21 +92,9 @@ export function PlanPanel({
    * (2026-08-18 실측). 접을 수 있게 하고 높이도 제한한다.
    */
   const [detailOpen, setDetailOpen] = useState(true);
-  const [dirty, setDirty] = useState(restored?.dirty ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  /**
-   * 선택(커서) — **줄** 번호다. 펼친 슬라이드도 한 줄로 센다.
-   *
-   * 항목 번호가 아니라 줄 번호인 이유는 3차 재설계에서 오른쪽 열을 없애고
-   * 슬라이드를 목록 안으로 넣었기 때문이다(docs/plan-service-tab-3.md).
-   */
-  const [cursor, setCursor] = useState(restored?.cursor ?? 0);
-
-  /** 펼친 항목 — 한 번에 하나만. 여러 개가 열리면 목록이 길어져 진행이 안 보인다. */
-  const [expandedId, setExpandedId] = useState<string | null>(restored?.expandedId ?? null);
 
   /**
    * 단독으로 송출한 항목 — 빨간 점을 켜기 위해 기억한다.
@@ -204,294 +180,23 @@ export function PlanPanel({
   const current = currentRow ? items[currentRow.itemIndex] : undefined;
 
   // ── 순서표 읽기·저장 ────────────────────────────────────────
-
-  const reload = useCallback(async () => {
-    try {
-      const [templateList, savedList] = await Promise.all([api.plans('template'), api.plans('plan')]);
-      setTemplates(templateList);
-      setSaved(savedList);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '예배 순서를 불러오지 못했습니다');
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  /**
-   * 아무것도 열지 않았으면 첫 유형을 연다.
-   *
-   * 빈 화면에서 시작하면 매번 '무엇을 골라야 하는지' 부터 판단해야 한다.
-   * 편집 중인 것이 있으면(=plan) 건드리지 않는다.
-   */
-  useEffect(() => {
-    if (plan || templates.length === 0) return;
-    const first = templates[0];
-    if (first) {
-      setPlan(first);
-      setItems(first.items);
-      setDirty(false);
-      setCursor(0);
-    }
-  }, [templates, plan]);
-
-  /**
-   * 편집 상태를 초안에 담는다 — 탭을 옮기면 이 패널은 언마운트된다.
-   *
-   * 커서까지 담는 이유: 20개짜리 순서에서 돌아왔을 때 커서가 맨 위로 튀면
-   * 어디까지 짜던 중이었는지 다시 찾아야 한다.
-   */
-  useEffect(() => {
-    if (!plan) return;
-    writePlanDraft({ plan, items, dirty, cursor, expandedId });
-  }, [plan, items, dirty, cursor, expandedId]);
-
-  /** 편집 중인 변경을 잃는 자리에는 반드시 확인을 받는다 */
-  function openPlan(target: ServicePlan): void {
-    if (dirty && !window.confirm('저장하지 않은 변경이 있습니다. 그래도 여시겠습니까?')) return;
-    setPlan(target);
-    setItems(target.items);
-    // 추가 바의 역본도 이 예배의 기본값에서 시작한다
-    setAddPrimary(target.defaults?.bible?.primary ?? defaultTranslation);
-    setAddSecondary(target.defaults?.bible?.secondary ?? []);
-    setDirty(false);
-    setCursor(0);
-    setNotice(null);
-    setLoadOpen(false);
-    setNameBar(null);
-  }
-
-  /**
-   * '이름 바꾸기' 를 열 때 기존 이름을 전체 선택한다.
-   *
-   * 칸이 이미 차 있는데 선택돼 있지 않으면 커서가 끝에 붙어, 새 이름을 치는 순간
-   * 옛 이름 뒤에 이어 붙는다('주일예배' + '주일 1부 예배').
-   *
-   * **'순서 저장하기' 에는 걸지 않는다** — 거기는 '2026-08-17 주일 1부 예배' 처럼
-   * 날짜가 채워져 있어 대개 그대로 쓰거나 뒤에 덧붙인다. 전체 선택하면 날짜까지
-   * 다시 쳐야 한다.
-   *
-   * 의존성에 `value` 를 넣으면 안 된다 — 한 글자 칠 때마다 전체가 선택돼
-   * 다음 글자가 앞의 것을 지운다.
-   */
-  const renamingId = nameBar?.renameId;
-  useEffect(() => {
-    if (renamingId !== undefined) nameInputRef.current?.select();
-  }, [renamingId]);
-
-  /** 지금 열어 둔 것을 뭐라고 부르는가 — 버튼·안내 문구가 이걸 따른다 */
-  const planNoun = plan?.kind === 'template' ? '유형' : '순서';
-  /** 목적격까지 붙인 것 — '유형을' / '순서를'. 받침이 달라 조사를 이어 붙일 수 없다 */
-  const planNounObj = plan?.kind === 'template' ? '유형을' : '순서를';
-  /**
-   * 저장 버튼의 이름. 안내 문구가 **실제 버튼과 같은 말**을 가리켜야 한다 —
-   * 다르면 화면에 없는 버튼을 찾게 된다.
-   */
-  const saveLabel = plan?.kind === 'template' ? '템플릿 업데이트' : '저장하기';
-
-  /**
-   * **열어 둔 것에 그대로 저장한다** — 유형이면 '템플릿 업데이트', 저장된 순서면 '저장하기'.
-   *
-   * 전에는 유형만 이 길이 있었다. 저장된 순서를 불러와 고치면 '순서 저장하기' 로
-   * 이름을 **다시 쳐서 같은 이름을 맞혀야** 덮어쓸 수 있었다. 이름이
-   * '2026-08-17 주일 1부 예배' 처럼 길어 한 글자만 달라도 덮어쓰기가 아니라
-   * 새 순서가 하나 더 생겼다 (2026-09-03 사용자 보고).
-   */
-  async function saveCurrent(): Promise<void> {
-    if (!plan) return;
-    const noun = plan.kind === 'template' ? '유형' : '순서';
-    // '유형을' / '순서를' — 받침이 달라 조사를 이어 붙일 수 없다
-    const nounObj = plan.kind === 'template' ? '유형을' : '순서를';
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await api.updatePlan(plan.id, {
-        name: plan.name,
-        items,
-        defaults: plan.defaults ?? null,
-      });
-      setPlan(result.plan);
-      setItems(result.plan.items);
-      setDirty(false);
-      await reload();
-      setNotice(
-        result.rejected && result.rejected.length > 0
-          ? `${nounObj} 갱신했지만 ${result.rejected.length}개 항목을 버렸습니다: ${result.rejected.join(', ')}`
-          : `'${result.plan.name}' ${noun}에 저장했습니다`,
-      );
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * 같은 이름이 이미 있는지 — 있으면 버튼이 '덮어쓰기' 로 바뀐다.
-   * 이름을 바꾸는 중이면 **자기 자신은 빼고** 본다 (자기 이름과 겹친다고 막으면 안 된다).
-   */
-  const nameBarTarget = nameBar
-    ? (nameBar.kind === 'template' ? templates : saved).find(
-        (p) => p.name === nameBar.value.trim() && p.id !== nameBar.renameId,
-      )
-    : undefined;
-
-  /** 이름 입력 바 확정 — 새로 만들거나, 같은 이름이 있으면 덮어쓴다 */
-  async function commitNameBar(): Promise<void> {
-    if (!nameBar) return;
-    const name = nameBar.value.trim();
-    if (name.length === 0) return;
-
-    setBusy(true);
-    setError(null);
-    try {
-      // 이름만 바꾼다 — 항목은 건드리지 않는다.
-      // 지금 화면의 items 를 함께 보내면, 아직 저장하지 않은 편집까지 조용히 굳는다.
-      if (nameBar.renameId !== undefined) {
-        const renamed = await api.updatePlan(nameBar.renameId, { name });
-        /*
-          **이름만 바꾸고 편집 중인 것은 그대로 둔다.**
-
-          서버가 돌려주는 plan 에는 **저장된** 기본 설정이 들어 있다. 그것을 그대로
-          넣으면 아직 저장하지 않은 기본 설정 편집이 조용히 사라진다 — items 는
-          별도 state 라 살아남는데 defaults 만 없어져, '저장 안 됨' 이 떠 있는 채로
-          방금 고친 역본·템플릿이 옛 값으로 돌아간다.
-        */
-        const current = plan;
-        if (current?.id === nameBar.renameId) {
-          setPlan({
-            ...renamed.plan,
-            ...(current.defaults ? { defaults: current.defaults } : {}),
-          });
-        }
-        setNameBar(null);
-        await reload();
-        setNotice(`이름을 '${name}' 으로 바꿨습니다`);
-        return;
-      }
-
-      // 빈 상태에서 유형을 만들면 뼈대를 넣어 준다 — 빈 목록은 무엇을 할 수 있는지 알려주지 못한다
-      const payload: CueItem[] =
-        items.length === 0 && nameBar.kind === 'template'
-          ? DEFAULT_GROUPS.map((label) => ({ id: newItemId(), type: 'divider', label }))
-          : items;
-
-      /*
-        회차 날짜. 유형에서 '순서 저장하기' 로 오면 오늘 예배를 남기는 것이니 오늘이다.
-        저장된 순서에서 '다른 이름으로 저장' 으로 오면 **그 회차의 날짜를 물려받는다** —
-        오늘로 찍으면 지난주 순서를 복제한 것이 '2026-09-03 · 2026-08-17 주일 2부' 처럼
-        날짜 둘이 붙어 목록에서 어느 주의 것인지 읽히지 않는다.
-      */
-      const serviceDate =
-        nameBar.kind !== 'plan' ? '' : plan?.kind === 'plan' ? (plan.serviceDate ?? '') : today();
-
-      const result = nameBarTarget
-        ? await api.updatePlan(nameBarTarget.id, { name, items: payload, defaults: plan?.defaults ?? null })
-        : (await api.createPlan(name, serviceDate, payload, nameBar.kind));
-
-      setPlan(result.plan);
-      setItems(result.plan.items);
-      setDirty(false);
-      setNameBar(null);
-      await reload();
-      setNotice(
-        `${nameBar.kind === 'template' ? '유형' : '순서'} '${name}' 을(를) ` +
-          `${nameBarTarget ? '덮어썼습니다' : '저장했습니다'}`,
-      );
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * 유형 복제 — '주일 1부' 를 놔둔 채 '주일 2부' 를 만드는 길.
-   * 비슷한 유형을 여럿 두는 것이 실제 운영이라, 처음부터 짜는 것보다 이게 기본이다.
-   */
-  async function duplicateCurrent(): Promise<void> {
-    if (!plan) return;
-    setBusy(true);
-    setError(null);
-    try {
-      // 서버가 kind 를 그대로 물려준다 — 순서를 복제하면 순서가 된다
-      const copy = await api.duplicatePlan(plan.id);
-      await reload();
-      openPlan(copy);
-      setNotice(`'${copy.name}' 을(를) 만들었습니다 — 이름을 바꿔 쓰세요`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '복제하지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * 유형 삭제.
-   *
-   * 유형을 **전부** 지우면 다음 서버 시작 때 기본 넷이 되살아난다
-   * (`seedDefaultTemplates` 는 '하나도 없을 때'만 넣는다). 지우고 나서 되살아나면
-   * 고장으로 보이므로 미리 알린다.
-   */
-  async function removeTemplate(): Promise<void> {
-    if (!plan) return;
-    // 저장된 순서는 지우는 절차가 따로 있다 ('순서 불러오기' 목록의 ✕ 와 같은 길)
-    if (plan.kind !== 'template') {
-      void removeSaved(plan);
-      return;
-    }
-    const last = templates.length <= 1;
-    const warning = last
-      ? '\n\n마지막 유형입니다. 모두 지우면 다음 서버 시작 때 기본 유형이 되살아납니다.'
-      : '';
-    if (!window.confirm(`예배 유형 '${plan.name}' 을(를) 지웁니다. 되돌릴 수 없습니다.${warning}`)) return;
-
-    setBusy(true);
-    setError(null);
-    try {
-      await api.deletePlan(plan.id);
-      setPlan(null);
-      setItems([]);
-      setDirty(false);
-      // 초안도 함께 버린다 — 남겨 두면 다음에 이 탭을 열 때 지운 유형이 되살아난다
-      clearPlanDraft();
-      await reload();
-      setNotice(`유형 '${plan.name}' 을(를) 지웠습니다`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** 저장된 순서 삭제 — 되돌릴 수 없으므로 확인을 받는다 */
-  async function removeSaved(target: ServicePlan): Promise<void> {
-    if (!window.confirm(`저장된 순서 '${target.name}' 을(를) 지웁니다. 되돌릴 수 없습니다.`)) return;
-    try {
-      await api.deletePlan(target.id);
-      if (plan?.id === target.id) {
-        setPlan(null);
-        clearPlanDraft();
-      }
-      await reload();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
-    }
-  }
-
-  /**
-   * 항목 목록을 바꾼다.
-   *
-   * 함수도 받는다. **비동기 작업이 끝난 뒤**에 고칠 때는 반드시 함수를 넘겨야 한다 —
-   * 배열을 넘기면 그 배열이 만들어진 시점(옛 렌더)의 값이라, 그 사이에 사람이 한
-   * 다른 편집을 조용히 덮어쓴다. 실제로 역본을 바꾼 직후 미리보기를 다시 읽는
-   * 경로에서 역본 변경이 되돌아갔다.
-   */
-  function patchItems(next: CueItem[] | ((prev: CueItem[]) => CueItem[])): void {
-    setItems(next);
-    setDirty(true);
-  }
+  // usePlanStorage 로 옮겼다 (2026-09-07 R-4).
+  // 여기가 사용자 데이터를 쓰는 길이다 — 잘못 덮어쓰면 지난주 순서가 사라진다.
+  const {
+    templates, saved, reload, openPlan, saveCurrent, duplicateCurrent,
+    removeTemplate, removeSaved,
+    nameBar, setNameBar, nameBarTarget, commitNameBar, nameInputRef,
+    loadOpen, setLoadOpen, planNoun, planNounObj, saveLabel,
+  } = usePlanStorage({
+    draft,
+    feedback: { setBusy, setError, setNotice },
+    // 추가 바의 역본을 이 예배의 기본값에서 시작한다 —
+    // 순서표 열기와 추가 바 사이에 실제로 있는 유일한 결합이다
+    onOpened: (target) => {
+      setAddPrimary(target.defaults?.bible?.primary ?? defaultTranslation);
+      setAddSecondary(target.defaults?.bible?.secondary ?? []);
+    },
+  });
 
   // ── 항목을 슬라이드로 푼다 (선택했을 때 미리보기용) ──────────
 
