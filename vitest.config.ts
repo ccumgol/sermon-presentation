@@ -53,7 +53,7 @@ export default defineConfig({
          * 않게 막는 것' 이다 — 닿을 수 없는 목표를 걸면 `--coverage` 가 늘 실패해서
          * 아무도 쳐다보지 않게 된다.
          *
-         * 2026-09-07 실측: lib 줄 97.9 · server 79.5 · src 8.9
+         * 2026-09-07 실측: lib 줄 98.1 · server 79.5 · src 22.4
          *
          * ⚠️ `server/` 가 80% 아래인 것은 새로 생긴 일이 아니다. 전에는 `lib/` 와
          * 한 덩이로 재서 평균 86% 로 통과했고, **낮은 쪽이 가려져 있었다.**
@@ -64,15 +64,16 @@ export default defineConfig({
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *
-         * 지금 값(2026-09-07 실측: 줄 8.9%)보다 조금 낮게 잡아 두고, 검사를 더할
-         * 때마다 올린다. 전체 숫자가 낮은 것은 화면 컴포넌트가 0% 이기 때문이다 —
-         * 떼어낸 훅들은 90% 대다 (usePlanSend 94% · usePlanPreview 94% ·
-         * useLiveState 93% · useMeasure 100%).
+         * 지금 값(2026-09-07 실측: 문장 22.4%)보다 조금 낮게 잡아 두고, 검사를
+         * 더할 때마다 올린다. 전체 숫자가 낮은 것은 **화면 컴포넌트가 0%** 이기
+         * 때문이다 — 떼어낸 훅들은 90% 대다:
+         *   usePlanStorage 98% · usePlanAdd 97% · usePlanSend 94% ·
+         *   usePlanPreview 94% · useLiveState 93% · useMeasure 100%
          *
-         * 남은 가장 큰 빚은 `PlanPanel.tsx`(2,036줄, 0%)의 **JSX** 다.
-         * 로직은 훅 셋으로 나갔고, 남은 것은 화면 그리기와 항목 추가·저장이다.
+         * 남은 가장 큰 빚은 `PlanPanel.tsx`(1,378줄, 0%)의 **JSX** 다.
+         * 로직은 훅 다섯으로 나갔다 (R-4 훅 분리 완료).
          */
-        'src/**': { lines: 8, functions: 6, branches: 4, statements: 8 },
+        'src/**': { lines: 20, functions: 12, branches: 14, statements: 20 },
       },
     },
   },

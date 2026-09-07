@@ -114,6 +114,21 @@ afterEach(cleanup);                  ← globals:false 라 자동으로 안 붙�
 `.test.tsx` 는 `vitest.config.ts` 의 `include` 에 들어 있어야 돈다 — 없으면
 **"No test files found" 만 나오고 지나간다.**
 
+**브라우저 저장소는 `window.` 를 붙여 부른다.** 맨몸 `localStorage` 는 Node 자체의
+실험적 전역이 jsdom 것을 가려서 `--localstorage-file` 없이는 **`undefined`** 다
+(실제로 겪었다). `window.sessionStorage` 처럼 쓰면 jsdom 것이 온다.
+
+**예배 순서 탭의 로직은 훅 다섯에 있다** (`src/control/hooks/usePlan*.ts`).
+`PlanPanel.tsx` 를 고치기 전에 그쪽을 본다 — 검사도 거기에 붙어 있다.
+
+| 훅 | 무엇 |
+|---|---|
+| `usePlanDraft` | 편집 중인 것(척추). 나머지 넷이 이걸 붙잡는다 |
+| `usePlanPreview` | 항목을 슬라이드로 푼다 (`resolveItem`) |
+| `usePlanSend` | 화면으로 내보내는 것 전부 · 자동 넘김 |
+| `usePlanStorage` | 순서표 읽기·저장·삭제 (**사용자 데이터를 쓰는 길**) |
+| `usePlanAdd` | 항목 추가 · 검색 디바운스 |
+
 **커버리지는 묶음별로 문턱이 있다** (`lib/` · `server/` · `src/`). 값은 실측한
 지금 값보다 조금 낮게 잡은 **ratchet** 이다 — 내려가지 않게 막는 것이 목적이니,
 검사를 더했으면 그 값을 올려 둔다.
