@@ -15,33 +15,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  buildPlanDeck, buildPlanRows, describeItem, insertIndexFor, isExpandable, itemsInGroup,
-  moveItem, newItemId,
-  removeItem, type PlanRow,
+  buildPlanRows, describeItem, insertIndexFor, isExpandable,
+  moveItem, newItemId, removeItem, type PlanRow,
 } from '../../../lib/plan-deck.ts';
-import { LANG_LABELS, MAX_LANGS, ACTIVE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
-import { itemTitle } from '../../../lib/item-title.ts';
+import { LANG_LABELS, ACTIVE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import {
   baseFontSizeFor,
   itemTemplateFor,
   templateIdFor as pickTemplateId,
 } from '../../../lib/plan-item-template.ts';
 import { verseQuotes } from '../../../lib/verse-quotes.ts';
-import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { PlanItemEditor } from '../components/PlanItemEditor.tsx';
 import { BackgroundSelect } from '../components/BackgroundSelect.tsx';
-import { ItemTextStyleControls } from '../components/ItemTextStyleControls.tsx';
 import {
-  ADD_KINDS, DEFAULT_GROUPS, ITEM_ICONS, MAX_SECONDARY, ORDER_PRESETS,
+  ADD_KINDS, DEFAULT_GROUPS, MAX_SECONDARY, ORDER_PRESETS,
   itemIcon, itemMeta, slideSummary, songLabelOf, today, type AddKind,
 } from '../../../lib/plan-item-view.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
-  AUTO_HOLD_MS_MAX,
-  AUTO_HOLD_MS_MIN,
-  type ClientMsg, type CueItem, type Deck, type ItemBackground, type LangCode, type ItemTextStyle, type PlanDefaults, type PlanKind, type ServicePlan,
-  type SongEntry,
-  type SlidePayload, type Template, type Translation,
+  type ClientMsg, type CueItem, type Deck, type LangCode,
+  type PlanDefaults, type PlanKind, type ServicePlan,
+  type Template, type Translation,
 } from '../../../shared/types.ts';
 import {
   api, ApiError, READING_BOOK_LABELS,
@@ -49,16 +43,9 @@ import {
 } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import { clearPlanDraft, readPlanDraft, writePlanDraft } from './plan-draft.ts';
-import {
-  DEFAULT_LITURGY_VERSION,
-  LITURGY_TEXTS,
-  findLiturgy,
-  type LiturgyPerSlide,
-  type LiturgyVersion,
-} from '../../../lib/liturgy-texts.ts';
-import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
-import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
+import { DEFAULT_LITURGY_VERSION, LITURGY_TEXTS } from '../../../lib/liturgy-texts.ts';
 import { usePlanPreview } from '../hooks/usePlanPreview.ts';
+import { usePlanSend } from '../hooks/usePlanSend.ts';
 
 /**
  * 찬양 검색에서 한 번에 보여 줄 곡 수. '찬양' 탭(60)보다 적은 이유는
@@ -133,17 +120,6 @@ export function PlanPanel({
   /** 펼친 항목 — 한 번에 하나만. 여러 개가 열리면 목록이 길어져 진행이 안 보인다. */
   const [expandedId, setExpandedId] = useState<string | null>(restored?.expandedId ?? null);
 
-  /** 인용구를 띄우기 직전 화면 — '직전으로' 가 여기로 되돌린다 */
-  const [before, setBefore] = useState<{ slide: SlidePayload; label: string } | null>(null);
-
-  /**
-   * 예배 전 안내 자동 진행 — 지금 돌고 있는 구분.
-   *
-   * 예배가 시작되면 반드시 멈춰야 하므로, 다른 항목을 송출하거나 순서표를 올리면
-   * 곧바로 끈다. 돌고 있다는 것이 화면에 크게 보여야 한다.
-   */
-  const [auto, setAuto] = useState<{ dividerId: string; holdMs: number; loop: boolean } | null>(null);
-
   /**
    * 단독으로 송출한 항목 — 빨간 점을 켜기 위해 기억한다.
    *
@@ -151,7 +127,6 @@ export function PlanPanel({
    * groups 가 없어 무엇이 나가는지 알 수 없다. 지금 뭐가 나가는지 모르는 것이
    * 예배 중에는 가장 위험하다.
    */
-  const [liveItemId, setLiveItemId] = useState<string | null>(null);
 
   // 추가 바
   /**
@@ -537,113 +512,16 @@ export function PlanPanel({
   );
 
   // ── 송출 ────────────────────────────────────────────────────
+  // 화면으로 내보내는 것 전부는 usePlanSend 로 옮겼다 (2026-09-07 R-4).
+  const {
+    liveSlide, liveLabel, slideCount,
+    sendItem, sendTitle, refreshLive, restoreBefore, startAuto, loadForService,
+    before, auto, setAuto, liveItemId,
+  } = usePlanSend({
+    deck, currentIndex, connected, send, items, plan, resolveItem, templateChoice,
+    feedback: { setBusy, setError, setNotice },
+  });
 
-  /** 지금 화면에 나가고 있는 슬라이드 (직전으로 되돌리기용) */
-  const liveSlide = deck?.slides[currentIndex];
-  const liveLabel = deck?.labels[currentIndex];
-
-  /**
-   * 항목을 송출한다.
-   *
-   * 전체 덱이 올라가 있고 이 항목의 경계를 찾을 수 있으면 **그 위치로 점프**한다.
-   * 그러면 이후 화살표 진행이 순서표 전체를 따라간다.
-   * 올라가 있지 않으면 **그 항목만 단독으로** 올린다 — 순서를 벗어나 급히 띄울 때.
-   */
-  const sendItem = useCallback(
-    async (item: CueItem, slideIndex = 0) => {
-      if (!connected || item.type === 'divider') return;
-      // 사람이 무언가를 송출하면 예배가 시작된 것이다 — 자동 진행을 끈다
-      setAuto(null);
-
-      /*
-       * 인용구를 띄우기 전 화면을 기억한다 — `↩ 직전으로` 가 여기로 돌아온다.
-       *
-       * 두 가지를 다 본다: 새 인용구(성경 절)와, 옛 순서표에 남아 있는 자유 글자
-       * 인용구. 광고와 인용구의 **유일한 실제 차이**가 이 동작이므로, 기능이 바뀌어도
-       * 잃지 않는다 ('설교 중 잠깐 띄울 내용' 이라는 뜻 그대로다).
-       */
-      const isQuote =
-        (item.type === 'bible' && item.quote === true) ||
-        (item.type === 'text' && item.variant === 'quote');
-      if (isQuote && liveSlide) {
-        setBefore({ slide: liveSlide, label: liveLabel ?? '' });
-      }
-
-      // 쓸 템플릿을 **슬라이드보다 먼저** 올린다 (항목 지정 → 예배 기본 설정 순).
-      // 순서가 반대면 옛 템플릿으로 한 번 그려졌다가 바뀌어 화면이 튄다.
-      const useTemplate = templateIdFor(item);
-      if (typeof useTemplate === 'number') send({ t: 'template:set', id: useTemplate });
-
-      const groupIndex = items.filter((i) => i.type !== 'divider').findIndex((i) => i.id === item.id);
-      const group = deck?.groups?.[groupIndex];
-
-      if (group && deck) {
-        send({ t: 'goto', index: group.startIndex + slideIndex });
-        setLiveItemId(null); // groups 로 판정한다
-        return;
-      }
-
-      try {
-        const resolved = await resolveItem(item);
-        if (resolved.slides.length === 0) {
-          setError(resolved.error ?? '표시할 내용이 없습니다');
-          return;
-        }
-        send({
-          t: 'deck:load',
-          payload: {
-            reference: describeItem(item),
-            slides: resolved.slides,
-            labels: resolved.labels,
-            index: Math.min(slideIndex, resolved.slides.length - 1),
-          },
-        });
-        setLiveItemId(item.id);
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : '송출하지 못했습니다');
-      }
-    },
-    // templateIdFor 가 여기 있어야 한다. 없던 동안 **기본 템플릿을 바꾼 직후
-    // ▶ 를 누르면 이전 값이 나갔다** (2026-09-07 실측: -8 로 바꿨는데 -1 이 나갔고,
-    // 항목을 옮겨 이 함수가 다시 만들어진 뒤에야 -8 이 나갔다).
-    [connected, items, deck, send, resolveItem, liveSlide, liveLabel, templateIdFor],
-  );
-
-  /**
-   * 화면에 나가 있는 항목을 고쳤으면 **다시 보낸다.**
-   *
-   * 없으면 폰트·글자 크기를 돌려도 화면이 그대로다 — 다시 ▶ 를 눌러야 반영된다.
-   * 이 값들은 '돌려 보면서 맞추는' 성격이라, 눈이 따라오지 않으면 옵션이 없는 것과 같다
-   * (실사용에서 '변경되지 않는다'로 보고된 증상이 이것이다).
-   *
-   * **단독 송출 중일 때만** 한다. 순서표 전체가 올라가 있으면 덱을 통째로 바꾸는 셈이라
-   * 예배 중에 진행 위치를 잃는다 — 담당자 크기·글자 조정이 쓰는 규칙과 같다.
-   *
-   * 짧게 모아 한 번만 보낸다. 슬라이더를 끌면 값이 연달아 바뀌는데, 교독문은 본문을
-   * 서버에서 다시 읽어 오므로(비동기) 늦게 온 옛 응답이 새 화면을 덮을 수 있다.
-   */
-  const liveRefresh = useRef<number | null>(null);
-  const refreshLive = useCallback(
-    (item: CueItem): void => {
-      if (liveItemId !== item.id) return;
-      if (liveRefresh.current !== null) clearTimeout(liveRefresh.current);
-      liveRefresh.current = window.setTimeout(() => {
-        liveRefresh.current = null;
-        // 보고 있던 장에 그대로 머문다 — 크기를 만질 때마다 첫 장으로 돌아가면 못 쓴다.
-        // 장 수가 줄어드는 경우(4줄씩 → 전체 한 장)는 sendItem 이 잘라 준다.
-        void sendItem(item, currentIndex);
-      }, 120);
-    },
-    [liveItemId, sendItem, currentIndex],
-  );
-
-  // 남은 타이머가 사라진 화면을 향해 쏘지 않게 한다
-  useEffect(
-    () => () => {
-      if (liveRefresh.current !== null) clearTimeout(liveRefresh.current);
-    },
-    [],
-  );
 
   // 고른 항목이 찬양이면 그 곡의 언어와 **악보 유무**를 읽어 둔다
   const currentSongId = (() => {
@@ -673,121 +551,6 @@ export function PlanPanel({
       alive = false;
     };
   }, [currentSongId, songInfo?.id]);
-
-  /**
-   * 항목 제목 한 줄을 띄운다 — 회중이 다음을 준비하도록.
-   *
-   * **그 항목이 쓸 템플릿을 함께 올린다.** 그러면 제목이 곧이어 나올 본문과 **같은
-   * 자리·같은 모양**으로 뜬다. 활성 템플릿을 그대로 쓰면 앞 순서(순서 표시 등)의
-   * 큰 명조가 남아 성경 참조가 엉뚱하게 커진다.
-   *
-   * **슬라이드 한 장짜리 덱으로 보낸다.** 덱 없이 한 장만 올리는 길도 있었지만
-   * (`t: 'show'`) 그러면 올라가 있던 순서표가 버려져 진행 위치를 잃는다. 그래서
-   * 아무도 쓰지 않았고, 2026-09-03 에 그 길을 지웠다.
-   */
-  const sendTitle = useCallback(
-    (item: CueItem) => {
-      if (!connected) return;
-      const title = itemTitle(item);
-      if (!title) return;
-
-      const useTemplate = templateIdFor(item);
-      if (typeof useTemplate === 'number') send({ t: 'template:set', id: useTemplate });
-
-      send({
-        t: 'deck:load',
-        payload: {
-          reference: `${describeItem(item)} (제목)`,
-          slides: [{ kind: 'text', lines: [title] }],
-          labels: ['제목'],
-          index: 0,
-        },
-      });
-      setLiveItemId(null);
-    },
-    [connected, send, items, templateIdFor],
-  );
-
-  /** 인용구를 띄우기 직전 화면으로 되돌린다 */
-  const restoreBefore = useCallback(() => {
-    if (!before || !connected) return;
-    send({
-      t: 'deck:load',
-      payload: { reference: before.label || '직전', slides: [before.slide], labels: [before.label], index: 0 },
-    });
-    setBefore(null);
-    setLiveItemId(null);
-  }, [before, connected, send]);
-
-  /**
-   * 예배 전 안내를 시작한다 — 이 구분이 거느린 항목만 덱으로 올리고 자동으로 넘긴다.
-   *
-   * 전체 순서표를 올리지 않는 이유는, 예배 전 안내가 **예배 순서의 일부가 아니라
-   * 그 앞의 시간**이기 때문이다. 예배를 시작할 때는 '예배용으로 올리기' 를 새로 누른다.
-   */
-  async function startAuto(divider: Extract<CueItem, { type: 'divider' }>): Promise<void> {
-    const group = itemsInGroup(items, divider.id);
-    if (group.length === 0) {
-      setError(`'${divider.label}' 아래에 항목이 없습니다`);
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await buildPlanDeck(divider.label, group, resolveItem);
-      if (result.deck.slides.length === 0) {
-        setError('올릴 수 있는 항목이 없습니다');
-        return;
-      }
-      if (result.failed.length > 0) {
-        setNotice(
-          `${result.failed.length}개 항목을 건너뛰었습니다: ` +
-            result.failed.map((f) => `${describeItem(f.item)} (${f.error})`).join(', '),
-        );
-      }
-      send({ t: 'deck:load', payload: result.deck });
-      setLiveItemId(null);
-      setAuto({
-        dividerId: divider.id,
-        holdMs: divider.auto?.holdMs ?? AUTO_HOLD_MS_DEFAULT,
-        loop: divider.auto?.loop !== false,
-      });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '시작하지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const slideCount = deck?.slides.length ?? 0;
-  const hold = auto?.holdMs ?? AUTO_HOLD_MS_DEFAULT;
-
-  /**
-   * 자동 진행 타이머.
-   *
-   * 슬라이드가 바뀔 때마다 **다음 한 번**만 예약한다. 반복 타이머를 쓰면
-   * 사람이 중간에 손으로 넘겼을 때 남은 시간이 어긋나 두 장이 연달아 넘어간다.
-   */
-  useEffect(() => {
-    if (!auto || !connected) return;
-    const total = slideCount;
-    if (total === 0) return;
-
-    const timer = setTimeout(() => {
-      if (currentIndex >= total - 1) {
-        // 예배 **전** 안내라 처음으로 돌아간다 (예배 중 덱은 순환하지 않는다)
-        if (auto.loop) send({ t: 'goto', index: 0 });
-        else setAuto(null);
-      } else {
-        send({ t: 'next' });
-      }
-    }, hold);
-
-    return () => clearTimeout(timer);
-    // 의존성은 **원시값만** 둔다. 전에 `deck?.slides` 를 넣었는데 상태가 올 때마다
-    // 새 배열이라 타이머가 계속 처음부터 다시 걸렸다.
-  }, [auto, connected, currentIndex, slideCount, hold, send]);
 
   /**
    * 교독문 검색. 번호('23')와 제목('시편 98')과 본문 낱말 모두로 찾는다.
@@ -847,46 +610,6 @@ export function PlanPanel({
     if (needsFiles) void reloadBgFiles();
   }, [defaultsOpen, addKind, items, reloadBgFiles]);
 
-  /** 순서표 전체를 하나의 덱으로 올린다 (순서대로 진행할 때) */
-  async function loadForService(): Promise<void> {
-    if (!plan || items.length === 0) return;
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    // 예배가 시작된다 — 자동 진행을 끈다
-    setAuto(null);
-
-    try {
-      const result = await buildPlanDeck(plan.name, items, resolveItem);
-      if (result.deck.slides.length === 0) {
-        setError('올릴 수 있는 항목이 없습니다');
-        return;
-      }
-      // 항목이 템플릿을 지정하지 않았으면 예배 기본 설정을 경계에 실어 보낸다.
-      // 이게 없으면 순서표를 올려 진행할 때만 기본 설정이 빠진다.
-      const withDefaults = {
-        ...result.deck,
-        groups: result.deck.groups?.map((group, index) => {
-          if (group.templateId !== undefined) return group;
-          const item = items.filter((i) => i.type !== 'divider')[index];
-          const id = item ? templateIdFor(item) : undefined;
-          return id === undefined ? group : { ...group, templateId: id };
-        }),
-      };
-      if (result.failed.length > 0) {
-        setNotice(
-          `${result.failed.length}개 항목을 건너뛰었습니다: ` +
-            result.failed.map((f) => `${describeItem(f.item)} (${f.error})`).join(', '),
-        );
-      }
-      send({ t: 'deck:load', payload: withDefaults });
-      setLiveItemId(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '순서표를 올리지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   // ── 항목 추가 ───────────────────────────────────────────────
 
