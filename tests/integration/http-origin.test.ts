@@ -229,3 +229,42 @@ describe('막히는 정당한 주소는 허용 목록으로 푼다', () => {
     expect(response.statusCode).toBe(403);
   });
 });
+
+/**
+ * **이 PC 는 요청 수를 세지 않는다** (보안 감사 L-2).
+ *
+ * OBS·컨트롤 패널·프로젝터·강사 모니터가 모두 이 PC 다. 그들을 세는 것은
+ * 예배를 막을 위험만 있고 얻는 것이 없다 — 태블릿이 화면을 한 번 열 때
+ * 스물 몇 번을 부르는데, 이 PC 는 그보다 훨씬 많이 부른다.
+ */
+describe('요청 수 제한은 이 PC 를 비켜 간다', () => {
+  it('루프백에서 700번 불러도 막히지 않는다 (한도는 600이다)', async () => {
+    for (let i = 0; i < 700; i++) {
+      const response = await app.inject({ method: 'GET', url: '/health' });
+      if (response.statusCode !== 200) {
+        throw new Error(`${i + 1}번째에서 ${response.statusCode} — 이 PC 가 막혔다`);
+      }
+    }
+  });
+
+  it('LAN 기기는 한도를 넘으면 429 와 Retry-After 를 받는다', async () => {
+    const address = '192.168.9.9';
+    let blocked: Awaited<ReturnType<typeof app.inject>> | undefined;
+
+    for (let i = 0; i < 700; i++) {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/health',
+        remoteAddress: address,
+        headers: { host: `${address}:7777` },
+      });
+      if (response.statusCode === 429) {
+        blocked = response;
+        break;
+      }
+    }
+
+    expect(blocked, '한도를 넘겼는데도 막히지 않았다').toBeDefined();
+    expect(Number(blocked!.headers['retry-after'])).toBeGreaterThan(0);
+  });
+});

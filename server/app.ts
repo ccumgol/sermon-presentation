@@ -19,6 +19,7 @@ import { initSongsDb, countSongs } from './db/songs.ts';
 import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
 import { isAllowedHost, isAllowedOrigin, parseAllowedOrigins } from '../lib/origin-check.ts';
+import { createRateLimiter } from '../lib/rate-limit.ts';
 import { lanHosts, lanInterfaces } from './lan.ts';
 import { storedLanOpen } from './lan-setting.ts';
 import { ensureDataDirs, paths } from './paths.ts';
@@ -155,6 +156,33 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
    * LAN 이 닫혀 있으면(기본) 모든 요청이 루프백이라 이 훅은 아무 일도 하지 않는다.
    */
   const trustedIps = parseTrustedIps(process.env.SERMON_TRUSTED_IPS);
+
+  /**
+   * ── 요청 수 제한 (보안 감사 L-2) ─────────────────────────────
+   *
+   * 로그인에는 시도 제한이 있었지만 **나머지 라우트에는 아무것도 없었다.**
+   * LAN 기기 하나가 `/api/backup/export`(곡 전체)를 쉼 없이 부르면 예배 중에
+   * 서버가 느려진다.
+   *
+   * **이 PC 는 세지 않는다.** OBS·컨트롤 패널·프로젝터·강사 모니터가 모두 이
+   * PC 이고, 그들을 세는 것은 예배를 막을 위험만 있고 얻는 것이 없다.
+   * 한도는 넉넉하다 — 태블릿이 화면을 한 번 열 때 스물 몇 번을 부른다.
+   */
+  const lanLimiter = createRateLimiter({ limit: 600, windowMs: 60_000 });
+  app.addHook('onRequest', async (request, reply) => {
+    if (isLoopbackAddress(request.ip)) return;
+    if (isTrustedAddress(request.ip, trustedIps)) return;
+
+    const verdict = lanLimiter.hit(request.ip);
+    if (!verdict.ok) {
+      app.log.warn(`요청 수 제한 — ${request.ip} (${verdict.retryAfterSec}초 뒤 다시)`);
+      return reply
+        .code(429)
+        .header('Retry-After', String(verdict.retryAfterSec))
+        .send({ success: false, data: null, error: '요청이 너무 많습니다. 잠시 뒤에 다시 해 보세요.' });
+    }
+  });
+
   app.addHook('onRequest', async (request, reply) => {
     if (isLoopbackAddress(request.ip)) return;
     if (isTrustedAddress(request.ip, trustedIps)) return;

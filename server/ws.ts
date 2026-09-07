@@ -20,6 +20,7 @@ import {
 import { verifySession } from './auth.ts';
 
 import { PROJECTOR_LAYER, PROJECTOR_TEMPLATE_ID, projectorTemplate } from '../lib/projector-view.ts';
+import { checkDeck } from '../lib/deck-guard.ts';
 import { isAllowedStyleKey, templateToCssVars } from '../lib/template-css.ts';
 import type { ClientMsg, ClientRole, Deck, LiveState, ServerMsg, Template } from '../shared/types.ts';
 import { getTemplateOrDefault } from './db/templates.ts';
@@ -236,9 +237,21 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         }
         break;
 
-      case 'deck:load':
-        state.loadDeck(msg.payload);
+      case 'deck:load': {
+        /*
+         * **모양과 크기를 먼저 본다** (감사 L-1). 이 값은 그대로 `live_state` 에
+         * 저장되므로, 거대한 묶음 하나가 상태 파일을 부풀리고 서버가 뜰 때마다
+         * 그것을 읽게 된다. 내용은 검사하지 않는다 — `lib/deck-guard.ts` 머리말.
+         */
+        const checked = checkDeck(msg.payload);
+        if (!checked.ok) {
+          log.warn(`deck:load 거부 — ${checked.error}`);
+          send(client.socket, { t: 'error', message: `묶음을 받지 않았습니다: ${checked.error}` });
+          break;
+        }
+        state.loadDeck(checked.deck);
         break;
+      }
 
       case 'next':
         state.next();
