@@ -285,14 +285,22 @@ export const api = {
     send<{ command: string; output: string }>('POST', '/api/system/install', { command }),
 
   backupSummary: () =>
-    get<{ songs: number; templates: number; plans: number; settings: number; fonts: string[]; approximateBytes: number }>(
-      '/api/backup/summary',
-    ),
+    get<{
+      songs: number; templates: number; plans: number; settings: number; fonts: string[];
+      readings: number; songbooks: number;
+      /** 악보 **상태** 개수 — 그림은 담기지 않는다 (폴더를 복사해야 한다) */
+      sheets: number;
+      approximateBytes: number;
+    }>('/api/backup/summary'),
   importBundle: (bundle: unknown, mode: 'merge' | 'replace') =>
     send<{
       songs: number; templates: number; plans: number; settings: number; fonts: number;
       /** 되살린 대응곡 연결 — 옮겨도 새찬송가↔통일찬송가 대응이 남는다는 증거다 */
       links: number;
+      readings: number;
+      songbooks: number;
+      /** 옮긴 악보 상태 — 그림은 폴더로 복사해야 한다 */
+      sheets: number;
       /** 이미 있어 건너뛴 곡 — 합치기를 여러 번 해도 늘지 않는다는 증거다 */
       songsExisting: number;
       skipped: string[];

@@ -139,6 +139,24 @@ export function listReadings(book: ReadingBook = DEFAULT_READING_BOOK): Responsi
   return rows.map(toReading);
 }
 
+/**
+ * 두 찬송가의 교독문을 **출처까지 함께** 준다 — 자료 이전(번들)용 (점검 P-3).
+ *
+ * `listReadings` 는 화면용이라 `book`·`source` 를 버린다. 번들은 그것까지 그대로
+ * 옮겨야 한다 — `source` 를 잃으면 받은 PC 에서 `deleteBySource` 로 그 자료만
+ * 걷어낼 수 없게 되고, `book` 을 잃으면 새/통 찬송가가 뒤섞인다.
+ */
+export function listAllReadings(): Array<ResponsiveReading & { book: ReadingBook; source: string }> {
+  const rows = getConnection()
+    .prepare('SELECT book, number, title, lines, source FROM responsive_readings ORDER BY book, number')
+    .all() as unknown as Row[];
+
+  return rows.flatMap((row) => {
+    if (!isReadingBook(row.book)) return [];
+    return [{ ...toReading(row), book: row.book, source: row.source }];
+  });
+}
+
 /** 어느 찬송가에 몇 편이 들어 있는지 — 고르는 화면이 빈 쪽을 흐리게 하는 데 쓴다 */
 export function countByBook(): Record<ReadingBook, number> {
   const rows = getConnection()

@@ -7,7 +7,18 @@
  *  - 사람이 열어 내용을 확인·수정할 수 있다 (예배 전 급할 때 실제로 유용하다)
  *  - 폰트는 base64 로 함께 담는다. 용량이 33% 늘지만 폰트는 보통 몇 개뿐이다
  *
- * 성경 DB 는 담지 않는다 — 원본에서 다시 빌드할 수 있고, 97MB 를 파일에 넣을 이유가 없다.
+ * ## 무엇이 담기고 무엇이 안 담기는가 (점검 P-3, 2026-09-07)
+ *
+ * | 담긴다 | 안 담긴다 |
+ * |---|---|
+ * | 찬양(가사·구간별 줄나눔 출처·즐겨찾기·대응곡·수록 정보) | **성경 DB** — 원본에서 다시 빌드한다 (97MB) |
+ * | 사용자가 만든 곡집 | **악보 그림**(`data/sheets/`, 약 50MB) — 폴더를 복사한다 |
+ * | 템플릿(사용자 것 + 덮어쓴 프리셋) · 예배 순서 · 설정 · 폰트 | 접속 암호·세션 열쇠·`lan_open`(그 PC 의 것이다) |
+ * | **교독문**(새·통 두 벌) · **악보 상태**(단 경계·모양·검토 판정) | |
+ *
+ * 전에는 교독문·곡집·악보 상태가 빠져 있었는데 문서는 '자료 가져오기로 각 PC 에
+ * 넣는다' 고 단언했다. 받은 사람은 교독문이 없는데 화면이 `node scripts/...` 를
+ * 시키고(설치판에는 터미널이 없다), 155장을 훑어 내린 악보 판정도 사라졌다.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,11 +26,17 @@ import path from 'node:path';
 
 import type { FastifyInstance } from 'fastify';
 
+import type { ResponsiveReading } from '../../lib/responsive-parser.ts';
 import { buildIdentityIndex, findExisting } from '../../lib/song-identity.ts';
 import { SECRET_SETTING_KEYS } from '../auth.ts';
 import { LAN_OPEN_KEY } from '../lan-setting.ts';
-import type { ApiResponse, Song, Template } from '../../shared/types.ts';
+import type { ApiResponse, Song, Songbook, Template } from '../../shared/types.ts';
 import { getConnection } from '../db/app.ts';
+import * as readings from '../db/readings.ts';
+import type { ReadingBook } from '../db/readings.ts';
+import * as sheets from '../db/sheets.ts';
+import type { SheetRow } from '../db/sheets.ts';
+import * as songbooks from '../db/songbooks.ts';
 import { snapshotDatabases } from '../db/snapshot.ts';
 import * as plans from '../db/plans.ts';
 import * as songs from '../db/songs.ts';
@@ -27,7 +44,14 @@ import * as templates from '../db/templates.ts';
 import { ensureDataDirs, paths } from '../paths.ts';
 
 export const BUNDLE_FORMAT = 'sermon-presentation-bundle';
-export const BUNDLE_VERSION = 1;
+/**
+ * 2 = 교독문·곡집·악보 상태가 더해진 판 (점검 P-3).
+ *
+ * **옛 번들(1)은 그대로 읽는다** — 새 칸이 없을 뿐이다. 반대로 옛 앱은 2를 거부한다
+ * (`version > BUNDLE_VERSION`). 그것이 맞다: 조용히 교독문을 버리는 것보다
+ * '앱을 업데이트하세요' 가 낫다.
+ */
+export const BUNDLE_VERSION = 2;
 
 /**
  * 가져오기 본문 한도.
@@ -61,6 +85,18 @@ export interface Bundle {
   plans: Array<{ name: string; serviceDate?: string; items: unknown[] }>;
   settings: Record<string, string>;
   fonts: Array<{ name: string; base64: string }>;
+  /** 교독문 — 새·통 두 벌을 `book` 으로 구분해 한 배열에 담는다 (v2) */
+  readings?: Array<ResponsiveReading & { book: ReadingBook; source: string }>;
+  /** 사용자가 만든 곡집. 내장 곡집은 코드가 출처라 담지 않는다 (v2) */
+  songbooks?: Array<Omit<Songbook, 'songCount'>>;
+  /**
+   * 악보 **상태** — 단 경계·모양·사람의 검토 판정 (v2).
+   *
+   * **그림은 담지 않는다.** 약 50MB 라 JSON 한 파일에 넣을 수 없다. 그림 없이
+   * 상태만 옮겨도 값이 있다 — 155장을 훑어 내린 판정이 남고, 그림을 폴더로
+   * 복사하면 곧바로 이어서 쓸 수 있다.
+   */
+  sheets?: SheetRow[];
 }
 
 function ok<T>(data: T): ApiResponse<T> {
@@ -119,6 +155,13 @@ export function buildBundle(): Bundle {
     })),
     settings: readSettings(),
     fonts: readFonts(),
+    readings: readings.listAllReadings(),
+    // 내장 곡집은 코드가 출처다. 사용자가 만든 것만 옮긴다
+    songbooks: songbooks
+      .listSongbooks(songs.conn())
+      .filter((book) => !book.isBuiltin)
+      .map(({ songCount: _count, ...rest }) => rest),
+    sheets: sheets.listSheets(songs.conn()),
   };
 }
 
@@ -129,6 +172,12 @@ export interface ImportResult {
   settings: number;
   /** 되살린 대응곡 연결 수 (양방향 한 짝을 1로 센다) */
   links: number;
+  /** 교독문 편 수 (v2) */
+  readings: number;
+  /** 만든 곡집 수 (v2) */
+  songbooks: number;
+  /** 옮긴 악보 상태 수 — **그림은 폴더로 복사해야 한다** (v2) */
+  sheets: number;
   /** replace 로 지우기 전에 뜬 백업 파일 (merge 면 없다) */
   backupFiles?: string[];
   fonts: number;
@@ -162,7 +211,10 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
     throw new Error(`지원하지 않는 버전입니다 (${String(bundle.version)}). 앱을 업데이트하세요.`);
   }
 
-  const result: ImportResult = { songs: 0, templates: 0, plans: 0, settings: 0, links: 0, fonts: 0, songsExisting: 0, skipped: [] };
+  const result: ImportResult = {
+    songs: 0, templates: 0, plans: 0, settings: 0, links: 0,
+    readings: 0, songbooks: 0, sheets: 0, fonts: 0, songsExisting: 0, skipped: [],
+  };
 
   if (mode === 'replace') {
     // 지우기 **전에** 스냅샷을 남긴다.
@@ -188,6 +240,39 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
       else if (!template.isBuiltin) templates.deleteTemplate(template.id);
     }
     for (const plan of plans.listPlans()) plans.deletePlan(plan.id);
+  }
+
+  /*
+   * ── 곡집을 **곡보다 먼저** 만든다 (점검 P-3) ─────────────────
+   *
+   * 순서가 중요하다. `setEntries` 는 **없는 곡집을 '기타' 로 떨어뜨린다** — 곡을
+   * 먼저 넣으면 사용자가 만든 곡집의 수록 정보가 조용히 '기타' 가 되고, 곡집을
+   * 뒤늦게 만들어도 그 연결은 돌아오지 않는다.
+   *
+   * 이미 있는 id 는 건드리지 않는다. 받는 쪽에서 같은 id 로 다르게 쓰고 있을 수
+   * 있고, 이름을 덮어쓰는 것은 이전이 할 일이 아니다.
+   */
+  const existingBooks = new Set(songbooks.listSongbooks(songs.conn()).map((book) => book.id));
+  for (const book of bundle.songbooks ?? []) {
+    if (typeof book?.id !== 'string' || typeof book.name !== 'string') {
+      result.skipped.push(`곡집 '${String(book?.name ?? '?')}': 형식 오류`);
+      continue;
+    }
+    if (existingBooks.has(book.id)) continue;
+    try {
+      songbooks.createSongbook(songs.conn(), {
+        id: book.id,
+        name: book.name,
+        shortLabel: book.shortLabel,
+        numbered: book.numbered,
+        ...(book.quickSlot !== undefined ? { quickSlot: book.quickSlot } : {}),
+        ...(book.sourceNote !== undefined ? { sourceNote: book.sourceNote } : {}),
+      });
+      existingBooks.add(book.id);
+      result.songbooks++;
+    } catch (err) {
+      result.skipped.push(`곡집 '${book.name}': ${err instanceof Error ? err.message : '만들지 못했습니다'}`);
+    }
   }
 
   /*
@@ -364,6 +449,73 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
     }
   }
 
+  /*
+   * ── 교독문 (점검 P-3) ────────────────────────────────────────
+   *
+   * 새·통 두 벌을 `book` 으로 갈라 넣는다. 번호가 곧 열쇠라 같은 번호는 덮어쓴다
+   * (`upsertReadings` 의 규칙 — 파일을 고쳐 다시 넣는 것이 정상 흐름이다).
+   *
+   * **`replace` 여도 지우지 않는다.** 옛 판(v1) 번들에는 교독문 칸이 아예 없어서,
+   * 지우고 넣는 방식이면 그 번들을 받은 순간 213편이 사라진다 — 되돌릴 방법도
+   * 없다(`replace` 는 이미 스냅샷을 뜨지만, 없는 것을 되살리지는 못한다).
+   * 자연 열쇠(찬송가+번호)가 있어 덮어쓰기만으로 충분하다.
+   */
+  const readingsByBook = new Map<ReadingBook, ResponsiveReading[]>();
+  const readingSources = new Map<ReadingBook, string>();
+  for (const reading of bundle.readings ?? []) {
+    if (!readings.isReadingBook(reading?.book) || typeof reading.number !== 'number') {
+      result.skipped.push(`교독문 '${String(reading?.title ?? '?')}': 형식 오류`);
+      continue;
+    }
+    const list = readingsByBook.get(reading.book) ?? [];
+    list.push({ number: reading.number, title: reading.title, lines: reading.lines ?? [] });
+    readingsByBook.set(reading.book, list);
+    // 출처를 그대로 옮긴다 — 잃으면 받은 PC 에서 그 자료만 걷어낼 수 없다
+    if (typeof reading.source === 'string') readingSources.set(reading.book, reading.source);
+  }
+  for (const [book, list] of readingsByBook) {
+    try {
+      result.readings += readings.upsertReadings(list, readingSources.get(book) ?? 'bundle', book);
+    } catch (err) {
+      result.skipped.push(`교독문(${book}): ${err instanceof Error ? err.message : '저장 실패'}`);
+    }
+  }
+
+  /*
+   * ── 악보 상태 (점검 P-3) ─────────────────────────────────────
+   *
+   * **그림은 담기지 않는다** — 약 50MB 라 JSON 한 파일에 넣을 수 없다. 여기서
+   * 옮기는 것은 단 경계와 **사람이 155장을 훑어 내린 판정**이다. 그림은
+   * `data/sheets/` 폴더를 복사한다 (README 의 이전 절차).
+   *
+   * 곡이 아니라 (곡집, 번호)에 붙으므로 `songIdMap` 과 무관하다.
+   */
+  for (const sheet of bundle.sheets ?? []) {
+    if (typeof sheet?.songbookId !== 'string' || typeof sheet.number !== 'number') {
+      result.skipped.push(`악보 '${String(sheet?.songbookId ?? '?')} ${String(sheet?.number ?? '?')}': 형식 오류`);
+      continue;
+    }
+    try {
+      sheets.putSheet(songs.conn(), {
+        songbookId: sheet.songbookId,
+        number: sheet.number,
+        width: sheet.width,
+        height: sheet.height,
+        systems: Array.isArray(sheet.systems) ? sheet.systems : [],
+        needsReview: sheet.needsReview === true,
+        ...(sheet.detectedAt ? { detectedAt: sheet.detectedAt } : {}),
+      });
+      // 사람이 정한 값은 `putSheet` 가 건드리지 않는다 — 따로 넣어야 한다
+      sheets.setSheetLayout(songs.conn(), sheet.songbookId, sheet.number, sheet.layout);
+      sheets.setSheetReview(songs.conn(), sheet.songbookId, sheet.number, sheet.reviewState);
+      result.sheets++;
+    } catch (err) {
+      result.skipped.push(
+        `악보 ${sheet.songbookId} ${sheet.number}: ${err instanceof Error ? err.message : '저장 실패'}`,
+      );
+    }
+  }
+
   for (const [key, value] of Object.entries(bundle.settings ?? {})) {
     if (EXCLUDED_SETTINGS.has(key) || typeof value !== 'string') continue;
     getConnection()
@@ -413,6 +565,10 @@ export async function registerBackupRoutes(app: FastifyInstance): Promise<void> 
       plans: bundle.plans.length,
       settings: Object.keys(bundle.settings).length,
       fonts: bundle.fonts.map((f) => f.name),
+      readings: bundle.readings?.length ?? 0,
+      songbooks: bundle.songbooks?.length ?? 0,
+      /** 악보 **상태** 개수. 그림은 담기지 않는다 — 폴더를 복사해야 한다 */
+      sheets: bundle.sheets?.length ?? 0,
       approximateBytes: Buffer.byteLength(JSON.stringify(bundle)),
     });
   });

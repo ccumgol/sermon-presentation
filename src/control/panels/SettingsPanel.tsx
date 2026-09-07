@@ -39,6 +39,10 @@ interface BackupSummary {
   plans: number;
   settings: number;
   fonts: string[];
+  readings: number;
+  songbooks: number;
+  /** 악보 **상태** 개수 — 그림은 담기지 않는다 (폴더를 복사해야 한다) */
+  sheets: number;
   approximateBytes: number;
 }
 
@@ -86,6 +90,10 @@ function BackupCard(): React.JSX.Element {
           `설정 ${result.settings} · 폰트 ${result.fonts}` +
           // 대응곡은 곡을 다 만든 뒤에 걸린다. 0 이면 연결이 끊긴 것이니 보여야 한다
           (result.links > 0 ? ` · 대응곡 ${result.links}` : '') +
+          (result.songbooks > 0 ? ` · 곡집 ${result.songbooks}` : '') +
+          (result.readings > 0 ? ` · 교독문 ${result.readings}` : '') +
+          // 악보는 **상태만** 옮겨진다. 그림이 없으면 화면에 안 나오므로 그렇게 적는다
+          (result.sheets > 0 ? ` · 악보 상태 ${result.sheets}(그림은 폴더 복사)` : '') +
           // 오류가 아니라 정상 동작이다. 이 줄이 없으면 '찬양 0' 만 보고 실패로 읽는다
           (result.songsExisting > 0 ? ` (이미 있는 찬양 ${result.songsExisting}곡은 그대로 두었습니다)` : '') +
           (result.skipped.length > 0 ? `\n건너뛴 항목 ${result.skipped.length}개: ${result.skipped.slice(0, 5).join(', ')}` : ''),
@@ -109,8 +117,18 @@ function BackupCard(): React.JSX.Element {
     <div className="card">
       <h2>데이터 이전</h2>
       <p className="hintline muted">
-        찬양·템플릿·예배 순서·설정·폰트를 파일 하나로 옮깁니다. 다른 PC 에 설치할 때 쓰세요.
-        성경 DB 는 담기지 않습니다 — 원본에서 다시 빌드하면 됩니다.
+        찬양·곡집·교독문·템플릿·예배 순서·설정·폰트를 파일 하나로 옮깁니다. 다른 PC 에 설치할
+        때 쓰세요.
+      </p>
+      {/*
+        **담기지 않는 둘을 여기서 말한다** (점검 P-3). 전에는 '자료 가져오기로 각 PC 에
+        넣는다' 고만 적어 두어, 받은 사람이 성경과 악보 그림이 없는 것을 나중에 알았다.
+      */}
+      <p className="hintline muted">
+        <b>성경 DB 와 악보 그림은 담기지 않습니다.</b> 성경은 원본에서 다시 빌드하고(또는
+        <code>bible.sqlite</code> 를 데이터 폴더에 넣고), 악보 그림은 데이터 폴더의{' '}
+        <code>sheets</code> 폴더를 그대로 복사하세요 — 둘 다 파일 하나에 담기엔 너무 큽니다
+        (약 100MB · 50MB). <b>악보의 단 경계와 검토 판정은 담깁니다.</b>
       </p>
 
       {summary && (
@@ -118,6 +136,9 @@ function BackupCard(): React.JSX.Element {
           <dt>담길 내용</dt>
           <dd>
             찬양 {summary.songs} · 템플릿 {summary.templates} · 순서 {summary.plans} · 설정 {summary.settings}
+            {summary.songbooks > 0 ? ` · 곡집 ${summary.songbooks}` : ''}
+            {summary.readings > 0 ? ` · 교독문 ${summary.readings}` : ''}
+            {summary.sheets > 0 ? ` · 악보 상태 ${summary.sheets}` : ''}
             {summary.fonts.length > 0 ? ` · 폰트 ${summary.fonts.length}` : ''}
           </dd>
           <dt>대략 크기</dt>
