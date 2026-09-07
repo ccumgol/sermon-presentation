@@ -84,6 +84,8 @@ function BackupCard(): React.JSX.Element {
       setStatus(
         `가져왔습니다 — 찬양 ${result.songs} · 템플릿 ${result.templates} · 순서 ${result.plans} · ` +
           `설정 ${result.settings} · 폰트 ${result.fonts}` +
+          // 대응곡은 곡을 다 만든 뒤에 걸린다. 0 이면 연결이 끊긴 것이니 보여야 한다
+          (result.links > 0 ? ` · 대응곡 ${result.links}` : '') +
           // 오류가 아니라 정상 동작이다. 이 줄이 없으면 '찬양 0' 만 보고 실패로 읽는다
           (result.songsExisting > 0 ? ` (이미 있는 찬양 ${result.songsExisting}곡은 그대로 두었습니다)` : '') +
           (result.skipped.length > 0 ? `\n건너뛴 항목 ${result.skipped.length}개: ${result.skipped.slice(0, 5).join(', ')}` : ''),

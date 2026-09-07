@@ -26,6 +26,28 @@ import { getSetting, setSetting } from './db/app.ts';
 const PASSWORD_KEY = 'lan_password';
 const SECRET_KEY = 'lan_session_secret';
 
+/**
+ * **번들(내보내기)에 담아서는 안 되는 설정 키.**
+ *
+ * 여기가 이 두 키의 주인이므로 목록도 여기서 낸다 — `server/routes/backup.ts` 가
+ * 이것을 가져다 제외한다. 이름을 바꿀 때 한 곳만 고치면 되고, 새 비밀을 설정에
+ * 넣는 사람이 **이 목록을 보고** 함께 넣게 된다.
+ *
+ * ## 왜 담으면 안 되나 (2026-09-07 실측)
+ *
+ * 번들은 **다른 PC 로 자료를 옮기려고 사람이 손으로 나르는 파일**이다. 그런데
+ * `lan_session_secret` 은 세션 쿠키의 **서명 열쇠**다 — 쿠키에는 만료 시각과
+ * 서명만 들어 있고 서버는 이 열쇠만 안다(`issueSession`). 열쇠를 아는 사람은
+ * **암호를 몰라도 유효한 쿠키를 만들 수 있다.** 격리 서버에서 실제로 통했다.
+ *
+ * `lan_password` 는 scrypt 해시라 곧바로 암호가 되지는 않지만, 교회에서 쓰는
+ * 암호는 짧고 외우기 쉬운 것이 되므로 사전 공격의 표적이 된다.
+ *
+ * 가져오기도 같은 목록으로 막는다. 안 막으면 번들을 받은 PC 의 암호가 **남의
+ * 암호로 조용히 바뀌고** 붙어 있던 태블릿이 전부 로그아웃된다.
+ */
+export const SECRET_SETTING_KEYS: readonly string[] = [PASSWORD_KEY, SECRET_KEY];
+
 /** scrypt 매개변수 — 대화형 로그인에 알맞은 세기 (약 100ms) */
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 } as const;
 

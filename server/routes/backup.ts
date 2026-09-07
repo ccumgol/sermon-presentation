@@ -16,6 +16,7 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 
 import { buildIdentityIndex, findExisting } from '../../lib/song-identity.ts';
+import { SECRET_SETTING_KEYS } from '../auth.ts';
 import type { ApiResponse, Song, Template } from '../../shared/types.ts';
 import { getConnection } from '../db/app.ts';
 import { snapshotDatabases } from '../db/snapshot.ts';
@@ -36,8 +37,15 @@ export const BUNDLE_VERSION = 1;
  */
 const IMPORT_BODY_LIMIT = 256 * 1024 * 1024;
 
-/** 송출 상태는 내보내지 않는다 — 다른 PC 에서 복원하면 엉뚱한 화면이 뜬다 */
-const EXCLUDED_SETTINGS = new Set(['live_state']);
+/**
+ * 번들에 담지 않는 설정 키 — 내보내기와 가져오기가 **같은 목록**을 쓴다.
+ *
+ * - `live_state`: 송출 상태. 다른 PC 에서 복원하면 엉뚱한 화면이 뜬다.
+ * - 접속 암호·세션 서명 열쇠(`server/auth.ts` 의 `SECRET_SETTING_KEYS`):
+ *   **번들은 사람이 손으로 나르는 파일이다.** 서명 열쇠가 실리면 그것을 본 사람이
+ *   암호 없이 쿠키를 만들 수 있다 (그 파일의 머리말에 근거).
+ */
+const EXCLUDED_SETTINGS = new Set<string>(['live_state', ...SECRET_SETTING_KEYS]);
 
 const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf']);
 
@@ -116,6 +124,8 @@ export interface ImportResult {
   templates: number;
   plans: number;
   settings: number;
+  /** 되살린 대응곡 연결 수 (양방향 한 짝을 1로 센다) */
+  links: number;
   /** replace 로 지우기 전에 뜬 백업 파일 (merge 면 없다) */
   backupFiles?: string[];
   fonts: number;
@@ -149,7 +159,7 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
     throw new Error(`지원하지 않는 버전입니다 (${String(bundle.version)}). 앱을 업데이트하세요.`);
   }
 
-  const result: ImportResult = { songs: 0, templates: 0, plans: 0, settings: 0, fonts: 0, songsExisting: 0, skipped: [] };
+  const result: ImportResult = { songs: 0, templates: 0, plans: 0, settings: 0, links: 0, fonts: 0, songsExisting: 0, skipped: [] };
 
   if (mode === 'replace') {
     // 지우기 **전에** 스냅샷을 남긴다.
@@ -236,16 +246,54 @@ export function applyBundle(raw: unknown, mode: ImportMode): ImportResult {
           ...(entry.number !== undefined ? { number: entry.number } : {}),
         })),
         ...(song.source ? { source: song.source } : {}),
+        /*
+         * **구간별 `linesSource` 를 그대로 옮긴다** (점검 P-2, 2026-09-07).
+         *
+         * 넘기지 않으면 `createSong` 의 기본값 `'auto'` 가 되어, 옮긴 PC 에서
+         * 승인(`manual`)·원본 줄나눔(`imported`) 표시가 **전부 사라진다.**
+         * 그러면 그 곡들이 검토 대기열로 되돌아오고 자동 재정렬의 대상이 된다 —
+         * 사람이 손으로 한 작업이 이전 한 번으로 없어지는 것이다.
+         * 번들에는 값이 들어 있었는데 가져오기가 버리고 있었다.
+         */
         sections: song.sections.map((section) => ({
           kind: section.kind,
           label: section.label,
           lines: section.lines,
+          ...(section.linesSource ? { linesSource: section.linesSource } : {}),
         })),
       });
       if (typeof song.id === 'number') songIdMap.set(song.id, newId);
+      // 즐겨찾기도 번들에 실려 있다 — 사람이 직접 지정한 것이라 되살려야 한다
+      if (song.isFavorite === true) songs.toggleFavorite(newId, true);
       result.songs++;
     } catch (err) {
       result.skipped.push(`곡 '${song.title}': ${err instanceof Error ? err.message : '저장 실패'}`);
+    }
+  }
+
+  /*
+   * ── 대응곡 연결 (점검 P-2) ────────────────────────────────────
+   *
+   * **곡을 다 만든 뒤에** 걸어야 한다. 연결은 곡 id 를 가리키므로 `songIdMap` 이
+   * 다 채워지기 전에는 상대를 찾을 수 없다.
+   *
+   * 번들에는 `links` 가 실려 있었는데 여기서 아무것도 하지 않아, 옮기면
+   * 새찬송가↔통일찬송가 대응이 통째로 끊겼다. `linkSongs` 는 양방향이고
+   * `INSERT OR IGNORE` 라 같은 짝을 두 번 걸어도 안전하다.
+   */
+  for (const song of bundle.songs ?? []) {
+    if (typeof song?.id !== 'number' || !Array.isArray(song.links)) continue;
+    const from = songIdMap.get(song.id);
+    if (from === undefined) continue;
+    for (const link of song.links) {
+      const to = typeof link?.id === 'number' ? songIdMap.get(link.id) : undefined;
+      if (to === undefined) {
+        // 조용히 넘기지 않는다 — 대응곡이 하나만 옮겨 온 경우다
+        result.skipped.push(`대응곡 '${song.title}' ↔ '${String(link?.title ?? '?')}': 상대 곡이 번들에 없습니다`);
+        continue;
+      }
+      songs.linkSongs(from, to);
+      result.links++;
     }
   }
 

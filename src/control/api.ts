@@ -280,6 +280,8 @@ export const api = {
   importBundle: (bundle: unknown, mode: 'merge' | 'replace') =>
     send<{
       songs: number; templates: number; plans: number; settings: number; fonts: number;
+      /** 되살린 대응곡 연결 — 옮겨도 새찬송가↔통일찬송가 대응이 남는다는 증거다 */
+      links: number;
       /** 이미 있어 건너뛴 곡 — 합치기를 여러 번 해도 늘지 않는다는 증거다 */
       songsExisting: number;
       skipped: string[];

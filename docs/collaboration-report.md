@@ -436,6 +436,15 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
+- [시작 2026-09-07 / Agent C] 점검 4건 조치 — S-1 → P-2 → S-2 → P-1 (사용자 승인)
+  근거: docs/REVIEW-release-2026-09-07.md · 보드 4.7
+  계획: ① S-1 번들에서 lan_password·lan_session_secret 제외 (한 줄 + 회귀 테스트)
+        ② P-2 가져오기가 linesSource(구간별)·isFavorite·links 를 되살린다
+        ③ S-2 HTTP 훅에 Origin·Host 검사 (WS 와 같은 규칙) — **OBS·프로젝터·
+           강사 모니터가 계속 붙는지 격리 서버로 반드시 재확인**
+        ④ P-1 설치판에서 암호를 정할 수 있게 + 문구를 packaged 로 가른다
+  ⚠️ 사용자 데이터(data/songs.sqlite)에 쓰지 않는다. 검증은 격리 서버(7810).
+  다음 단계: ① S-1 착수
 - [완료 2026-09-07 / Agent C] 배포 직전 전면 점검 (사용자 요청)
   요청: "보안 문제, 배포를 통해 다른 사람들이 사용할 수 있는 stand alone 빌드에
   앞서 면밀하게 프로젝트와 각 파일들을 점검해줘."

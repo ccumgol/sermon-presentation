@@ -603,8 +603,22 @@ export interface SongInput {
   defaultTemplateId?: number;
   /** 수록 곡집·번호. 비우면 '기타' 곡집에 번호 없이 들어간다. */
   entries?: SongEntryInput[];
-  sections: Array<{ kind: SongSection['kind']; label: string; lines: SongLine[] }>;
-  /** 줄나눔 출처. 원본의 줄바꿈을 그대로 쓴 경우 'imported' 로 표시한다. */
+  sections: Array<{
+    kind: SongSection['kind'];
+    label: string;
+    lines: SongLine[];
+    /**
+     * **이 구간만의** 줄나눔 출처. 주면 아래 `linesSource`(곡 전체 기본값)보다 이긴다.
+     *
+     * 한 곡 안에서 구간마다 값이 다를 수 있어 필요하다 — 1절만 사람이 승인해
+     * `manual` 이고 나머지는 `auto` 인 곡이 실제로 있다. 번들 가져오기가 이 값을
+     * 넘기지 않아 **옮기면 승인 표시가 전부 사라졌다** (점검 P-2, 2026-09-07).
+     *
+     * 일부러 넣을 때만 쓴다. 보통 경로는 이 칸을 비우고 곡 단위 기본값을 쓴다.
+     */
+    linesSource?: LinesSource;
+  }>;
+  /** 줄나눔 출처의 **곡 단위 기본값.** 원본의 줄바꿈을 그대로 쓴 경우 'imported'. */
   linesSource?: LinesSource;
 }
 
@@ -692,8 +706,11 @@ function writeSections(
   );
 
   for (const [position, section] of sections.entries()) {
+    // 구간이 자기 값을 들고 왔으면 그것이 이긴다 (번들 가져오기·복구가 쓴다).
+    // 없으면 곡 단위 기본값 — 지금까지의 모든 경로가 이쪽이다.
+    const source = section.linesSource ?? linesSource;
     const sectionId = Number(
-      insertSection.run(songId, section.kind, section.label, position, linesSource).lastInsertRowid,
+      insertSection.run(songId, section.kind, section.label, position, source).lastInsertRowid,
     );
     for (const line of section.lines) {
       insertLine.run(sectionId, line.lineIndex, line.lang, line.text);
