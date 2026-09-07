@@ -26,8 +26,11 @@
  * 서버 본체는 ESM 이므로 `import()` 로 불러온다.
  */
 
+const { appendFileSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow, shell, dialog, Menu } = require('electron');
+
+const { argsWithAttempt, decideRestart, readAttempt } = require('./restart-policy.cjs');
 
 /** 포장했으면 `resources/app` 안, 개발 중이면 저장소 루트 */
 const APP_ROOT = app.isPackaged ? path.join(process.resourcesPath, 'app') : path.join(__dirname, '..');
@@ -68,6 +71,90 @@ if (!app.requestSingleInstanceLock()) {
 
 let mainWindow = null;
 let stopServer = null;
+
+/*
+ * ── 처리되지 않은 오류 — **가장 먼저 등록한다** (점검 P-4) ──────────
+ *
+ * 터미널로 돌릴 때는 `server/index.ts` 가 오류를 크게 남기고 죽고, `start.sh` 의
+ * 감시 루프가 1초 뒤 다시 띄운다. **설치판에는 둘 다 없었다** — 서버가 이 프로세스
+ * 안에서 도는데 처리되지 않은 오류가 나면 앱이 그냥 사라진다. 예배 중이면 화면은
+ * 마지막 슬라이드로 멈추고, 다시 켜 줄 사람은 봉사자다.
+ *
+ * **오류를 삼켜 살려 두지 않는다** — `server/index.ts` 와 같은 판단이다. 그 뒤
+ * 프로세스 상태를 믿을 수 없으므로(반쯤 열린 트랜잭션·깨진 소켓) **빨리 죽고 빨리
+ * 살아나는 편**이 안전하다. 여기서는 `app.relaunch()` 가 감시 루프 노릇을 한다.
+ *
+ * 세 가지를 반드시 지킨다:
+ *   ① **터미널이 없다** → 무슨 일이었는지 데이터 폴더의 `crash.log` 에 적는다
+ *   ② **DB 를 닫는다** → `app.exit()` 는 `before-quit` 를 건너뛴다. 안 닫으면 WAL 이
+ *      남아 데이터 폴더를 복사했을 때 빈 DB 가 된다 (2026-09-04 실측)
+ *   ③ **거듭 죽으면 멈춘다** → 무한 재시작은 원인을 가린다 (`restart-policy.cjs`)
+ */
+const startedAt = Date.now();
+const restartAttempt = readAttempt(process.argv);
+let handlingCrash = false;
+
+/** 데이터 폴더에 남긴다 — 설치판을 쓰는 사람이 찾아갈 수 있는 유일한 자리다 */
+function writeCrashLog(kind, detail) {
+  try {
+    const dir = process.env.SERMON_DATA_DIR;
+    mkdirSync(dir, { recursive: true });
+    const line = `\n[${new Date().toISOString()}] ${kind} (다시 시작 ${restartAttempt}회 뒤)\n${detail}\n`;
+    appendFileSync(path.join(dir, 'crash.log'), line, 'utf8');
+    return path.join(dir, 'crash.log');
+  } catch {
+    // 로그를 못 남겨도 되살리기는 해야 한다
+    return null;
+  }
+}
+
+/** DB 를 닫는다. `app.exit()` 전에 반드시 — 안 닫으면 WAL 이 남는다 */
+function closeServerQuietly() {
+  if (!stopServer) return;
+  const close = stopServer;
+  stopServer = null;
+  try {
+    close();
+  } catch {
+    /* 닫다 실패해도 종료는 해야 한다 */
+  }
+}
+
+function onFatal(kind, error) {
+  // 종료 중에 또 나는 오류로 되살리기가 꼬이지 않게 한 번만 다룬다
+  if (handlingCrash) return;
+  handlingCrash = true;
+
+  const detail = error && error.stack ? error.stack : String(error);
+  const logPath = writeCrashLog(kind, detail);
+  const verdict = decideRestart({ livedMs: Date.now() - startedAt, attempt: restartAttempt });
+
+  closeServerQuietly();
+
+  if (verdict.restart) {
+    app.relaunch({ args: argsWithAttempt(process.argv.slice(1), verdict.nextAttempt) });
+    app.exit(1);
+    return;
+  }
+
+  /*
+   * 포기할 때는 **말없이 사라지지 않는다.** 무엇이 일어났고 어디를 봐야 하는지
+   * 알려 준다 — 그러지 않으면 '눌렀는데 안 켜진다' 만 남는다.
+   */
+  try {
+    dialog.showErrorBox(
+      '예배 프레젠테이션이 계속 종료됩니다',
+      `${verdict.reason}\n\n${kind}\n${detail.split('\n').slice(0, 6).join('\n')}` +
+        (logPath ? `\n\n자세한 기록: ${logPath}` : ''),
+    );
+  } catch {
+    /* 창을 띄울 수 없는 시점일 수 있다 */
+  }
+  app.exit(1);
+}
+
+process.on('uncaughtException', (error) => onFatal('처리되지 않은 예외', error));
+process.on('unhandledRejection', (reason) => onFatal('처리되지 않은 거부(Promise)', reason));
 
 function createWindow(url) {
   mainWindow = new BrowserWindow({
