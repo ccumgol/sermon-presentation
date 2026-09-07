@@ -103,6 +103,25 @@ npx tsc --noEmit && npx vitest run && npx vite build
 
 셋 다 통과해야 완료다. 커밋 메시지와 보고에 **무엇으로 확인했는지** 적는다.
 
+**`src/`(React) 검사를 쓸 때** — 파일 맨 위 두 줄이 필요하다. 빼면 조용히 헛돈다.
+
+```tsx
+// @vitest-environment jsdom        ← 이 파일만 DOM 환경. 전역을 바꾸면 통합 검사가 영향받는다
+afterEach(cleanup);                  ← globals:false 라 자동으로 안 붙는다. 없으면 다음 검사에서
+                                       같은 요소가 두 개 잡힌다 (실제로 겪었다)
+```
+
+`.test.tsx` 는 `vitest.config.ts` 의 `include` 에 들어 있어야 돈다 — 없으면
+**"No test files found" 만 나오고 지나간다.**
+
+**커버리지는 묶음별로 문턱이 있다** (`lib/` · `server/` · `src/`). 값은 실측한
+지금 값보다 조금 낮게 잡은 **ratchet** 이다 — 내려가지 않게 막는 것이 목적이니,
+검사를 더했으면 그 값을 올려 둔다.
+
+```bash
+npx vitest run --coverage
+```
+
 **`./start.sh`(사용자의 `presentation` 명령)를 Agent 가 실행하지 않는다.** 그것은 사용자
 데이터로 7777 을 잡고 브라우저를 연다. **검증은 격리 서버로 한다** — 포트를 직접 준다.
 

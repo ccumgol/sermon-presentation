@@ -64,7 +64,7 @@
 | 무엇인가 | OBS Studio **브라우저 소스**로 성경 본문·찬양 가사를 송출하는 로컬 앱 |
 | 기술 | Node.js 26(TypeScript 네이티브 실행, 빌드 없음) · Fastify 5 · `node:sqlite` · React 19 + Vite |
 | 기능 완성도 | **실사용 가능**. 성경 12역본 · 찬양 **4,531곡**(2026-09-07 실측) · 템플릿 프리셋 **8종** · 예배 순서(유형·저장·자동 진행·배경) · 줄나눔 검토 · 교독문 두 벌 · 프로젝터·강사 모니터 |
-| 테스트 | **1,440개 통과** · 92파일 (단위 + 통합, `npx vitest run` 약 10초 · 2026-09-07 실측) |
+| 테스트 | **1,500개 통과** · 96파일 (단위 + 통합 + **UI**, `npx vitest run` 약 12초 · 2026-09-07 실측) |
 | 문서 | README(설치·구조) · PLAN(설계와 판단 근거) · KNOWN-DATA-ISSUES(원본 데이터 문제) + **운영 3종**(2026-08-16 사용자 요청으로 신설) — [USER-GUIDE](USER-GUIDE.md)(탭별 사용법) · [TROUBLESHOOTING](TROUBLESHOOTING.md)(증상별 해결) · [CHANGELOG](CHANGELOG.md)(변경 이력) · [SECURITY-AUDIT](SECURITY-AUDIT.md)(보안 감사, 2026-08-16). analysis·handover·setup-guide 처럼 **겹치는 문서는 여전히 만들지 않습니다** |
 | 저장소 | `github.com/ccumgol/sermon-presentation` (**PRIVATE**) · `main` 직통 |
 | 실행 환경 | **모든 Agent 가 사용자의 같은 맥·같은 `data/` 를 공유** (0.3 참고) |
@@ -306,8 +306,9 @@ CI 는 태그·수동 실행만 · `PlanPanel.tsx` 2,549줄 (4.3 · 4.5 참고).
 
 | 항목 | 상태 | 비고 |
 |---|---|---|
-| 테스트 **1,440개** (92파일) | 🟢 유지 | 단위 + 통합. `fileParallelism: false`(통합 테스트가 SQLite 파일 공유). **전부 `lib/`·`server/` 대상** — `src/`(React) 를 겨냥한 파일은 1개뿐이다 |
-| **UI 테스트 (`src/` 커버리지 0)** | 🔴 없음 | 검수 리포트가 **'가장 큰 빚'** 으로 지목. 1,440개가 전부 `lib/`·`server/` 다. `PlanPanel`+`SongPanel` 3,571줄에 테스트가 없다 |
+| 테스트 **1,500개** (96파일) | 🟢 유지 | 단위 + 통합 + UI. `fileParallelism: false`(통합 테스트가 SQLite 파일 공유) |
+| **UI 테스트 (`src/`)** | 🟡 **시작함** (2026-09-07) | 0 → **줄 7.0%**. 값이 큰 넷을 먼저 덮었다 — `useLiveState` 93% · `TabletSetup` 83% · `api.ts` 의 `request` · `useMeasure`. **커버리지를 `src/` 까지 재기 시작했다**(전에는 아예 재지 않아 숫자로 보이지 않았다). 남은 가장 큰 빚은 `PlanPanel.tsx` 2,549줄 — R-4 훅 분리 뒤가 낫다 |
+| `server/` 커버리지 79.5% | 🟡 드러남 | 새로 생긴 일이 아니다 — 전에는 `lib/`(97.9%)와 한 덩이로 재서 평균 86% 로 통과했고 **낮은 쪽이 가려져 있었다.** 나눠서 재기 시작하니 보였다 |
 | lint 도구 | 🔴 없음 | ESLint/Prettier 미도입 — 도입 여부 사용자 확인 필요 |
 | CI | 🔴 없음 | GitHub Actions 미설정 |
 | `server/db/songs.ts` **1,167줄** | ⚪ 보류 | 분리하면 충돌 위험 커서 기능 안정화 후 판단 |
@@ -479,6 +480,31 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 ```
+- [완료 2026-09-07 / Agent C] src/(React) 테스트 — 가장 큰 빚 (사용자 요청)
+  결과: 검사 1,440 → **1,500개**(96파일). src/ 줄 커버리지 **0 → 7.0%**.
+        보드 4.3 의 '🔴 UI 테스트 없음' 을 🟡 시작함으로 바꿨다.
+  틀(harness):
+    · `.test.tsx` 가 `include` 에 없어 **"No test files found" 만 나왔다** → 넓혔다
+    · DOM 은 **파일별** `// @vitest-environment jsdom` 으로 준다 — 전역을 바꾸면
+      통합 검사 1,440개가 함께 영향받는다
+    · `afterEach(cleanup)` 을 파일마다 명시한다 (globals:false 라 자동으로 안 붙고,
+      없으면 다음 검사에서 같은 요소가 두 개 잡힌다 — 실제로 겪었다)
+    · 새 devDependency 셋: jsdom · @testing-library/react · user-event.
+      **프로덕션 의존성은 그대로 5개다.** jest-dom 은 안 들였다 (필요한 것이
+      `disabled` 값 하나여서 직접 봤다)
+  덮은 것 (값이 큰 순서):
+    · useLiveState 19개(줄 93%) — 컨트롤 화면의 모든 표시가 지나는 곳
+    · TabletSetup 16개(줄 83%) — 암호 없이 랜을 열지 못하게 하는 화면 쪽 관문
+    · api.ts 의 request 14개 — 서버의 거절(403·409·429)을 사람에게 전하는 통로
+    · useMeasure 11개 — **이미 사고가 난 자리**(useMemo 를 풀면 미리보기가 빈다)
+  **넷 다 고치기 전 코드로 되돌려 검사가 실패하는 것을 확인했다.**
+  드러난 것: **server/ 커버리지가 79.5% 로 80% 아래다.** 새로 생긴 일이 아니라,
+        전에는 lib/(97.9%)와 한 덩이로 재서 평균 86% 로 통과하며 가려져 있었다.
+        묶음별 문턱(ratchet)으로 바꾸니 보였다 — 문서에 사실로 적었다.
+  검증: tsc 0 · vitest 1,500개/96파일 · vite build · npm audit 0건 ·
+        `vitest run --coverage` 통과
+  다음 단계: PlanPanel.tsx(2,549줄)이 남은 가장 큰 빚이다. **R-4 훅 분리 뒤에**
+        붙이는 편이 낫다 — 예배를 진행하는 화면이라 기계적으로 밀어붙이지 않는다.
 - [완료 2026-09-07 / Agent C] 점검 나머지 + 문서 전면 갱신 (사용자 요청)
   결과: 1325a1e(S-5·S-6·P-7·D-7) · 06a8967(감사 L-1·L-2) · 문서 커밋.
         **점검 14건과 보안 감사의 미결 항목이 모두 닫혔다.**
