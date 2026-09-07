@@ -17,7 +17,7 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 전에 누가 무엇을 했는지 찾을 때 | [docs/work-log.md](docs/work-log.md) (작업 이력 전체) · [docs/CHANGELOG.md](docs/CHANGELOG.md) (요약) |
 | 데이터가 이상할 때 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) — 원본 자료 자체의 문제 목록 |
 | 찬양 자료를 밖에서 정리해 올 때 | [docs/SONG-IMPORT-FORMAT.md](docs/SONG-IMPORT-FORMAT.md) — 반입 형식 규격 |
-| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 남은 항목 |
+| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 조치. **2026-09-07 로 모든 항목이 닫혔다** — 새로 여는 것이 있으면 여기에 적는다 |
 | 설치·구조를 알아야 할 때 | [README.md](README.md) |
 | 배포판(맥·윈도우)을 만들 때 | [docs/PACKAGING.md](docs/PACKAGING.md) — 만드는 법과 **겪은 함정** |
 | 설치 파일을 받은 사람이 물을 때 | [README '설치판으로 쓰기'](README.md) — 터미널 없이 쓰는 순서. 맥은 격리 표시 지우기 한 줄이 필요하다 |
@@ -141,6 +141,13 @@ git diff --name-only origin/main..HEAD   # data/ 나 settings.local.json 이 섞
   모르는 슬라이드 종류를 받으면 이전 화면을 그대로 둔다 — 예배 중 검은 화면을 막는다.
 - **출력 페이지(`public/output/`)는 의존성 0.** React·CDN·외부 폰트를 쓰지 않는다.
   그래서 일부 로직이 `lib/` 와 의도적으로 중복돼 있다 — 고칠 때 **양쪽을 함께** 고친다.
+  지금 짝인 것: `isAllowedStyleKey`(`lib/template-css.ts` ↔ `output.js`).
+- **바깥에서 온 값은 형태부터 본다.** WS 페이로드·HTTP 본문·설정 값 모두.
+  `deck:load` 는 `lib/deck-guard.ts`, `style:set` 은 `isAllowedStyleKey` 를 지난다 —
+  **거부할 때는 로그를 남긴다**(조용히 버리면 예배 전에 진단할 수 없다).
+- **설치판에서만 나타나는 함정이 있다.** 터미널로 돌릴 때는 셸의 환경을 물려받아
+  드러나지 않는다 — 애드혹 서명 · 좁은 `PATH`(`/usr/bin:/bin:/usr/sbin:/sbin`) ·
+  터미널 명령을 시키는 안내문. **설치판을 건드렸으면 앱을 실제로 띄워 확인한다.**
 - **자동 결과는 제안이다.** 사람이 승인해야 확정된다.
 - **추측 말고 실측.** 폰트 대체·글자 크기·스크롤바 폭까지 브라우저에서 재고 정했다.
 - 파일은 200~400줄이 적당, **최대 800줄**. 함수는 50줄 이하.
