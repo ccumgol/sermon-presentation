@@ -19,7 +19,8 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 찬양 자료를 밖에서 정리해 올 때 | [docs/SONG-IMPORT-FORMAT.md](docs/SONG-IMPORT-FORMAT.md) — 반입 형식 규격 |
 | 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 남은 항목 |
 | 설치·구조를 알아야 할 때 | [README.md](README.md) |
-| 배포판(맥·윈도우)을 만들 때 | [docs/PACKAGING.md](docs/PACKAGING.md) — 만드는 법과 **겪은 함정 셋** |
+| 배포판(맥·윈도우)을 만들 때 | [docs/PACKAGING.md](docs/PACKAGING.md) — 만드는 법과 **겪은 함정** |
+| 설치 파일을 받은 사람이 물을 때 | [README '설치판으로 쓰기'](README.md) — 터미널 없이 쓰는 순서. 맥은 격리 표시 지우기 한 줄이 필요하다 |
 
 ---
 
