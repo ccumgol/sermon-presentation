@@ -14,7 +14,8 @@ import qrcode from 'qrcode-generator';
 import { qrToSvg, type QrSvg } from '../../lib/qr-svg.ts';
 import { lanInterfaces } from '../lan.ts';
 import { hasPassword } from '../auth.ts';
-import { IS_LAN_OPEN } from '../config.ts';
+import { isPackagedApp } from '../../lib/bible-missing.ts';
+import { storedLanOpen } from '../lan-setting.ts';
 
 export interface TabletTarget {
   /** LAN 주소 (`192.168.1.190`) */
@@ -42,11 +43,20 @@ function buildQr(url: string): QrSvg {
   return qrToSvg((row, col) => qr.isDark(row, col), qr.getModuleCount());
 }
 
-export function registerTabletRoutes(app: FastifyInstance, getPort: () => number): void {
+/**
+ * @param isLanOpen 지금 이 서버가 LAN 에 열려 있는가 — `buildApp` 이 한 번 계산해 넘긴다.
+ *   전에는 이 파일이 `IS_LAN_OPEN`(환경 변수만 보는 값)을 직접 읽어서, 설정 탭에서
+ *   켠 경우를 알지 못했다 (점검 P-1).
+ */
+export function registerTabletRoutes(
+  app: FastifyInstance,
+  getPort: () => number,
+  isLanOpen: () => boolean,
+): void {
   app.get('/api/tablet-access', async () => {
     // LAN 이 닫혀 있으면 주소를 주지 않는다 — 열리지 않는 주소를 보여 주면
     // '주소는 있는데 접속이 안 된다' 가 된다.
-    const targets: TabletTarget[] = IS_LAN_OPEN
+    const targets: TabletTarget[] = isLanOpen()
       ? lanInterfaces().map((nic) => {
           const url = `http://${nic.address}:${getPort()}/`;
           return { address: nic.address, iface: nic.iface, url, qr: buildQr(url) };
@@ -56,8 +66,18 @@ export function registerTabletRoutes(app: FastifyInstance, getPort: () => number
     return {
       success: true,
       data: {
-        lanOpen: IS_LAN_OPEN,
+        lanOpen: isLanOpen(),
+        /**
+         * **다시 시작하면 열리는가** — 저장된 선택.
+         *
+         * `lanOpen`(지금 실제로 열려 있는가)과 나눠서 준다. 하나로 합치면 설정 탭에서
+         * 켠 직후 화면이 '닫혀 있습니다 · [열기]' 로 남아 **눌렀는데 아무 일도 없는 것처럼**
+         * 보인다 (실제로 브라우저로 눌러 보고 발견했다). 되돌릴 방법도 없어진다.
+         */
+        lanWanted: storedLanOpen(),
         passwordSet: hasPassword(),
+        /** 설치판인가 — 화면이 안내 문구를 가려 쓴다 (터미널·저장소가 없다) */
+        packaged: isPackagedApp(),
         targets,
       },
       error: null,

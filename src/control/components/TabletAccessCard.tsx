@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api, ApiError, type TabletAccess } from '../api.ts';
+import { TabletSetup } from './TabletSetup.tsx';
 
 /** QR 한 장. `size` 는 여백을 포함한 모듈 수 */
 function QrImage({
@@ -65,22 +66,23 @@ export function TabletAccessCard(): React.JSX.Element | null {
 
   if (!access) return null;
 
-  // ── LAN 이 닫혀 있다 — 주소를 보여 주면 '접속이 안 된다' 가 된다 ──
+  /*
+   * ── LAN 이 닫혀 있다 ─────────────────────────────────────────
+   *
+   * 주소를 보여 주지 않는다 — 열리지 않는 주소를 주면 '접속이 안 된다' 가 된다.
+   *
+   * 전에는 여기서 `presentation lan` 을 입력하라고 안내했다. **설치판에는 터미널도
+   * alias 도 없다** (점검 P-1). 이제 이 카드에서 암호를 정하고 열 수 있다.
+   */
   if (!access.lanOpen) {
     return (
       <div className="card">
         <h2>태블릿에서 조작하기</h2>
         <p className="hintline muted">
-          지금은 <b>이 PC 안에서만</b> 열려 있습니다. 태블릿으로 조작하려면 터미널에서 이렇게
-          다시 띄우세요.
+          지금은 <b>이 PC 안에서만</b> 열려 있습니다. 태블릿으로도 조작하려면 접속 암호를 정한 뒤
+          열어 주세요.
         </p>
-        <div className="url-row">
-          <code>presentation lan</code>
-        </div>
-        <p className="hintline muted">
-          이미 열려 있던 터미널은 옛 설정을 들고 있을 수 있습니다. 안 되면 <b>새 터미널</b>을
-          열거나 <code>source ~/.zshrc</code> 를 먼저 실행하세요.
-        </p>
+        <TabletSetup access={access} onChanged={load} />
       </div>
     );
   }
@@ -89,11 +91,18 @@ export function TabletAccessCard(): React.JSX.Element | null {
     <div className="card">
       <h2>태블릿에서 조작하기</h2>
 
+      {/*
+        암호가 없으면 **가장 먼저** 말한다 — 이 상태의 랜은 감사 H-1 이 막으려던
+        상태다. 전에는 `npm run password` 를 시켰는데 설치판에서는 할 수 없다.
+      */}
       {!access.passwordSet && (
         <p className="hintline warn">
-          접속 암호가 정해져 있지 않습니다. 이 PC 에서 <code>npm run password</code> 로 정하세요.
+          <b>접속 암호가 정해져 있지 않습니다.</b> 아래에서 정하세요 — 지금은 같은 WiFi 의 누구나
+          예배 화면을 바꿀 수 있습니다.
         </p>
       )}
+
+      <TabletSetup access={access} onChanged={load} />
 
       <p className="hintline muted">
         태블릿 카메라로 QR 을 찍으면 로그인 화면이 열립니다. <b>암호는 그때 한 번</b> 넣고,

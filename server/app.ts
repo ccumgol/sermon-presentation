@@ -11,7 +11,7 @@ import path from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
-import { DEFAULT_PRIMARY_TRANSLATION, IS_LAN_OPEN } from './config.ts';
+import { DEFAULT_PRIMARY_TRANSLATION, isLanHost, resolveHost } from './config.ts';
 import { initAppDb } from './db/app.ts';
 import { initPlanStore, countPlans } from './db/plans.ts';
 import { initReadingStore } from './db/readings.ts';
@@ -20,6 +20,7 @@ import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
 import { isAllowedHost, isAllowedOrigin, parseAllowedOrigins } from '../lib/origin-check.ts';
 import { lanHosts, lanInterfaces } from './lan.ts';
+import { storedLanOpen } from './lan-setting.ts';
 import { ensureDataDirs, paths } from './paths.ts';
 import {
   SESSION_COOKIE, isAuthExemptPath, isLoopbackAddress, isTrustedAddress, parseTrustedIps,
@@ -89,6 +90,15 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   }
 
   const stateRestored = initState();
+
+  /*
+   * **지금 이 서버가 실제로 열려 있는 범위.**
+   *
+   * 환경 변수(`start.sh lan`)와 저장된 선택(설치판의 설정 탭) 둘 다를 거친
+   * 결과다 — `resolveHost` 가 그 우선순위를 정한다. `/api/info` 와 태블릿 QR 이
+   * 이 값으로 안내하므로, 여기서 한 번만 계산해 두 곳이 어긋나지 않게 한다.
+   */
+  const lanOpen = isLanHost(resolveHost(storedLanOpen()));
 
   /**
    * ── 어디서 온 요청인가 (점검 S-2) ────────────────────────────
@@ -291,8 +301,8 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
       wsUrl: `ws://localhost:${options.getPort()}/ws`,
       // LAN 에 열려 있을 때만 태블릿 주소를 준다. 닫혀 있는데 주소를 보여 주면
       // '주소는 있는데 접속이 안 된다' 가 된다.
-      lanAddresses: IS_LAN_OPEN ? lanHosts().map((h) => `http://${h}:${options.getPort()}/`) : [],
-      lanOpen: IS_LAN_OPEN,
+      lanAddresses: lanOpen ? lanHosts().map((h) => `http://${h}:${options.getPort()}/`) : [],
+      lanOpen,
       dataDir: paths.dataDir,
       bibleSourceDir: paths.bibleSourceDir,
       bibleReady,
@@ -311,7 +321,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
 
   registerLoginRoutes(app);
   registerSystemRoutes(app);
-  registerTabletRoutes(app, options.getPort);
+  registerTabletRoutes(app, options.getPort, () => lanOpen);
   await registerSongRoutes(app);
   await registerSongbookRoutes(app);
   await registerPlanRoutes(app);

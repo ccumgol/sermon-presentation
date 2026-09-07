@@ -6,11 +6,12 @@
 
 import { buildApp, lanInterfaces } from './app.ts';
 import { hasPassword } from './auth.ts';
-import { DEFAULT_PORT, HOST, IS_LAN_OPEN, PORT_SCAN_RANGE } from './config.ts';
+import { DEFAULT_PORT, PORT_SCAN_RANGE, isLanHost, resolveHost } from './config.ts';
 import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
 import { closeSongsDb } from './db/songs.ts';
 import { onSameDevice } from './db/snapshot.ts';
+import { storedLanOpen } from './lan-setting.ts';
 import { bibleMissingLine } from '../lib/bible-missing.ts';
 import { listenWithFallback } from './listen.ts';
 import { paths } from './paths.ts';
@@ -70,9 +71,16 @@ if (stateRestored.corrupt) {
  * 그래서 '경고만 하고 열기' 대신 **거부**한다 — 고치는 방법은 한 줄이고,
  * `./start.sh lan` 은 이 상황을 미리 잡아 그 자리에서 물어본다.
  */
-if (IS_LAN_OPEN && !hasPassword()) {
+/*
+ * 바인딩 주소는 **환경 변수와 저장된 선택**을 함께 본다 (점검 P-1).
+ * 환경 변수가 이기므로 `./start.sh lan` 과 격리 서버 검증은 그대로 동작한다.
+ */
+const host = resolveHost(storedLanOpen());
+const lanOpen = isLanHost(host);
+
+if (lanOpen && !hasPassword()) {
   app.log.error('LAN 에 열려면 접속 암호가 필요합니다. 아직 정해지지 않았습니다.');
-  app.log.error("  이 PC 에서:  npm run password");
+  app.log.error("  이 PC 에서:  npm run password  (또는 앱의 설정 탭 → 태블릿에서 조작하기)");
   app.log.error('  암호 없이 이 PC 안에서만 쓰려면:  ./start.sh  (또는 npm start)');
   closeAppDb();
   process.exit(1);
@@ -81,7 +89,7 @@ if (IS_LAN_OPEN && !hasPassword()) {
 actualPort = await listenWithFallback(app, {
   firstPort: DEFAULT_PORT,
   range: PORT_SCAN_RANGE,
-  host: HOST,
+  host,
   onBusy: (port) => app.log.warn(`포트 ${port} 사용 중 — 다음 포트를 시도합니다`),
 });
 
@@ -98,7 +106,7 @@ app.log.info(`OBS 브라우저 소스: http://localhost:${actualPort}/output/?la
 //
 // 기본을 localhost 로 바꾸면서, 태블릿을 쓰던 사람에게는 '갑자기 안 되는' 상황이
 // 된다. 원인과 여는 방법을 기동 때 바로 보여 주지 않으면 예배 직전에 헤맨다.
-if (IS_LAN_OPEN) {
+if (lanOpen) {
   const nics = lanInterfaces();
   for (const nic of nics) {
     app.log.info(`태블릿 접속      : http://${nic.address}:${actualPort}/   (${nic.iface})`);

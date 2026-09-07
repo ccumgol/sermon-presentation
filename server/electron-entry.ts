@@ -16,11 +16,13 @@
  */
 
 import { buildApp } from './app.ts';
-import { DEFAULT_PORT, HOST, PORT_SCAN_RANGE } from './config.ts';
+import { DEFAULT_PORT, PORT_SCAN_RANGE, isLanHost, resolveHost } from './config.ts';
 import { closeAppDb } from './db/app.ts';
 import { closeBibleDb } from './db/bible.ts';
 import { closeSongsDb } from './db/songs.ts';
+import { hasPassword } from './auth.ts';
 import { listenWithFallback } from './listen.ts';
+import { storedLanOpen } from './lan-setting.ts';
 import { createWsHub, type WsHub } from './ws.ts';
 
 export interface RunningServer {
@@ -41,10 +43,24 @@ export async function startServer(): Promise<RunningServer> {
     onTemplateChanged: (template) => hub?.pushTemplate(template),
   });
 
+  /*
+   * 바인딩 주소 — 설정 탭에서 켠 '태블릿에 열기' 를 여기서 반영한다 (점검 P-1).
+   *
+   * **암호가 없으면 열지 않고 이 PC 안으로 되돌린다.** 터미널판은 이 상황에서
+   * 종료하지만(사람이 곧바로 고칠 수 있다), **창이 있는 앱은 그러면 안 된다** —
+   * 예배 준비 중에 앱이 아예 안 뜨는 것이 더 나쁘다. 열지 않고 알린다.
+   */
+  const wantsLan = isLanHost(resolveHost(storedLanOpen()));
+  const host = wantsLan && !hasPassword() ? '127.0.0.1' : resolveHost(storedLanOpen());
+  if (wantsLan && !hasPassword()) {
+    app.log.error('태블릿에 열도록 되어 있지만 접속 암호가 없어 이 PC 안에서만 열었습니다.');
+    app.log.error('  설정 탭 → 태블릿에서 조작하기 → 접속 암호를 정한 뒤 앱을 다시 시작하세요.');
+  }
+
   actualPort = await listenWithFallback(app, {
     firstPort: DEFAULT_PORT,
     range: PORT_SCAN_RANGE,
-    host: HOST,
+    host,
     onBusy: (port) => app.log.warn(`포트 ${port} 사용 중 — 다음 포트를 시도합니다`),
   });
 

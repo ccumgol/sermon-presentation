@@ -17,6 +17,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { buildIdentityIndex, findExisting } from '../../lib/song-identity.ts';
 import { SECRET_SETTING_KEYS } from '../auth.ts';
+import { LAN_OPEN_KEY } from '../lan-setting.ts';
 import type { ApiResponse, Song, Template } from '../../shared/types.ts';
 import { getConnection } from '../db/app.ts';
 import { snapshotDatabases } from '../db/snapshot.ts';
@@ -44,8 +45,10 @@ const IMPORT_BODY_LIMIT = 256 * 1024 * 1024;
  * - 접속 암호·세션 서명 열쇠(`server/auth.ts` 의 `SECRET_SETTING_KEYS`):
  *   **번들은 사람이 손으로 나르는 파일이다.** 서명 열쇠가 실리면 그것을 본 사람이
  *   암호 없이 쿠키를 만들 수 있다 (그 파일의 머리말에 근거).
+ * - `lan_open`: 태블릿에 열지 말지는 **그 PC 의 보안 결정**이다. 번들을 받은 PC 가
+ *   남의 선택 때문에 랜에 열리면 안 된다.
  */
-const EXCLUDED_SETTINGS = new Set<string>(['live_state', ...SECRET_SETTING_KEYS]);
+const EXCLUDED_SETTINGS = new Set<string>(['live_state', LAN_OPEN_KEY, ...SECRET_SETTING_KEYS]);
 
 const FONT_EXTENSIONS = new Set(['.woff2', '.woff', '.ttf', '.otf']);
 

@@ -32,8 +32,12 @@ import type {
 export interface TabletAccess {
   /** LAN 에 열려 있는가 — 닫혀 있으면 주소를 주지 않는다 */
   lanOpen: boolean;
+  /** **다시 시작하면** 열리는가 (저장된 선택). `lanOpen` 과 다를 수 있다 */
+  lanWanted: boolean;
   /** 접속 암호가 정해져 있는가 */
   passwordSet: boolean;
+  /** 설치판인가 — 터미널 명령을 시키면 안 된다 (점검 P-1) */
+  packaged: boolean;
   targets: Array<{
     address: string;
     /** 어느 장치인가 (`en0`) — 주소가 여러 개일 때 고르는 단서 */
@@ -135,6 +139,13 @@ const get = <T,>(url: string): Promise<T> => request<T>(url);
 export const api = {
   info: () => get<ServerInfo>('/api/info'),
   tabletAccess: () => get<TabletAccess>('/api/tablet-access'),
+  /** 접속 암호를 정한다 (이 PC 에서만) — 정하면 붙어 있던 기기가 모두 로그아웃된다 */
+  setPassword: (password: string) =>
+    send<{ passwordSet: boolean }>('POST', '/api/system/password', { password }),
+  clearPassword: () => send<{ passwordSet: boolean }>('DELETE', '/api/system/password'),
+  /** 태블릿에 열기·닫기. 값만 저장되고 **다시 시작할 때** 반영된다 */
+  setLanOpen: (open: boolean) =>
+    send<{ lanOpen: boolean; restartRequired: boolean; packaged: boolean }>('PUT', '/api/system/lan', { open }),
   translations: () => get<Translation[]>('/api/translations'),
   books: () => get<BookMeta[]>('/api/books'),
   /**

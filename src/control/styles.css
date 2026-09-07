@@ -2396,6 +2396,34 @@ button.link-inline {
   font-size: 12px;
 }
 
+/* ── 태블릿 준비 (암호·열기) ────────────────────────────────────────
+   설치판에는 터미널이 없어 이 자리에서 암호를 정하고 열고 닫는다 (점검 P-1).
+   예배 직전에 만지는 곳이라 '지금 어떤 상태인가' 가 한눈에 보여야 한다. */
+.tablet-setup-row {
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line, #d6d9de);
+}
+
+/* 상태 낱말만 색으로 구분한다. `.hintline.ok/.warn` 은 한 줄 전체를 칠하므로
+   줄 안의 한 낱말에는 쓸 수 없다. */
+.ok-text { color: var(--ok); }
+.warn-text { color: var(--warn); }
+
+.tablet-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--panel-2, rgba(127, 127, 127, 0.08));
+}
+
+/* 암호 칸은 좁아도 된다 — 넓으면 화면이 '이만큼 길게 쓰라' 고 말하는 것처럼 보인다 */
+.tablet-password-form input { max-width: 260px; }
+
 /* ── 타언어 가사 두 창 ───────────────────────────────────────────────
    한국어를 왼쪽에 두고 오른쪽에 줄을 맞춰 적는다. 좁은 화면(랩탑 세로)에서는
    위아래로 접는다 — 두 칸을 억지로 나란히 두면 한 줄에 몇 글자 안 들어간다. */

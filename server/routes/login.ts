@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from 'fastify';
 
+import { isPackagedApp } from '../../lib/bible-missing.ts';
 import { SESSION_COOKIE, isLoopbackAddress } from '../../lib/lan-auth.ts';
 import {
   clearFailures,
@@ -36,10 +37,19 @@ export function registerLoginRoutes(app: FastifyInstance): void {
     const address = request.ip;
 
     if (!hasPassword()) {
+      /*
+       * **할 수 있는 일을 말해 준다** (점검 P-1).
+       *
+       * 전에는 늘 `npm run password` 를 시켰다. 설치판을 쓰는 사람에게는 터미널도
+       * 저장소도 없어서 할 수 없는 일이다 — 성경 DB 안내에서 이미 겪은 것과 같다
+       * (`lib/bible-missing.ts`).
+       */
       return reply.code(503).send({
         success: false,
         data: null,
-        error: '이 서버에는 암호가 정해져 있지 않습니다. PC 에서 npm run password 로 정하세요.',
+        error: isPackagedApp()
+          ? '이 서버에는 접속 암호가 정해져 있지 않습니다. 서버 PC 의 앱에서 설정 탭 → 태블릿에서 조작하기 → 접속 암호를 정하세요.'
+          : '이 서버에는 접속 암호가 정해져 있지 않습니다. 서버 PC 에서 npm run password 로 정하세요.',
       });
     }
 

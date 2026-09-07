@@ -18,9 +18,12 @@ import { existsSync } from 'node:fs';
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
+import { isPackagedApp } from '../../lib/bible-missing.ts';
 import { checkEnv, isAllowedCommand, platformOf } from '../../lib/env-check.ts';
 import { isLoopbackAddress } from '../../lib/lan-auth.ts';
 import type { ApiResponse } from '../../shared/types.ts';
+import { clearPassword, hasPassword, setPassword } from '../auth.ts';
+import { setStoredLanOpen, storedLanOpen } from '../lan-setting.ts';
 import { paths } from '../paths.ts';
 
 function ok<T>(data: T): ApiResponse<T> {
@@ -91,6 +94,81 @@ export function registerSystemRoutes(app: FastifyInstance): void {
       dataDir: paths.dataDir,
       items: checkEnv(platform, existsSync, (tool) => tools.get(tool) === true),
     });
+  });
+
+  /**
+   * ── 접속 암호 정하기·없애기 (점검 P-1) ──────────────────────
+   *
+   * **설치판에는 터미널도 저장소도 없다.** 그런데 화면은 `npm run password` 를
+   * 시키고 있었다 — 할 수 없는 일이다. 그래서 앱에서 정할 수 있게 한다.
+   *
+   * **이 PC 에서만** 받는다. 태블릿이 암호를 바꿀 수 있으면, 한 번 들어온 기기가
+   * 주인을 잠글 수 있다. 폴더 열기·설치와 같은 규칙이다.
+   *
+   * 암호를 바꾸면 서명 열쇠도 새로 발급되어(`setPassword`) **이미 붙어 있던 기기가
+   * 모두 로그아웃된다.** 바꾸는 이유가 대개 '누가 알아 버렸다' 이므로 그것이 맞다.
+   */
+  app.post<{ Body: { password?: unknown } }>('/api/system/password', async (request, reply) => {
+    if (!isLocal(request)) return reply.code(403).send(fail('이 PC 에서만 정할 수 있습니다'));
+
+    const password = request.body?.password;
+    if (typeof password !== 'string') return reply.code(400).send(fail('암호를 입력하세요'));
+    try {
+      setPassword(password);
+    } catch (err) {
+      // `setPassword` 가 길이를 판정한다 — 규칙을 두 곳에 적지 않는다
+      return reply.code(400).send(fail(err instanceof Error ? err.message : '암호를 정하지 못했습니다'));
+    }
+    app.log.info('접속 암호를 새로 정했습니다 (이미 접속해 있던 기기는 모두 로그아웃됩니다)');
+    return ok({ passwordSet: true });
+  });
+
+  /**
+   * 암호를 없앤다.
+   *
+   * **태블릿에 열려 있는 상태에서는 거부한다.** 없애는 순간 같은 WiFi 의 누구나
+   * 예배 화면을 바꾸고 가사를 지울 수 있다 (감사 H-1·H-2 에서 실증된 상태로
+   * 되돌아간다). 먼저 닫으라고 말해 주는 편이 낫다.
+   */
+  app.delete('/api/system/password', async (request, reply) => {
+    if (!isLocal(request)) return reply.code(403).send(fail('이 PC 에서만 없앨 수 있습니다'));
+    if (storedLanOpen()) {
+      return reply
+        .code(409)
+        .send(fail('태블릿에 열려 있는 동안에는 암호를 없앨 수 없습니다. 먼저 태블릿 접속을 닫으세요.'));
+    }
+    clearPassword();
+    app.log.info('접속 암호를 없앴습니다 (태블릿으로는 열 수 없습니다)');
+    return ok({ passwordSet: false });
+  });
+
+  /**
+   * ── 태블릿에 열기·닫기 (점검 P-1) ───────────────────────────
+   *
+   * 값만 저장하고 **다시 시작할 때** 반영한다. 바인딩 주소는 서버가 뜰 때 한 번
+   * 정해지고, 도는 중에 리스너를 더 여는 장치를 **예배 중에 도는 서버**에 넣는 것은
+   * 위험이 이득보다 크다. 그래서 `restartRequired` 를 돌려주고 화면이 안내한다.
+   *
+   * **암호 없이 열지 않는다.** 터미널판은 이 상황에서 기동을 거부하고(`server/index.ts`),
+   * 설치판은 열지 않고 이 PC 안으로 되돌린다(`server/electron-entry.ts`) — 어느
+   * 쪽이든 '열었다고 생각했는데 아니다' 가 되므로 여기서 미리 막는다.
+   */
+  app.put<{ Body: { open?: unknown } }>('/api/system/lan', async (request, reply) => {
+    if (!isLocal(request)) return reply.code(403).send(fail('이 PC 에서만 바꿀 수 있습니다'));
+
+    const open = request.body?.open;
+    if (typeof open !== 'boolean') return reply.code(400).send(fail('open 은 true 또는 false 여야 합니다'));
+    if (open && !hasPassword()) {
+      return reply.code(409).send(fail('먼저 접속 암호를 정하세요. 암호 없이 태블릿에 열지 않습니다.'));
+    }
+
+    setStoredLanOpen(open);
+    app.log.warn(
+      open
+        ? '태블릿 접속을 켰습니다 — 다시 시작하면 같은 WiFi 의 기기가 접속할 수 있습니다 (암호 필요)'
+        : '태블릿 접속을 껐습니다 — 다시 시작하면 이 PC 안에서만 열립니다',
+    );
+    return ok({ lanOpen: open, restartRequired: true, packaged: isPackagedApp() });
   });
 
   /**
