@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { isPackagedApp } from '../../lib/bible-missing.ts';
-import { checkEnv, isAllowedCommand, platformOf } from '../../lib/env-check.ts';
+import { checkEnv, isAllowedCommand, pickToolPath, platformOf } from '../../lib/env-check.ts';
 import { isLoopbackAddress } from '../../lib/lan-auth.ts';
 import type { ApiResponse } from '../../shared/types.ts';
 import { clearPassword, hasPassword, setPassword } from '../auth.ts';
@@ -43,10 +43,30 @@ function run(file: string, args: string[], timeout = 5000): Promise<{ ok: boolea
   });
 }
 
-/** 설치 도구가 이 PC 에 있는가 (`brew`·`winget`) */
-async function hasTool(tool: string): Promise<boolean> {
+/**
+ * 설치 도구를 찾는다 — **절대 경로**를 돌려준다 (점검 P-5).
+ *
+ * `which` 만으로는 부족하다. **Finder·독으로 띄운 맥 앱의 `PATH` 는
+ * `/usr/bin:/bin:/usr/sbin:/sbin` 뿐이다** (2026-09-07, 사용자가 띄워 둔 앱의
+ * 프로세스 환경을 읽어 실측). Homebrew 가 `/opt/homebrew/bin/brew` 에 있어도
+ * 그 목록에 없어서 못 찾는다 — 터미널로 돌릴 때는 셸의 `PATH` 를 물려받아
+ * 문제가 없으니 **설치판에서만** 나타난다.
+ *
+ * 그래서 `which` 를 먼저 보고(사용자가 다른 자리에 두었을 수 있다), 실패하면
+ * 알려진 자리를 본다 (`lib/env-check.ts` 의 `toolCandidates`).
+ *
+ * @returns 실행할 수 있는 절대 경로, 없으면 `undefined`
+ */
+async function findTool(tool: string): Promise<string | undefined> {
   const probe = process.platform === 'win32' ? 'where' : 'which';
-  return (await run(probe, [tool], 3000)).ok;
+  const found = await run(probe, [tool], 3000);
+  return pickToolPath(
+    tool,
+    platformOf(process.platform),
+    found.ok ? found.output : undefined,
+    existsSync,
+    process.env,
+  );
 }
 
 /**
@@ -87,7 +107,7 @@ export function registerSystemRoutes(app: FastifyInstance): void {
   app.get('/api/system/env', async () => {
     const platform = platformOf(process.platform);
     const tools = new Map<string, boolean>();
-    for (const tool of ['brew', 'winget']) tools.set(tool, await hasTool(tool));
+    for (const tool of ['brew', 'winget']) tools.set(tool, (await findTool(tool)) !== undefined);
 
     return ok({
       platform,
@@ -191,8 +211,21 @@ export function registerSystemRoutes(app: FastifyInstance): void {
     const [file, ...args] = command.split(' ');
     if (!file) return reply.code(400).send(fail('허용된 설치 명령이 아닙니다'));
 
+    /*
+     * **이름이 아니라 절대 경로로 돌린다** (점검 P-5).
+     *
+     * 설치판의 `PATH` 에는 `/opt/homebrew/bin` 이 없다. 이름으로 돌리면
+     * '허용된 명령인데 실행이 안 된다' 가 된다 — 화면은 눌렀는데 실패만 남는다.
+     */
+    const binary = await findTool(file);
+    if (binary === undefined) {
+      return reply
+        .code(409)
+        .send(fail(`${file} 을 찾지 못했습니다. 공식 페이지에서 직접 받아 주세요.`));
+    }
+
     // 설치는 오래 걸린다 (내려받기 포함). 10분을 넘기면 무언가 잘못된 것이다
-    const result = await run(file, args, 10 * 60 * 1000);
+    const result = await run(binary, args, 10 * 60 * 1000);
     if (!result.ok) {
       return reply.code(500).send(fail(`설치에 실패했습니다. 공식 페이지에서 직접 받아 주세요.\n${result.output.slice(0, 500)}`));
     }

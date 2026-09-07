@@ -75,6 +75,73 @@ export const ENV_ITEMS: readonly EnvItem[] = [
   },
 ];
 
+/**
+ * 설치 도구가 있을 만한 **절대 경로** — `which` 가 실패할 때 여기를 본다.
+ *
+ * ## 왜 필요한가 (점검 P-5, 2026-09-07 실측)
+ *
+ * **Finder·독으로 띄운 맥 앱의 `PATH` 는 셸의 것이 아니다.** 사용자가 띄워 둔
+ * 설치 앱의 프로세스 환경을 읽어 보니 이랬다:
+ *
+ * ```
+ * PATH=/usr/bin:/bin:/usr/sbin:/sbin
+ * ```
+ *
+ * Homebrew 는 `/opt/homebrew/bin/brew` 에 **분명히 있는데**(6.0.18) 그 목록에
+ * `/opt/homebrew/bin` 이 없다. 그래서 앱 안에서 `which brew` 가 실패하고,
+ * 화면은 '설치 도구가 없습니다 → 공식 페이지' 로 떨어진다 — 한 번 누르면 되는
+ * 일을 사람이 손으로 받아 설치하게 된다.
+ *
+ * 터미널로 돌릴 때는 셸의 `PATH` 를 물려받아 이 문제가 없다. **설치판에서만**
+ * 나타나므로 만든 사람은 끝까지 모른다 (서명 문제와 같은 종류의 함정이다).
+ *
+ * 윈도우는 GUI 앱도 사용자 `PATH` 를 물려받아 대개 문제가 없지만, 같은 방식으로
+ * 후보를 둔다 — 없으면 그냥 지나간다.
+ */
+export function toolCandidates(
+  tool: string,
+  platform: Platform,
+  env: Record<string, string | undefined> = {},
+): string[] {
+  if (platform === 'mac' && tool === 'brew') {
+    // 애플 실리콘 · 인텔 두 자리
+    return ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'];
+  }
+  if (platform === 'win' && tool === 'winget') {
+    const local = env.LOCALAPPDATA;
+    return local ? [`${local}\\Microsoft\\WindowsApps\\winget.exe`] : [];
+  }
+  return [];
+}
+
+/**
+ * 설치 도구의 실행 경로를 고른다 — **판단만** 여기서 한다.
+ *
+ * `which`(윈도우는 `where`)를 먼저 믿는다 — 사용자가 다른 자리에 두었을 수 있다.
+ * 실패하면 위 `toolCandidates` 의 알려진 자리를 본다. 실제로 셸을 돌리고 파일을
+ * 보는 것은 부르는 쪽(`server/routes/system.ts`)의 일이다 — 그래야 검사할 수 있다
+ * (이 파일의 `checkEnv` 와 같은 방식).
+ *
+ * @param whichOutput `which <도구>` 가 성공했다면 그 출력, 실패했으면 `undefined`
+ * @returns 실행할 절대 경로, 없으면 `undefined`
+ */
+export function pickToolPath(
+  tool: string,
+  platform: Platform,
+  whichOutput: string | undefined,
+  exists: (path: string) => boolean,
+  env: Record<string, string | undefined> = {},
+): string | undefined {
+  // `where` 는 여러 줄을 줄 수 있다 — 첫 줄이 우선순위가 가장 높은 것이다
+  const fromWhich = whichOutput?.split('\n')[0]?.trim();
+  if (fromWhich !== undefined && fromWhich.length > 0) return fromWhich;
+
+  for (const candidate of toolCandidates(tool, platform, env)) {
+    if (exists(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 /** 이 PC 가 무엇인가 — `process.platform` 을 우리 말로 */
 export function platformOf(nodePlatform: string): Platform {
   if (nodePlatform === 'darwin') return 'mac';

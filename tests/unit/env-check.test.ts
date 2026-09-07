@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { checkEnv, ENV_ITEMS, isAllowedCommand, platformOf } from '../../lib/env-check.ts';
+import { ENV_ITEMS, checkEnv, isAllowedCommand, pickToolPath, platformOf, toolCandidates } from '../../lib/env-check.ts';
 
 const nothing = (): boolean => false;
 const everything = (): boolean => true;
@@ -102,6 +102,80 @@ describe('설치 명령 흰 목록', () => {
       for (const install of Object.values(item.install)) {
         expect(isAllowedCommand(install.command), install.command).toBe(true);
       }
+    }
+  });
+});
+
+/**
+ * **설치판의 `PATH` 에서도 설치 도구를 찾는다** (점검 P-5, 2026-09-07 실측).
+ *
+ * Finder·독으로 띄운 맥 앱의 프로세스 환경을 직접 읽어 보니 이랬다:
+ *
+ * ```
+ * PATH=/usr/bin:/bin:/usr/sbin:/sbin
+ * ```
+ *
+ * Homebrew 는 `/opt/homebrew/bin/brew` 에 **분명히 있는데**(6.0.18) 그 목록에
+ * `/opt/homebrew/bin` 이 없어서 `which brew` 가 실패한다. 그러면 화면이
+ * '설치 도구가 없습니다 → 공식 페이지' 로 떨어져, 한 번 누르면 되는 일을 사람이
+ * 손으로 받아 설치하게 된다.
+ *
+ * **터미널로 돌릴 때는 셸의 `PATH` 를 물려받아 이 문제가 없다** — 설치판에서만
+ * 나타나므로 만든 사람은 끝까지 모른다.
+ */
+describe('pickToolPath — 설치판의 좁은 PATH 를 견딘다', () => {
+  const noFile = () => false;
+  const brewAtHomebrew = (path: string) => path === '/opt/homebrew/bin/brew';
+  const brewAtUsrLocal = (path: string) => path === '/usr/local/bin/brew';
+
+  it('which 가 찾으면 그것을 쓴다 — 사용자가 다른 자리에 두었을 수 있다', () => {
+    expect(pickToolPath('brew', 'mac', '/somewhere/else/brew\n', noFile)).toBe('/somewhere/else/brew');
+  });
+
+  it('which 가 실패해도 애플 실리콘 자리를 찾는다 (★ 이것이 P-5 다)', () => {
+    expect(pickToolPath('brew', 'mac', undefined, brewAtHomebrew)).toBe('/opt/homebrew/bin/brew');
+  });
+
+  it('인텔 맥 자리도 찾는다', () => {
+    expect(pickToolPath('brew', 'mac', undefined, brewAtUsrLocal)).toBe('/usr/local/bin/brew');
+  });
+
+  it('정말 없으면 undefined — 그때는 공식 페이지로 안내하는 것이 맞다', () => {
+    expect(pickToolPath('brew', 'mac', undefined, noFile)).toBeUndefined();
+  });
+
+  it('which 가 빈 줄만 주면 후보로 넘어간다', () => {
+    expect(pickToolPath('brew', 'mac', '   \n', brewAtHomebrew)).toBe('/opt/homebrew/bin/brew');
+    expect(pickToolPath('brew', 'mac', '', brewAtHomebrew)).toBe('/opt/homebrew/bin/brew');
+  });
+
+  it('where 가 여러 줄을 주면 첫 줄을 쓴다 (윈도우)', () => {
+    const output = 'C:\\a\\winget.exe\nC:\\b\\winget.exe';
+    expect(pickToolPath('winget', 'win', output, noFile)).toBe('C:\\a\\winget.exe');
+  });
+
+  it('윈도우 후보는 LOCALAPPDATA 를 쓴다 — 없으면 후보도 없다', () => {
+    const env = { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' };
+    const expected = 'C:\\Users\\me\\AppData\\Local\\Microsoft\\WindowsApps\\winget.exe';
+    expect(toolCandidates('winget', 'win', env)).toEqual([expected]);
+    expect(toolCandidates('winget', 'win', {})).toEqual([]);
+  });
+
+  it('모르는 도구·플랫폼에는 후보를 만들지 않는다', () => {
+    expect(toolCandidates('brew', 'win')).toEqual([]);
+    expect(toolCandidates('winget', 'mac')).toEqual([]);
+    expect(toolCandidates('무엇', 'mac')).toEqual([]);
+  });
+
+  it('후보 경로는 **목록에 있는 도구 이름**과 짝이 맞는다', () => {
+    // ENV_ITEMS 가 권하는 도구에 후보가 하나도 없으면 설치판에서 못 찾는다
+    const tools = new Set(
+      ENV_ITEMS.flatMap((item) => Object.entries(item.install).map(([platform, install]) =>
+        [platform as 'mac' | 'win', install.tool] as const)),
+    );
+    for (const [platform, tool] of tools) {
+      expect(toolCandidates(tool, platform, { LOCALAPPDATA: 'C:\\x' }).length, `${platform}/${tool}`)
+        .toBeGreaterThan(0);
     }
   });
 });
