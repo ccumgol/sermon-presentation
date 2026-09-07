@@ -12,7 +12,7 @@
  *    10항목이 한 화면에 들어와야 진행이 보인다.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   buildPlanDeck, buildPlanRows, describeItem, insertIndexFor, isExpandable, itemsInGroup,
@@ -21,6 +21,11 @@ import {
 } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, MAX_LANGS, ACTIVE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { itemTitle } from '../../../lib/item-title.ts';
+import {
+  baseFontSizeFor,
+  itemTemplateFor,
+  templateIdFor as pickTemplateId,
+} from '../../../lib/plan-item-template.ts';
 import { verseQuotes } from '../../../lib/verse-quotes.ts';
 import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { PlanItemEditor } from '../components/PlanItemEditor.tsx';
@@ -516,6 +521,21 @@ export function PlanPanel({
   // ── 항목을 슬라이드로 푼다 (선택했을 때 미리보기용) ──────────
 
 
+  /**
+   * 항목이 쓸 템플릿을 고르는 데 필요한 것들 (lib/plan-item-template.ts).
+   *
+   * **useMemo 로 고정한다** — 송출 함수들이 이걸 의존성으로 쓴다. 매 렌더마다
+   * 새 객체가 나오면 그 함수들이 매번 새로 만들어져 고정의 뜻이 없어진다.
+   */
+  const templateChoice = useMemo(
+    () => ({ defaults: plan?.defaults, styleTemplates, template }),
+    [plan?.defaults, styleTemplates, template],
+  );
+  const templateIdFor = useCallback(
+    (item: CueItem) => pickTemplateId(item, templateChoice),
+    [templateChoice],
+  );
+
   // ── 송출 ────────────────────────────────────────────────────
 
   /** 지금 화면에 나가고 있는 슬라이드 (직전으로 되돌리기용) */
@@ -583,7 +603,10 @@ export function PlanPanel({
         setError(err instanceof ApiError ? err.message : '송출하지 못했습니다');
       }
     },
-    [connected, items, deck, send, resolveItem, liveSlide, liveLabel],
+    // templateIdFor 가 여기 있어야 한다. 없던 동안 **기본 템플릿을 바꾼 직후
+    // ▶ 를 누르면 이전 값이 나갔다** (2026-09-07 실측: -8 로 바꿨는데 -1 이 나갔고,
+    // 항목을 옮겨 이 함수가 다시 만들어진 뒤에야 -8 이 나갔다).
+    [connected, items, deck, send, resolveItem, liveSlide, liveLabel, templateIdFor],
   );
 
   /**
@@ -682,7 +705,7 @@ export function PlanPanel({
       });
       setLiveItemId(null);
     },
-    [connected, send, items, plan?.defaults?.templates],
+    [connected, send, items, templateIdFor],
   );
 
   /** 인용구를 띄우기 직전 화면으로 되돌린다 */
@@ -1317,50 +1340,6 @@ export function PlanPanel({
    * 말없이 안 바뀌면 옵션이 고장난 것으로 읽힌다.
    */
   const liveViaPlanDeck = liveItemId === null && liveItemIndex >= 0;
-
-  /** 기본 설정에서 이 항목이 어느 칸에 해당하는지 */
-  function defaultsKeyFor(item: CueItem): 'bible' | 'song' | 'order' | 'text' | null {
-    if (item.type === 'bible') return 'bible';
-    if (item.type === 'song') return 'song';
-    if (item.type === 'text') return item.variant === 'order' ? 'order' : 'text';
-    return null;
-  }
-
-  /**
-   * 이 항목이 실제로 쓸 템플릿 id.
-   *
-   * 항목이 지정한 것 → 예배 기본 설정 → (없으면) 지금 템플릿 유지.
-   * 기본 설정을 두는 이유는, 한 예배 안에서 성경·찬양 템플릿이 대개 그대로 가기
-   * 때문이다. 항목마다 고르게 하면 하나 빠뜨렸을 때 그 항목만 다르게 나간다.
-   */
-  function templateIdFor(item: CueItem): number | undefined {
-    const own = 'templateId' in item ? item.templateId : undefined;
-    if (typeof own === 'number') return own;
-    const key = defaultsKeyFor(item);
-    return key ? plan?.defaults?.templates?.[key] : undefined;
-  }
-
-  /** 이 항목이 실제로 쓸 템플릿 — 지정이 없으면 기본 설정, 그것도 없으면 지금 것 */
-  function itemTemplateFor(item: CueItem): Template | null {
-    const id = templateIdFor(item);
-    if (typeof id === 'number') return styleTemplates.find((t) => t.id === id) ?? template;
-    return template;
-  }
-
-  /**
-   * 이 항목이 실제로 쓸 템플릿의 기본 글자 크기.
-   *
-   * 지금 활성 템플릿을 쓰면 안 된다 — 항목이 다른 템플릿을 지정했으면 크기가 달라
-   * 줄 감김 어림이 틀린다 (실측에서 140% 인데도 경고가 안 떴다).
-   */
-  function baseFontSizeFor(item: CueItem, fallback: number): number {
-    const id = templateIdFor(item);
-    if (typeof id === 'number') {
-      const found = styleTemplates.find((t) => t.id === id);
-      if (found) return found.text.primary.fontSize;
-    }
-    return template?.text.primary.fontSize ?? fallback;
-  }
 
   /** 기본 설정을 고친다 — 순서표에 저장되므로 dirty 로 표시된다 */
   function patchDefaults(mutate: (current: PlanDefaults) => PlanDefaults): void {
@@ -2308,8 +2287,8 @@ export function PlanPanel({
           liveItemIndex={liveItemIndex}
           liveViaPlanDeck={liveViaPlanDeck}
           patchItems={patchItems}
-          itemTemplateFor={itemTemplateFor}
-          baseFontSizeFor={baseFontSizeFor}
+          itemTemplateFor={(item) => itemTemplateFor(item, templateChoice)}
+          baseFontSizeFor={(item, fallback) => baseFontSizeFor(item, fallback, templateChoice)}
           sendItem={sendItem}
           refreshLive={refreshLive}
           refreshQuotePreview={refreshQuotePreview}
