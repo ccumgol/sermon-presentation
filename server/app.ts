@@ -18,6 +18,7 @@ import { initReadingStore } from './db/readings.ts';
 import { initSongsDb, countSongs } from './db/songs.ts';
 import { initTemplateStore, getTemplateOrDefault } from './db/templates.ts';
 import { BibleDbMissingError, initBibleDb, listTranslations } from './db/bible.ts';
+import { isAllowedHost, isAllowedOrigin, parseAllowedOrigins } from '../lib/origin-check.ts';
 import { lanHosts, lanInterfaces } from './lan.ts';
 import { ensureDataDirs, paths } from './paths.ts';
 import {
@@ -88,6 +89,49 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   }
 
   const stateRestored = initState();
+
+  /**
+   * ── 어디서 온 요청인가 (점검 S-2) ────────────────────────────
+   *
+   * **WS 와 똑같은 규칙을 HTTP 에도 적용한다.** 여태 이 검사는 `server/ws.ts` 에만
+   * 있었고, 그래서 바깥 웹페이지가 REST 로는 그냥 들어왔다 (격리 서버 실증):
+   *
+   *   · `Origin: https://evil.example` + `Content-Type: text/plain` 으로
+   *     `POST /api/songs/1/confirm` → 200. `lines_source` 가 `auto` → `manual` 로
+   *     바뀐다. 본문을 안 보는 POST 는 **프리플라이트가 걸리지 않는다.**
+   *   · `Host: evil.example` 로 `GET /api/backup/export` → 200 (곡 전체가 나간다).
+   *     같은 방법으로 `mode:replace` 가져오기까지 성공했다. 리바인딩된 페이지는
+   *     같은 출처라 GET 에 `Origin` 을 붙이지 않으므로 **Host 를 따로 봐야 한다.**
+   *
+   * **루프백을 면제하지 않는다.** 이 공격은 오퍼레이터 PC 의 브라우저에서 오므로
+   * 요청 주소가 곧 루프백이다 — 여기서 면제하면 막는 의미가 없다.
+   *
+   * 정당한 접속은 그대로 통과한다:
+   *   · OBS 브라우저 소스·프로젝터·강사 모니터 → Host 가 `localhost` 다
+   *   · 태블릿 → Host 가 사설 IP(`192.168.*`)다
+   *   · 컨트롤 패널의 fetch → Origin 과 Host 가 같고 그 Host 가 우리 것이다
+   *   · `curl`·테스트 → Origin 이 없다 (Host 만 본다)
+   *
+   * 막히는 정당한 주소가 있으면(리버스 프록시·Tailscale 같은 100.64/10 주소)
+   * `SERMON_ALLOWED_ORIGINS` 에 넣는다. 거부할 때 로그가 그렇게 말해 준다.
+   */
+  const allowedOrigins = parseAllowedOrigins(process.env.SERMON_ALLOWED_ORIGINS);
+  app.addHook('onRequest', async (request, reply) => {
+    const { origin, host } = request.headers;
+    if (isAllowedOrigin(origin, host, allowedOrigins) && isAllowedHost(host, allowedOrigins)) return;
+
+    // 정당한 접속이 막혔을 때 무엇을 해야 하는지 로그가 말해 준다.
+    // 이 경고 없이는 '예배 직전에 화면이 안 붙는다' 를 진단할 수 없다.
+    app.log.warn(
+      `요청 거부 — Origin ${origin ?? '(없음)'} / Host ${host ?? '(없음)'} · ${request.method} ${request.url}. ` +
+        '정당한 접속이면 SERMON_ALLOWED_ORIGINS 에 그 주소를 넣으세요.',
+    );
+    return reply.code(403).send({
+      success: false,
+      data: null,
+      error: '이 주소로 온 요청은 받지 않습니다. 정당한 접속이면 SERMON_ALLOWED_ORIGINS 에 넣으세요.',
+    });
+  });
 
   /**
    * ── 접속 암호 (보안 감사 권고 4) ─────────────────────────────

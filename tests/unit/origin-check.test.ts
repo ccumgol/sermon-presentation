@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isAllowedOrigin, parseAllowedOrigins } from '../../lib/origin-check.ts';
+import { isAllowedHost, isAllowedOrigin, parseAllowedOrigins } from '../../lib/origin-check.ts';
 
 const HOST = 'localhost:7777';
 
@@ -129,5 +129,38 @@ describe('태블릿 접속 경로는 끊기지 않는다', () => {
 
   it('IPv6 루프백을 허용한다', () => {
     expect(isAllowedOrigin('http://[::1]:7777', '[::1]:7777')).toBe(true);
+  });
+});
+
+/**
+ * `isAllowedHost` — **Origin 이 없는 요청까지 막기 위한 것** (점검 S-2).
+ *
+ * DNS 리바인딩된 페이지는 브라우저 눈에 같은 출처라서 GET 에 `Origin` 을 붙이지
+ * 않는다. 그래서 Host 는 Origin 과 별개로 본다.
+ */
+describe('isAllowedHost — Host 만으로 판정한다', () => {
+  it('이 PC·사설망·.local 은 받는다', () => {
+    for (const host of ['localhost:7777', '127.0.0.1:7777', '[::1]:7777', '192.168.1.190:7777', 'church.local:7777']) {
+      expect(isAllowedHost(host), host).toBe(true);
+    }
+  });
+
+  it('공인 DNS 에 올릴 수 있는 이름은 막는다 — 리바인딩의 전제다', () => {
+    for (const host of ['evil.example', 'evil.example:7777', 'sermon.church.com']) {
+      expect(isAllowedHost(host), host).toBe(false);
+    }
+  });
+
+  it('Host 가 없으면 막는다 (HTTP/1.1 은 반드시 보낸다)', () => {
+    expect(isAllowedHost(undefined)).toBe(false);
+    expect(isAllowedHost('')).toBe(false);
+  });
+
+  it('허용 목록의 Origin 이 가리키는 Host 는 받는다 — 리버스 프록시·Tailscale', () => {
+    const allowed = ['http://100.101.71.64:7777'];
+    expect(isAllowedHost('100.101.71.64:7777', allowed)).toBe(true);
+    // 포트가 다르면 다른 주소다
+    expect(isAllowedHost('100.101.71.64:8000', allowed)).toBe(false);
+    expect(isAllowedHost('evil.example', allowed)).toBe(false);
   });
 });

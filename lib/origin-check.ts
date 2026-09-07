@@ -1,12 +1,29 @@
 /**
- * WebSocket 접속의 Origin 검사 — 순수 로직 (SECURITY-AUDIT H-3).
+ * 접속의 Origin·Host 검사 — 순수 로직 (SECURITY-AUDIT H-3 · 검토 R-1 · 점검 S-2).
+ *
+ * **WebSocket 과 HTTP 가 같은 규칙을 씁니다.** WS 는 `server/ws.ts` 의
+ * `verifyClient`, HTTP 는 `server/app.ts` 의 `onRequest` 훅에서 부릅니다.
  *
  * ## 왜 필요한가
  *
  * **브라우저의 CORS 는 WebSocket 에 적용되지 않습니다.** 오퍼레이터가 예배 중 아무
  * 웹사이트나 열어도, 그 페이지의 스크립트가 `new WebSocket('ws://localhost:7777/ws')`
- * 로 붙어 송출 화면을 바꿀 수 있습니다. REST 는 JSON 본문이라 프리플라이트가 걸려
- * 상대적으로 안전하지만 WS 에는 그 보호가 없습니다.
+ * 로 붙어 송출 화면을 바꿀 수 있습니다.
+ *
+ * ## HTTP 도 안전하지 않았습니다 (점검 S-2, 2026-09-07)
+ *
+ * 여기 "REST 는 JSON 본문이라 프리플라이트가 걸려 상대적으로 안전하다" 고 적어
+ * 두었는데, **두 경우에 그 전제가 깨집니다.** 격리 서버에서 실증했습니다:
+ *
+ * 1. **본문이 필요 없는 POST** 는 프리플라이트가 걸리지 않습니다.
+ *    `Content-Type: text/plain` 으로 보내면 바깥 페이지가 그대로 호출합니다 —
+ *    `POST /api/songs/1/confirm` 이 통해 `lines_source` 가 `auto` → `manual` 로
+ *    바뀌었습니다(사람이 승인한 표시입니다). 즐겨찾기도 같았습니다.
+ * 2. **DNS 리바인딩** 된 페이지는 같은 출처가 되어 JSON 본문도 프리플라이트 없이
+ *    보냅니다. `GET /api/backup/export` 로 곡 전체를 읽고
+ *    `POST /api/backup/import` `mode:replace` 로 데이터를 지우는 것까지 됐습니다.
+ *
+ * 그래서 이 검사는 이제 **HTTP 에도** 붙습니다.
  *
  * ## 규칙
  *
@@ -124,6 +141,22 @@ export function isAllowedOrigin(
   // 우리 서버가 내보낸 페이지인가 — 컨트롤 패널·출력 페이지가 여기에 해당한다.
   // Host 도 접속하는 쪽이 정하는 값이므로 그것까지 확인한다 (R-1).
   return host !== undefined && originHost === host && isServedHost(host);
+}
+
+/**
+ * 이 `Host` 로 온 요청을 받아도 되는가 — **`Origin` 이 없는 요청까지 막기 위한 것.**
+ *
+ * `isAllowedOrigin` 만으로는 DNS 리바인딩을 못 막는다. 리바인딩된 페이지는 브라우저
+ * 눈에 **같은 출처**라서, `fetch('/api/backup/export')` 같은 GET 에는 `Origin` 을
+ * 아예 붙이지 않는다. 그래서 Host 는 **Origin 이 있든 없든** 따로 본다.
+ *
+ * 허용 목록의 Origin 이 가리키는 Host 도 함께 받아 준다 — 리버스 프록시 뒤에 두면
+ * Host 가 프록시 이름이 되므로, `SERMON_ALLOWED_ORIGINS` 하나만 정하면 양쪽이 풀린다.
+ */
+export function isAllowedHost(host: string | undefined, allowed: readonly string[] = []): boolean {
+  if (isServedHost(host)) return true;
+  if (host === undefined) return false;
+  return allowed.some((entry) => hostOf(entry) === host);
 }
 
 /** `SERMON_ALLOWED_ORIGINS="https://a.example, https://b.example"` → 배열 */
