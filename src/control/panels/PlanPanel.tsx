@@ -17,19 +17,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   buildPlanDeck, buildPlanRows, describeItem, insertIndexFor, isExpandable, itemsInGroup,
   moveItem, newItemId,
-  removeItem, splitOrderText, type PlanRow,
+  removeItem, type PlanRow,
 } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, MAX_LANGS, ACTIVE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import { itemTitle } from '../../../lib/item-title.ts';
-import { quoteSlides, verseQuotes } from '../../../lib/verse-quotes.ts';
+import { verseQuotes } from '../../../lib/verse-quotes.ts';
 import { DisplayToggles } from '../components/DisplayToggles.tsx';
 import { PlanItemEditor } from '../components/PlanItemEditor.tsx';
 import { BackgroundSelect } from '../components/BackgroundSelect.tsx';
 import { ItemTextStyleControls } from '../components/ItemTextStyleControls.tsx';
-import { paginateByMeasure } from '../../../lib/paginator.ts';
 import {
   ADD_KINDS, DEFAULT_GROUPS, ITEM_ICONS, MAX_SECONDARY, ORDER_PRESETS,
-  itemIcon, itemMeta, slideSummary, songLabelOf, textVariantLabel, today, type AddKind,
+  itemIcon, itemMeta, slideSummary, songLabelOf, today, type AddKind,
 } from '../../../lib/plan-item-view.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
@@ -46,18 +45,15 @@ import {
 import { isComposing } from '../ime.ts';
 import { clearPlanDraft, readPlanDraft, writePlanDraft } from './plan-draft.ts';
 import {
-  DEFAULT_LITURGY_PER_SLIDE,
   DEFAULT_LITURGY_VERSION,
   LITURGY_TEXTS,
   findLiturgy,
-  liturgyLines,
-  liturgySlides,
   type LiturgyPerSlide,
   type LiturgyVersion,
 } from '../../../lib/liturgy-texts.ts';
 import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
 import { OrderCharTuner } from '../components/OrderCharTuner.tsx';
-import { useMeasure } from '../hooks/useMeasure.ts';
+import { usePlanPreview } from '../hooks/usePlanPreview.ts';
 
 /**
  * 찬양 검색에서 한 번에 보여 줄 곡 수. '찬양' 탭(60)보다 적은 이유는
@@ -131,13 +127,6 @@ export function PlanPanel({
 
   /** 펼친 항목 — 한 번에 하나만. 여러 개가 열리면 목록이 길어져 진행이 안 보인다. */
   const [expandedId, setExpandedId] = useState<string | null>(restored?.expandedId ?? null);
-
-  /** 펼친 항목을 푼 결과 */
-  const [preview, setPreview] = useState<{ slides: SlidePayload[]; labels: string[] } | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
-  /** 항목마다 지정할 수 있는 **표시 템플릿** 목록 (예배 유형 templates 와 다른 것) */
-  const [styleTemplates, setStyleTemplates] = useState<Template[]>([]);
 
   /** 인용구를 띄우기 직전 화면 — '직전으로' 가 여기로 되돌린다 */
   const [before, setBefore] = useState<{ slide: SlidePayload; label: string } | null>(null);
@@ -221,9 +210,12 @@ export function PlanPanel({
   const addRef = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
   /** 종류 버튼을 눌러 입력창이 교체된 뒤에 포커스를 줘야 하는지 */
   const wantFocus = useRef(false);
-  const measurer = useMeasure();
 
-  const maxChars = template?.behavior.maxCharsPerLine;
+  // 항목을 슬라이드로 푸는 것은 usePlanPreview 로 옮겼다 (2026-09-07 R-4).
+  // 송출하지 않는다 — 선택과 송출은 갈라져 있다.
+  const { resolveItem, preview, previewError, styleTemplates } = usePlanPreview({
+    items, expandedId, template,
+  });
 
   /** 화면에 그릴 줄 목록 — 펼친 항목의 슬라이드가 그 아래에 들어간다 */
   const rows = buildPlanRows(items, expandedId, preview?.slides.length ?? 0);
@@ -523,217 +515,6 @@ export function PlanPanel({
 
   // ── 항목을 슬라이드로 푼다 (선택했을 때 미리보기용) ──────────
 
-  const resolveItem = useCallback(
-    async (item: CueItem): Promise<{ slides: SlidePayload[]; labels: string[]; error?: string }> => {
-      if (item.type === 'bible') {
-        const passage = await api.passage(item.ref, [item.primary, ...item.secondary], item.paging ?? 'verse');
-        if (!passage.parse.ok) return { slides: [], labels: [], error: passage.parse.message };
-        if (!passage.passage || !passage.deck) return { slides: [], labels: [], error: '본문을 찾지 못했습니다' };
-
-        /*
-         * 항목이 정한 표시 여부를 슬라이드마다 실어 보낸다.
-         *
-         * **결정은 출력 페이지가 한다** — 여기서 풀어 담으면 나중에 템플릿만 바꿨을 때
-         * 그 값이 따라오지 않는다. 여기서는 항목의 뜻을 전달만 한다.
-         */
-        const withDisplay = (slides: SlidePayload[]): SlidePayload[] =>
-          item.display === undefined && item.style === undefined
-            ? slides
-            : slides.map((slide) =>
-                slide.kind === 'bible'
-                  ? {
-                      ...slide,
-                      ...(item.display ? { display: item.display } : {}),
-                      ...(item.style ? { style: item.style } : {}),
-                    }
-                  : slide,
-              );
-
-        /*
-         * 인용구는 **참조를 본문 앞에 붙인다** — `고전 1:3 하나님 우리 아버지와…`.
-         *
-         * 네 화면(관리자 목록·OBS·강사 모니터·프로젝터)이 서로 다른 렌더러를 쓰는데,
-         * 참조를 별개 요소로 두면 규칙이 넷이 되어 다시 어긋난다 (사용자 지적
-         * 2026-08-20). 글자로 넣으면 네 화면이 그것을 '본문' 으로 받아 저절로 같아진다.
-         *
-         * 접두사는 **항목의 `ref`** 다 — 목록 줄(`describeItem`)과 글자까지 같아진다.
-         * 본문 낭독(성경 항목)은 `item.quote` 가 없어 이 길로 오지 않는다.
-         */
-        const finish = (slides: SlidePayload[]): SlidePayload[] =>
-          item.quote ? quoteSlides(withDisplay(slides), item.ref, item.display?.reference !== false) : withDisplay(slides);
-
-        if ((item.paging ?? 'verse') === 'auto') {
-          const paginated = await paginateByMeasure(passage.passage, (slide) =>
-            measurer.measure(slide, template ?? undefined),
-          );
-          if (paginated.slides.length > 0) {
-            return {
-              slides: finish(paginated.slides),
-              labels: paginated.slides.map((_, i) => `${i + 1}`),
-            };
-          }
-        }
-        return { slides: finish(passage.deck.slides), labels: passage.deck.labels };
-      }
-
-      if (item.type === 'song') {
-        // 악보는 항목이 켠 것만 — 기본은 가사다 (2026-09-04 사용자 결정)
-        const songDeck = await api.songDeck(
-          item.songId, item.langs, item.lines ?? '2', undefined, maxChars, item.sheet === true,
-        );
-        const slides =
-          item.display === undefined && item.style === undefined
-            ? songDeck.deck.slides
-            : songDeck.deck.slides.map((slide) =>
-                slide.kind === 'song'
-                  ? {
-                      ...slide,
-                      ...(item.display ? { display: item.display } : {}),
-                      ...(item.style ? { style: item.style } : {}),
-                    }
-                  : slide,
-              );
-        return { slides, labels: songDeck.deck.labels };
-      }
-
-      if (item.type === 'text') {
-        // 순서 표시는 기본이 좌우 나누기 — 왼쪽 순서 이름, 오른쪽 담당자
-        if (item.variant === 'order' && item.layout !== 'stack') {
-          return {
-            slides: [
-              {
-                kind: 'order',
-                ...splitOrderText(item.content),
-                ...(item.charStyles ? { charStyles: item.charStyles } : {}),
-                ...(item.presenterScale !== undefined ? { presenterScale: item.presenterScale } : {}),
-                ...(item.titleStroke !== undefined ? { titleStroke: item.titleStroke } : {}),
-                ...(item.presenterStroke !== undefined ? { presenterStroke: item.presenterStroke } : {}),
-              },
-            ],
-            labels: ['순서 표시'],
-          };
-        }
-        const lines = item.content.split(/\r?\n/).filter((line) => line.trim().length > 0);
-        return { slides: [{ kind: 'text', lines }], labels: [textVariantLabel(item.variant)] };
-      }
-
-      /*
-       * 슬라이드쇼 — 폴더를 **띄울 때** 읽는다.
-       *
-       * 순서표에는 폴더만 담겨 있다. 그림 이름을 담아 두면 나중에 파일을 더 넣어도
-       * 순서표를 고쳐야 하는데, '폴더에 넣기만 하면 되는 것' 이 이 기능의 요점이다.
-       */
-      if (item.type === 'slideshow') {
-        const { files } = await api.slideshow(item.source, item.folder);
-        if (files.length === 0) {
-          return { slides: [], labels: [], error: `폴더에 그림이 없습니다 (${item.folder || '기본 폴더'})` };
-        }
-        return {
-          slides: files.map((file) => ({
-            kind: 'image' as const,
-            src: file.url,
-            alt: file.name,
-            ...(item.fit === 'cover' ? { fit: 'cover' as const } : {}),
-          })),
-          labels: files.map((file) => file.name.replace(/\.[^.]+$/, '')),
-        };
-      }
-
-      if (item.type === 'liturgy') {
-        const lines = liturgyLines(item.textId, item.version, item.overrideLines);
-        if (!lines) return { slides: [], labels: [], error: '본문을 찾지 못했습니다' };
-
-        const pages = liturgySlides(lines, item.perSlide ?? DEFAULT_LITURGY_PER_SLIDE);
-        return {
-          slides: pages.map((page) => ({
-            kind: 'text' as const,
-            lines: [...page],
-            ...(item.background ? { background: item.background } : {}),
-            ...(item.style ? { style: item.style } : {}),
-          })),
-          labels: pages.map((_, index) => `${index + 1}`),
-        };
-      }
-
-      if (item.type === 'reading') {
-        try {
-          const reading = await api.reading(item.readingNumber, item.readingBook);
-          if (reading.slides.length === 0) {
-            return { slides: [], labels: [], error: '본문이 비어 있습니다' };
-          }
-          return {
-            slides: reading.slides.map((slide) => ({
-              kind: 'reading' as const,
-              leader: slide.leader,
-              ...(slide.people !== undefined ? { people: slide.people } : {}),
-              reference: reading.title,
-              ...(item.background ? { background: item.background } : {}),
-              ...(item.style ? { style: item.style } : {}),
-            })),
-            labels: reading.slides.map((_, index) => `${index + 1}`),
-          };
-        } catch (err) {
-          // 가져오기를 안 한 PC 면 여기로 온다 — 조용히 빈 화면을 내보내지 않는다
-          return {
-            slides: [],
-            labels: [],
-            error: err instanceof ApiError ? err.message : '교독문을 불러오지 못했습니다',
-          };
-        }
-      }
-
-      if (item.type === 'blank') return { slides: [{ kind: 'blank' }], labels: ['공백'] };
-
-      // 구분은 슬라이드가 없다 (buildPlanDeck 도 건너뛴다)
-      return { slides: [], labels: [] };
-    },
-    [measurer, template, maxChars],
-  );
-
-  // 펼친 항목을 풀어 슬라이드 줄로 보여 준다. **송출하지 않는다.**
-  const expandedItem = items.find((item) => item.id === expandedId);
-  /**
-   * 항목 **내용**이 바뀌어도 다시 풀어야 한다.
-   *
-   * 전에는 `id` 만 봤다. 그래서 판본이나 화면 넘김을 바꿔도 미리보기가 그대로라
-   * 방금 만진 설정이 먹히지 않은 것처럼 보였다. 항목 하나를 직렬화하는 비용은
-   * 무시할 만하고, 이 값이 같으면 결과도 같다.
-   */
-  const expandedSignature = expandedItem ? JSON.stringify(expandedItem) : null;
-  useEffect(() => {
-    if (!expandedItem) {
-      setPreview(null);
-      setPreviewError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setPreviewError(null);
-    void resolveItem(expandedItem)
-      .then((result) => {
-        if (cancelled) return;
-        setPreview({ slides: result.slides, labels: result.labels });
-        setPreviewError(result.error ?? null);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        // 이전 항목의 슬라이드를 남겨 두면 오퍼레이터가 엉뚱한 것을 송출한다
-        setPreview(null);
-        setPreviewError(err instanceof ApiError ? err.message : '불러오지 못했습니다');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [expandedSignature, resolveItem]);
-
-  // 템플릿 목록 — 항목마다 지정할 수 있게 이름을 보여 준다
-  useEffect(() => {
-    void api
-      .templates()
-      .then(setStyleTemplates)
-      .catch(() => setStyleTemplates([]));
-  }, []);
 
   // ── 송출 ────────────────────────────────────────────────────
 

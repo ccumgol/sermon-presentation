@@ -111,8 +111,11 @@ describe('본문 낭독(📖 성경)은 바뀌지 않는다', () => {
   });
 
   it('quote 표시가 없으면 슬라이드를 손대지 않는다 — 부르는 쪽이 이 함수를 건너뛴다', () => {
-    // resolveItem 이 item.quote 일 때만 quoteSlides 를 부른다. 그 조건을 파일로 고정한다
-    const panel = read('src/control/panels/PlanPanel.tsx');
-    expect(panel).toContain('item.quote ? quoteSlides(');
+    // resolveItem 이 item.quote 일 때만 quoteSlides 를 부른다. 그 조건을 파일로 고정한다.
+    // 2026-09-07: resolveItem 이 PlanPanel 에서 usePlanPreview 로 나갔다 —
+    // 이제 훅을 직접 부를 수 있으니 이 글자 검사는 동작 검사로 갈아탈 자리다
+    // (tests/unit/plan-preview.test.tsx 가 그 일을 한다).
+    const hook = read('src/control/hooks/usePlanPreview.ts');
+    expect(hook).toContain('item.quote ? quoteSlides(');
   });
 });
