@@ -60,6 +60,15 @@ export interface ServerInfo {
   bibleDb: string;
   /** 설치한 앱인가 — 안내 문구가 갈린다 */
   packaged: boolean;
+  /** 판 번호 (`package.json`). 빌드마다 바뀌지 않는다 */
+  version: string;
+  /**
+   * 프로그램 파일이 만들어진 시각.
+   *
+   * **이것이 두 빌드를 가른다** — 받은 사람이 '내 것이 옛 판인가' 를 물을 때
+   * 볼 값이다 (점검 P-7). 판 번호는 그대로인 채 내용만 바뀌는 일이 흔하다.
+   */
+  builtAt?: string;
   translationCount: number;
   songCount: number;
   planCount: number;

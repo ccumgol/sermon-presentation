@@ -5,7 +5,7 @@
   "description": "OBS 브라우저 소스로 성경 본문과 찬양 가사를 송출하는 로컬 애플리케이션",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24"
   },
   "scripts": {
     "start": "npm run app:build && node server/index.ts",

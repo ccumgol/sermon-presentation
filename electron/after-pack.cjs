@@ -35,7 +35,7 @@
  * 여기서 하는 일은 전부 macOS 것이다. 윈도우 빌드에서는 할 일이 없다.
  */
 
-const { existsSync, readFileSync, statSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
@@ -111,7 +111,6 @@ function adhocSign(appPath, appName) {
 
   // ④ 마지막으로 앱 자신
   sign(appPath);
-  void statSync;
 
   /*
    * **서명이 유효한지 확인하고, 아니면 빌드를 실패시킨다.**

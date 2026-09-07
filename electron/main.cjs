@@ -71,6 +71,8 @@ if (!app.requestSingleInstanceLock()) {
 
 let mainWindow = null;
 let stopServer = null;
+/** 서버가 뜬 주소 — 독 아이콘으로 창만 다시 만들 때 쓴다 */
+let serverUrl = null;
 
 /*
  * ── 처리되지 않은 오류 — **가장 먼저 등록한다** (점검 P-4) ──────────
@@ -156,6 +158,15 @@ function onFatal(kind, error) {
 process.on('uncaughtException', (error) => onFatal('처리되지 않은 예외', error));
 process.on('unhandledRejection', (reason) => onFatal('처리되지 않은 거부(Promise)', reason));
 
+/** 주소의 스킴만 뽑는다. 해석할 수 없으면 빈 문자열 — 아무것도 열지 않는다 */
+function safeProtocol(target) {
+  try {
+    return new URL(target).protocol;
+  } catch {
+    return '';
+  }
+}
+
 function createWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -176,15 +187,34 @@ function createWindow(url) {
    * 기본 동작대로 두면 바깥 브라우저가 뜨는데, 그러면 전체 화면·번인 대책 등
    * 프로젝터 창이 하는 일이 딴 데서 돌아 손이 두 곳으로 갈린다.
    */
+  const ourOrigin = new URL(url).origin;
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
-    if (target.startsWith(url.replace(/\/$/, ''))) {
+    /*
+     * **출처(origin)로 견준다 — 접두사 비교가 아니다** (점검 S-6).
+     *
+     * 전에는 `target.startsWith('http://localhost:7777')` 였다. 그러면
+     * `http://localhost:77777.evil.example` 이 그 접두사를 만족해 **우리 창으로
+     * 열린다.** 지금은 우리 페이지만 창을 열어 도달 경로가 없지만, URL 접두사
+     * 비교는 검토 R-1(Origin/Host 위조)에서 이미 한 번 물린 방식이다.
+     */
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(target).origin === ourOrigin;
+    } catch {
+      // 해석할 수 없는 주소는 우리 것이 아니다
+    }
+    if (sameOrigin) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: { width: 1280, height: 720, backgroundColor: '#000000' },
       };
     }
-    // 바깥 주소(설치 안내의 공식 페이지 등)는 기본 브라우저로 — 앱 안에 가두지 않는다
-    void shell.openExternal(target);
+    /*
+     * 바깥 주소(설치 안내의 공식 페이지 등)는 기본 브라우저로 — 앱 안에 가두지 않는다.
+     * **http(s) 만 넘긴다.** `shell.openExternal` 은 `file:`·사용자 지정 스킴도
+     * 열 수 있어, 페이지가 정한 문자열을 그대로 넘기면 그것이 곧 구멍이 된다.
+     */
+    if (/^https?:$/.test(safeProtocol(target))) void shell.openExternal(target);
     return { action: 'deny' };
   });
 
@@ -197,6 +227,7 @@ async function start() {
   const { startServer } = await import(path.join(APP_ROOT, 'dist-server', 'server', 'electron-entry.js'));
   const { url, close } = await startServer();
   stopServer = close;
+  serverUrl = url;
   createWindow(url);
 }
 
@@ -226,9 +257,19 @@ app.on('second-instance', () => {
   }
 });
 
+/*
+ * 맥에서 독 아이콘을 눌렀을 때 — **창만 다시 만든다.**
+ *
+ * 전에는 `start()` 를 다시 불렀다. 그러면 서버가 **두 번째로** 뜨고(다음 포트로
+ * 올라간다) 첫 번째는 닫히지 않는다 — OBS 가 보던 주소와 조작 화면의 주소가
+ * 갈라진다. 게다가 아래 `window-all-closed` 가 곧바로 `app.quit()` 을 부르므로
+ * 창이 0개인 상태는 사실상 오지 않아, 그 잘못이 조용히 남아 있었다.
+ *
+ * 서버는 이미 돌고 있다. 필요한 것은 창뿐이다.
+ */
 app.on('activate', () => {
-  // 맥에서 독 아이콘을 누르면 창이 다시 떠야 한다
-  if (BrowserWindow.getAllWindows().length === 0 && stopServer) void start();
+  if (BrowserWindow.getAllWindows().length > 0) return;
+  if (serverUrl) createWindow(serverUrl);
 });
 
 app.on('window-all-closed', () => {

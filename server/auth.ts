@@ -148,6 +148,34 @@ const FAIL_LIMIT = 8;
 const FAIL_WINDOW_MS = 5 * 60 * 1000;
 const attempts = new Map<string, { count: number; first: number }>();
 
+/**
+ * 이 표가 무한히 자라지 않게 한다 (점검 S-5).
+ *
+ * 전에는 **그 주소로 다시 시도할 때만** 정리됐다. 주소를 바꿔 가며 찔러 보면
+ * 항목이 계속 쌓인다 — LAN 안이라 실질 위험은 낮지만, 예배 중에 도는 프로세스가
+ * 며칠씩 켜져 있으므로 새는 곳을 두지 않는다.
+ *
+ * 시간이 지난 것을 먼저 버리고, 그래도 너무 많으면 **가장 오래된 것부터** 버린다.
+ * 상한을 두는 쪽이 안전하다 — 잠금이 풀리는 것이 표가 무한히 자라는 것보다 낫다.
+ */
+const MAX_TRACKED = 1024;
+
+function prune(now: number): void {
+  for (const [address, entry] of attempts) {
+    if (now - entry.first > FAIL_WINDOW_MS) attempts.delete(address);
+  }
+  if (attempts.size <= MAX_TRACKED) return;
+
+  // Map 은 넣은 순서를 지키므로 앞쪽이 오래된 것이다
+  const excess = attempts.size - MAX_TRACKED;
+  let dropped = 0;
+  for (const address of attempts.keys()) {
+    if (dropped >= excess) break;
+    attempts.delete(address);
+    dropped += 1;
+  }
+}
+
 /** 이 주소가 지금 잠겨 있는가 → 남은 초 (아니면 0) */
 export function lockedFor(address: string, now = Date.now()): number {
   const entry = attempts.get(address);
@@ -163,10 +191,21 @@ export function lockedFor(address: string, now = Date.now()): number {
 export function noteFailure(address: string, now = Date.now()): void {
   const entry = attempts.get(address);
   if (!entry || now - entry.first > FAIL_WINDOW_MS) {
+    /*
+     * **넣은 뒤에 걷어낸다.** 먼저 걷어내면 상한까지 줄인 다음 하나를 더해
+     * `MAX_TRACKED + 1` 이 된다 — 검사에서 1,025 로 걸렸다. 새 항목은 넣은
+     * 순서상 맨 뒤라 정리에 밀려나지 않는다.
+     */
     attempts.set(address, { count: 1, first: now });
+    prune(now);
     return;
   }
   entry.count += 1;
+}
+
+/** 지금 몇 주소를 지켜보고 있나 — 검사용 (표가 자라지 않는 것을 확인한다) */
+export function trackedFailureCount(): number {
+  return attempts.size;
 }
 
 export function clearFailures(address: string): void {

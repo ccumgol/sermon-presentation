@@ -1,6 +1,6 @@
 # sermon-presentation — Agent 필수 지침
 
-교회 예배용 프레젠테이션 앱. Node 26(빌드 없음) + Fastify + `node:sqlite` + React 19,
+교회 예배용 프레젠테이션 앱. Node(빌드 없음 · **하한 24**, 개발은 26) + Fastify + `node:sqlite` + React 19,
 OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 화면이 멈추면 예배가 멈춘다.
 
 **이 파일은 자동으로 읽힌다. 여기 있는 것은 전부 필수다.** 나머지는 필요할 때 찾아본다.

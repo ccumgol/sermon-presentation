@@ -318,6 +318,26 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
       <div className="card">
         <h2>서버 정보</h2>
         <dl className="meta">
+          {/*
+            **판 번호를 맨 위에 둔다** (점검 P-7). 이 앱에는 자동 갱신이 없어서,
+            고칠 것이 생기면 설치 파일을 다시 나눠 준다. 그때 받은 사람도 준
+            사람도 '그거 새 판으로 깔았나' 를 확인할 방법이 있어야 한다.
+
+            판 번호는 빌드마다 바뀌지 않으므로 **만든 시각**을 함께 낸다 —
+            실제로 두 빌드를 가르는 것은 이쪽이다.
+          */}
+          <dt>판</dt>
+          <dd>
+            {info.version}
+            {info.builtAt !== undefined && (
+              <>
+                {' '}
+                <span className="muted">
+                  ({new Date(info.builtAt).toLocaleString('ko-KR')} 에 만들어짐)
+                </span>
+              </>
+            )}
+          </dd>
           <dt>포트</dt>
           <dd>{info.port}</dd>
           <dt>역본</dt>

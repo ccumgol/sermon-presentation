@@ -43,7 +43,7 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 
 | 항목 | 버전 | 비고 |
 |------|------|------|
-| Node.js | 22.18 이상 | TypeScript를 네이티브로 실행하고 `node:sqlite`가 내장된 버전 |
+| Node.js | **24 이상** | TypeScript를 네이티브로 실행하고 `node:sqlite`가 내장된 판. 설치판은 Electron 44 에 든 Node 24 로 돌고, CI 도 24 로 빌드한다 — 그것이 **실제로 확인되는 하한**이다 (개발은 26 을 쓴다) |
 | 원본 성경 DB | — | 기본 경로 `~/Desktop/Data/BibleDB` |
 | OBS Studio | 28 이상 | 브라우저 소스의 투명 배경 지원 |
 

@@ -40,6 +40,7 @@ import { bibleMissingMessage, isPackagedApp } from '../lib/bible-missing.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTemplateRoutes } from './routes/templates.ts';
 import { getState, initState } from './state.ts';
+import { appVersion } from './version.ts';
 import type { Template } from '../shared/types.ts';
 
 export interface BuildAppOptions {
@@ -310,6 +311,13 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
       bibleDb: paths.bibleDb,
       /** 설치한 앱인가 — 화면이 안내 문구를 가려 쓴다 (터미널·저장소가 없다) */
       packaged: isPackagedApp(),
+      /**
+       * 어느 판인가 (점검 P-7).
+       *
+       * 판 번호는 빌드마다 바뀌지 않으므로 **만든 시각**이 실제로 두 빌드를
+       * 가른다. 받은 사람이 '내 것이 옛 판인가' 를 물을 때 볼 값이다.
+       */
+      ...appVersion(),
       translationCount: bibleReady ? listTranslations().length : 0,
       songCount: countSongs(),
       planCount: countPlans(),
