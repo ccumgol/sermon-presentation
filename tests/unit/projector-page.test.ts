@@ -143,3 +143,45 @@ describe('막대에 있어야 하는 것', () => {
     expect(PAGE).toContain('id="overflow"');
   });
 });
+
+/**
+ * **출력 페이지에도 같은 스타일 키 규칙이 있어야 한다** (점검 S-3 · 감사 L-1).
+ *
+ * `lib/template-css.ts` 의 `isAllowedStyleKey` 와 짝이다. 출력 페이지는 의존성 0
+ * 이라(OBS 내장 브라우저 대비) 그 함수를 가져다 쓸 수 없어 규칙이 양쪽에 있다 —
+ * 서버만 고치고 여기를 잊으면, 다른 경로로 온 값이 그대로 화면에 들어간다.
+ *
+ * import 할 수 없으므로 **파일을 읽어** 확인한다 (이 파일의 다른 검사들과 같은 방법).
+ */
+describe('출력 페이지가 스타일 키를 가려 받는다', () => {
+  it('허용 판정 함수가 있다', () => {
+    expect(OUTPUT_JS).toContain('function isAllowedStyleKey');
+  });
+
+  it('`--` 로 시작하는 키 + backdrop · anchor 만 받는다', () => {
+    const rule = /function isAllowedStyleKey\(key\) \{\s*return ([^;]+);/.exec(OUTPUT_JS);
+    expect(rule, 'isAllowedStyleKey 의 본문을 찾지 못했다').not.toBeNull();
+    const body = rule![1]!;
+    expect(body).toContain("key.indexOf('--') === 0");
+    expect(body).toContain("key === 'backdrop'");
+    expect(body).toContain("key === 'anchor'");
+  });
+
+  it('setProperty 앞에서 그 판정을 실제로 쓴다 — 함수만 두면 소용없다', () => {
+    const patchFn = OUTPUT_JS.slice(
+      OUTPUT_JS.indexOf('function applyStylePatch'),
+      OUTPUT_JS.indexOf('function applyBackdropFromString'),
+    );
+    expect(patchFn).toContain('if (!isAllowedStyleKey(key))');
+    // 판정이 setProperty 보다 앞에 있어야 한다
+    expect(patchFn.indexOf('isAllowedStyleKey(key)')).toBeLessThan(patchFn.indexOf('setProperty'));
+  });
+
+  it('버린 키를 조작 화면으로 올린다 — 화면에는 아무것도 그리지 않는다', () => {
+    const patchFn = OUTPUT_JS.slice(
+      OUTPUT_JS.indexOf('function applyStylePatch'),
+      OUTPUT_JS.indexOf('function applyBackdropFromString'),
+    );
+    expect(patchFn).toContain('pendingErrors.push');
+  });
+});

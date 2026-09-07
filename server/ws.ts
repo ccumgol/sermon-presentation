@@ -20,7 +20,7 @@ import {
 import { verifySession } from './auth.ts';
 
 import { PROJECTOR_LAYER, PROJECTOR_TEMPLATE_ID, projectorTemplate } from '../lib/projector-view.ts';
-import { templateToCssVars } from '../lib/template-css.ts';
+import { isAllowedStyleKey, templateToCssVars } from '../lib/template-css.ts';
 import type { ClientMsg, ClientRole, Deck, LiveState, ServerMsg, Template } from '../shared/types.ts';
 import { getTemplateOrDefault } from './db/templates.ts';
 import { isOutputStale, outputBuildMs } from './output-build.ts';
@@ -288,7 +288,15 @@ export function createWsHub(server: Server, log: Logger): WsHub {
          * **프로젝터는 뺀다.** 프로젝터는 활성 템플릿을 따르지 않으므로, 다른 템플릿을
          * 편집하는 중에 프로젝터 글씨가 따라 흔들리면 예배 중에 벽에 비친 글이 춤춘다.
          */
-        const patch = { t: 'style:patch', payload: toCssPatch(msg.patch) } as const;
+        const { vars, blocked } = toCssPatch(msg.patch);
+        if (blocked.length > 0) {
+          /*
+           * 조용히 버리지 않는다. 정당한 클라이언트라면 우리 화면인데 키 이름이
+           * 틀린 것이고, 정당하지 않다면 그 사실을 알아야 한다. 둘 다 로그가 필요하다.
+           */
+          log.warn(`style:set 의 허용되지 않은 키를 버렸습니다: ${blocked.join(', ')}`);
+        }
+        const patch = { t: 'style:patch', payload: vars } as const;
         for (const c of clients.values()) {
           if (c.layer !== PROJECTOR_LAYER) send(c.socket, patch);
         }
@@ -368,12 +376,28 @@ export function createWsHub(server: Server, log: Logger): WsHub {
  * style:set 의 값을 CSS 변수 문자열로 바꾼다.
  * 숫자는 px 로 보지 않는다 — 배율(--fit-scale)처럼 단위 없는 값이 있으므로
  * 호출하는 쪽이 단위를 포함한 문자열을 보내는 것이 원칙이다.
+ *
+ * **키를 가려 받는다** (점검 S-3 · 감사 L-1). 전에는 아무 키나 통과시켜서
+ * `{display:'none'}` 하나로 송출 화면을 지울 수 있었다 — 그리고 템플릿을 다시
+ * 보내도 복구되지 않는다(`--` 변수만 덮으므로). 판정은
+ * `lib/template-css.ts` 의 `isAllowedStyleKey` 가 하고, **같은 규칙이
+ * `public/output/output.js` 에도** 있다 (출력 페이지는 의존성 0).
+ *
+ * @returns 통과한 값과, 막힌 키 이름(부르는 쪽이 로그를 남긴다)
  */
-function toCssPatch(patch: Record<string, unknown>): Record<string, string> {
-  const out: Record<string, string> = {};
+function toCssPatch(patch: Record<string, unknown>): {
+  vars: Record<string, string>;
+  blocked: string[];
+} {
+  const vars: Record<string, string> = {};
+  const blocked: string[] = [];
   for (const [key, value] of Object.entries(patch)) {
     if (value === null || value === undefined) continue;
-    out[key] = String(value);
+    if (!isAllowedStyleKey(key)) {
+      blocked.push(key);
+      continue;
+    }
+    vars[key] = String(value);
   }
-  return out;
+  return { vars, blocked };
 }

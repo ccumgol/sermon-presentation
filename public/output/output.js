@@ -95,10 +95,38 @@
     document.documentElement.style.setProperty('--align', pair[1]);
   }
 
-  /** 서버가 보내는 CSS 변수 패치를 그대로 적용한다. DOM 재구성 없음. */
+  /**
+   * 서버가 보내는 CSS 변수 패치를 적용한다. DOM 재구성 없음.
+   *
+   * **키를 가려 받는다** (점검 S-3 · 감사 L-1). 전에는 아무 키나
+   * `setProperty` 로 넣어서, `{display:'none'}` 한 줄이 오면 **이 화면이 통째로
+   * 사라졌다.** 게다가 템플릿을 다시 받아도 복구되지 않는다 — 템플릿은 `--` 로
+   * 시작하는 변수만 덮으므로 `display` 가 그대로 남는다. 예배 중 검은 화면이
+   * 최악의 결과이므로 여기서도 막는다.
+   *
+   * ⚠️ **같은 규칙이 `lib/template-css.ts` 의 `isAllowedStyleKey` 에도 있다.**
+   * 이 파일은 의존성 0 을 지켜야 해서(OBS 내장 브라우저 대비) 가져다 쓸 수 없다 —
+   * 고칠 때 양쪽을 함께 고친다.
+   */
+  function isAllowedStyleKey(key) {
+    return key.indexOf('--') === 0 || key === 'backdrop' || key === 'anchor';
+  }
+
   function applyStylePatch(patch) {
     var root = document.documentElement;
     Object.keys(patch).forEach(function (key) {
+      if (!isAllowedStyleKey(key)) {
+        /*
+         * 화면에는 아무것도 그리지 않는다 — 예배 중에 글자가 나가면 안 된다.
+         * 대신 조작 화면으로 올린다 (`client:error` → `output:error` 배너).
+         * 다른 오류들과 같은 통을 쓴다 (`pendingErrors` · reportErrors 가 보낸다).
+         */
+        pendingErrors.push({
+          message: '허용되지 않은 스타일 키를 버렸습니다: ' + key,
+          url: location.href,
+        });
+        return;
+      }
       if (key === 'anchor') {
         applyAnchor(patch[key]);
         return;

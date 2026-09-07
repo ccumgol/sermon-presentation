@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_TEMPLATES, SHARED_PRESET_IDS, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
-import {
-  anchorToAlignment, clampRhythm, diffCssVars, MAX_TITLE_RHYTHM, overrideVarsFor, templateToCssVars, withAlpha,
-} from '../../lib/template-css.ts';
+import { MAX_TITLE_RHYTHM, anchorToAlignment, clampRhythm, diffCssVars, isAllowedStyleKey, overrideVarsFor, templateToCssVars, withAlpha } from '../../lib/template-css.ts';
 import type { Anchor, Template } from '../../shared/types.ts';
 
 function base(): Template {
@@ -428,6 +426,45 @@ describe('화면에서 새로 만질 수 있는 글자 값', () => {
       expect(vars[`--${prefix}-spacing`]).toBeUndefined();
       expect(vars[`--${prefix}-transform`]).toBeUndefined();
       expect(vars[`--${prefix}-box-bg`]).toBeUndefined();
+    }
+  });
+});
+
+/**
+ * 출력 화면에 넣어도 되는 키인가 (점검 S-3 · 감사 L-1).
+ *
+ * 여기가 느슨해지면 `{display:'none'}` 한 줄로 송출 화면이 사라진다. 그리고
+ * 템플릿을 다시 보내도 복구되지 않는다 — `--` 변수만 덮으므로.
+ */
+describe('isAllowedStyleKey', () => {
+  it('CSS 변수는 받는다', () => {
+    for (const key of ['--primary-size', '--backdrop-opacity', '--모르는이름']) {
+      expect(isAllowedStyleKey(key), key).toBe(true);
+    }
+  });
+
+  it('변수가 아닌 두 키만 예외로 받는다 — 출력 페이지가 직접 해석한다', () => {
+    expect(isAllowedStyleKey('backdrop')).toBe(true);
+    expect(isAllowedStyleKey('anchor')).toBe(true);
+  });
+
+  it('진짜 CSS 속성은 막는다 — 화면 자체를 바꿀 수 있다', () => {
+    for (const key of ['display', 'opacity', 'position', 'visibility', 'transform', 'color', 'all']) {
+      expect(isAllowedStyleKey(key), key).toBe(false);
+    }
+  });
+
+  it('변수처럼 보이게 꾸민 것도 막는다', () => {
+    for (const key of [' --primary-size', 'x--primary-size', '-display', '']) {
+      expect(isAllowedStyleKey(key), JSON.stringify(key)).toBe(false);
+    }
+  });
+
+  it('프리셋 8종이 내는 키를 하나도 막지 않는다 — 여기가 막히면 화면이 깨진다', () => {
+    for (const preset of BUILTIN_TEMPLATES) {
+      for (const key of Object.keys(templateToCssVars(preset))) {
+        expect(isAllowedStyleKey(key), `${preset.name} 의 ${key}`).toBe(true);
+      }
     }
   });
 });
