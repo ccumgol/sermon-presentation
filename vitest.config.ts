@@ -70,17 +70,22 @@ export default defineConfig({
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *
-         * 지금 값(2026-09-08 실측: 문장 25.7%)보다 조금 낮게 잡아 두고, 검사를
+         * 지금 값(2026-09-08 실측: 문장 32.8%)보다 조금 낮게 잡아 두고, 검사를
          * 더할 때마다 올린다.
          *
-         * 예배 순서 탭은 훅 90% 대 + 갈라낸 화면 컴포넌트 70~100% 다:
+         * 예배 순서 탭은 훅 90% 대 + 갈라낸 화면 컴포넌트 60~100% 다:
          *   usePlanStorage 98 · usePlanAdd 97 · usePlanSend 94 · usePlanPreview 94 ·
-         *   PlanLoadList 100 · PlanHead 92 · PlanActions 82 · PlanCueList 79
+         *   PlanLoadList 100 · PlanHead 92 · PlanAddBar 92 · PlanDefaultsCard 91 ·
+         *   PlanActions 82 · PlanCueList 79 · **PlanItemEditor 60**
          *
-         * 남은 것은 **아직 검사가 없는 화면들**이다 — PlanAddBar ·
-         * PlanDefaultsCard · PlanItemEditor · BiblePanel · SongPanel 등.
+         * PlanItemEditor 는 732줄에 종류별 블록이 열이라 한 번에 100% 가 되지
+         * 않는다. 주요 종류(구분·찬양·성경·순서 표시·교독문·전례문)를 덮었고,
+         * 남은 것은 전례문 본문 덮어쓰기 편집기다.
+         *
+         * 남은 것은 **아직 검사가 없는 화면들**이다 — BiblePanel · SongPanel ·
+         * TemplatePanel · SongbookManager 등.
          */
-        'src/**': { lines: 24, functions: 15, branches: 20, statements: 24 },
+        'src/**': { lines: 32, functions: 27, branches: 32, statements: 32 },
       },
     },
   },
