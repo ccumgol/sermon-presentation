@@ -53,14 +53,17 @@ export default defineConfig({
          * 않게 막는 것' 이다 — 닿을 수 없는 목표를 걸면 `--coverage` 가 늘 실패해서
          * 아무도 쳐다보지 않게 된다.
          *
-         * 2026-09-08 실측: lib 줄 98.1 · server 79.5 · src 문장 25.7
+         * 2026-09-08 실측: lib 줄 98.1 · server 문장 79.5 · src 문장 25.7
+         *
+         * server/ 는 `ws.ts` 통합 검사(2026-09-08)로 문장 77.5 → **79.5** 로 올랐다.
+         * `ws.ts` 자체는 57.3 → 86.0 이다 — 예배 중 화면이 도는 통로다.
          *
          * ⚠️ `server/` 가 80% 아래인 것은 새로 생긴 일이 아니다. 전에는 `lib/` 와
          * 한 덩이로 재서 평균 86% 로 통과했고, **낮은 쪽이 가려져 있었다.**
          * 나눠서 재기 시작하니 드러났다.
          */
         'lib/**': { lines: 95, functions: 95, branches: 88, statements: 94 },
-        'server/**': { lines: 78, functions: 82, branches: 70, statements: 76 },
+        'server/**': { lines: 79, functions: 83, branches: 71, statements: 78 },
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *

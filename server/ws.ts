@@ -34,8 +34,13 @@ interface Client {
 }
 
 export interface WsHub {
-  /** 현재 접속 수 — 컨트롤 패널의 '출력 연결됨' 표시에 쓴다 */
-  counts(): { control: number; output: number };
+  /**
+   * 현재 접속 수 — 컨트롤 패널의 '출력 연결됨' 표시에 쓴다.
+   *
+   * 강사 모니터·프로젝터는 **OBS 로 나가는 화면이 아니라** 따로 센다. 섞으면
+   * 'OBS 연결됨' 표시가 거짓이 된다.
+   */
+  counts(): { control: number; output: number; stage: number; projector: number };
   /** 템플릿이 바뀌었을 때 모든 화면에 즉시 반영한다 (REST 편집 경로에서 호출) */
   pushTemplate(template: Template): void;
   close(): void;
