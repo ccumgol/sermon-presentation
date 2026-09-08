@@ -12,11 +12,9 @@
  *    10항목이 한 화면에 들어와야 진행이 보인다.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import {
-  buildPlanRows, describeItem, isExpandable, moveItem, removeItem, type PlanRow,
-} from '../../../lib/plan-deck.ts';
+import { buildPlanRows, describeItem, isExpandable, type PlanRow } from '../../../lib/plan-deck.ts';
 import { LANG_LABELS, ACTIVE_LANGS, toggleLang } from '../../../lib/lang-select.ts';
 import {
   baseFontSizeFor,
@@ -25,18 +23,15 @@ import {
 } from '../../../lib/plan-item-template.ts';
 import { PlanItemEditor } from '../components/PlanItemEditor.tsx';
 import { PlanAddBar } from '../components/plan/PlanAddBar.tsx';
+import { PlanCueList } from '../components/plan/PlanCueList.tsx';
 import { PlanDirtyLine } from '../components/plan/PlanDirtyLine.tsx';
 import { PlanHead } from '../components/plan/PlanHead.tsx';
 import { PlanLoadList } from '../components/plan/PlanLoadList.tsx';
 import { PlanNameBar } from '../components/plan/PlanNameBar.tsx';
 import { BackgroundSelect } from '../components/BackgroundSelect.tsx';
-import {
-  MAX_SECONDARY, itemIcon, itemMeta, slideSummary, today,
-} from '../../../lib/plan-item-view.ts';
-import {
-  AUTO_HOLD_MS_DEFAULT,
-  type ClientMsg, type CueItem, type Deck, type LangCode,
-  type Template, type Translation,
+import { MAX_SECONDARY, today } from '../../../lib/plan-item-view.ts';
+import type {
+  ClientMsg, CueItem, Deck, LangCode, Template, Translation,
 } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { usePlanBackgrounds } from '../hooks/usePlanBackgrounds.ts';
@@ -122,13 +117,13 @@ export function PlanPanel({
   /** 고른 찬양 항목의 곡 정보 — 언어 버튼을 흐리게 하고, 악보가 있는지 알린다 */
   const [songInfo, setSongInfo] = useState<{ id: number; available: string[]; hasSheet: boolean } | null>(null);
 
-  const listRef = useRef<HTMLDivElement>(null);
 
   // 항목을 슬라이드로 푸는 것은 usePlanPreview 로 옮겼다 (2026-09-07 R-4).
   // 송출하지 않는다 — 선택과 송출은 갈라져 있다.
-  const { resolveItem, preview, previewError, styleTemplates } = usePlanPreview({
+  const previewHook = usePlanPreview({
     items, expandedId, template,
   });
+  const { resolveItem, preview, styleTemplates } = previewHook;
 
   /** 화면에 그릴 줄 목록 — 펼친 항목의 슬라이드가 그 아래에 들어간다 */
   const rows = buildPlanRows(items, expandedId, preview?.slides.length ?? 0);
@@ -189,15 +184,14 @@ export function PlanPanel({
 
   // ── 송출 ────────────────────────────────────────────────────
   // 화면으로 내보내는 것 전부는 usePlanSend 로 옮겼다 (2026-09-07 R-4).
-  const {
-    liveSlide, liveLabel, slideCount,
-    sendItem, sendTitle, refreshLive, restoreBefore, startAuto, loadForService,
-    before, auto, setAuto, liveItemId,
-    liveItemIndex, liveSlideIndexInItem, liveViaPlanDeck,
-  } = usePlanSend({
+  const sendHook = usePlanSend({
     deck, currentIndex, connected, send, items, plan, resolveItem, templateChoice,
     feedback: { setBusy, setError, setNotice },
   });
+  const {
+    sendItem, sendTitle, refreshLive, restoreBefore, loadForService,
+    before, auto, setAuto, liveItemId, liveItemIndex, liveViaPlanDeck,
+  } = sendHook;
 
 
   // 고른 항목이 찬양이면 그 곡의 언어와 **악보 유무**를 읽어 둔다
@@ -319,11 +313,6 @@ export function PlanPanel({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [rows.length, currentRow, items, activateRow]);
-
-  // 커서가 화면 밖으로 나가지 않게
-  useEffect(() => {
-    listRef.current?.querySelector('.cue-row.current, .cue-divider.current')?.scrollIntoView({ block: 'nearest' });
-  }, [cursor]);
 
   // ── 렌더 ────────────────────────────────────────────────────
 
@@ -666,171 +655,16 @@ export function PlanPanel({
 
           {!plan && <p className="hintline muted">예배 유형을 고르거나 ＋ 로 새로 만드세요.</p>}
 
-          {plan && (
-            <div className="cue-list" ref={listRef}>
-              {items.length === 0 && <p className="hintline muted">아래에서 항목을 추가하세요.</p>}
-
-              {rows.map((row, rowIndex) => {
-                const item = items[row.itemIndex];
-                if (!item) return null;
-                const isCursor = rowIndex === cursor;
-
-                // ── 구분(그룹 머리글) ──
-                if (row.kind === 'divider' && item.type === 'divider') {
-                  const running = auto?.dividerId === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`cue-divider${isCursor ? ' current' : ''}${running ? ' auto' : ''}`}
-                      onClick={() => setCursor(rowIndex)}
-                    >
-                      <span className="label">
-                        {item.label}
-                        {item.auto && <span className="auto-tag" title="예배 전 안내 — 자동으로 넘어갑니다">⏱</span>}
-                      </span>
-                      <span className="actions">
-                        {/*
-                          **꺼져 있을 때도 자리를 보여 준다.**
-                          전에는 자동 넘김을 켜기 전까지 구분 행에 아무 표시가 없어서
-                          이 기능이 있는 줄도 몰랐다 ('▶ 를 눌러도 안 된다' 신고,
-                          2026-09-01). 흐린 ⏱ 을 누르면 켜지고 그 자리에 ▶ 가 생긴다 —
-                          켜는 곳과 시작하는 곳이 같아야 헤매지 않는다.
-                        */}
-                        {item.auto ? (
-                          <button
-                            type="button"
-                            className="go"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (running) setAuto(null);
-                              else void startAuto(item);
-                            }}
-                            disabled={!connected || busy}
-                            title={running ? '자동 진행 정지' : '예배 전 안내 시작 (자동으로 넘어갑니다)'}
-                          >
-                            {running ? '■' : '▶'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              patchItems(
-                                items.map((i) =>
-                                  i.id === item.id
-                                    ? { ...i, auto: { holdMs: AUTO_HOLD_MS_DEFAULT, loop: true } }
-                                    : i,
-                                ),
-                              );
-                            }}
-                            title="예배 전 안내로 쓰기 — 켜면 ▶ 가 생겨 자동으로 넘어갑니다"
-                          >
-                            ⏱
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex - 1)); }}
-                          disabled={row.itemIndex === 0}
-                          title="위로"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex + 1)); }}
-                          disabled={row.itemIndex === items.length - 1}
-                          title="아래로"
-                        >
-                          ↓
-                        </button>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(removeItem(items, item.id)); }} title="삭제">✕</button>
-                      </span>
-                    </div>
-                  );
-                }
-
-                // ── 펼친 항목의 슬라이드 줄 ──
-                if (row.kind === 'slide') {
-                  const slide = preview?.slides[row.slideIndex];
-                  const isLiveSlide =
-                    row.itemIndex === liveItemIndex && liveSlideIndexInItem === row.slideIndex;
-                  return (
-                    <div
-                      key={`${item.id}-s${row.slideIndex}`}
-                      className={`cue-slide-row${isCursor ? ' current' : ''}${isLiveSlide ? ' live' : ''}`}
-                      onClick={() => { setCursor(rowIndex); void sendItem(item, row.slideIndex); }}
-                      title="눌러서 송출"
-                    >
-                      <span className="live-dot" title={isLiveSlide ? '송출 중' : undefined} />
-                      <span className="num">{preview?.labels[row.slideIndex] || row.slideIndex + 1}</span>
-                      <span className="text">
-                        {slide ? slideSummary(slide, preview?.slides[row.slideIndex - 1]) : ''}
-                      </span>
-                    </div>
-                  );
-                }
-
-                // ── 항목 줄 ──
-                const isLive = row.itemIndex === liveItemIndex;
-                const expandable = isExpandable(item);
-                const expanded = expandedId === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    className={`cue-row${isCursor ? ' current' : ''}${isLive ? ' live' : ''}${expanded ? ' expanded' : ''}`}
-                    onClick={() => { setCursor(rowIndex); activateRow(row); }}
-                    title={expandable ? '눌러서 펼치기 (Tab)' : '눌러서 송출'}
-                  >
-                    <span className="live-dot" title={isLive ? '송출 중' : undefined} />
-                    <span className="twisty">{expandable ? (expanded ? '▾' : '▸') : ''}</span>
-                    <span className="icon">{itemIcon(item)}</span>
-                    <span className="body">
-                      <span className="title">{describeItem(item)}</span>
-                      <span className="meta">{itemMeta(item)}</span>
-                    </span>
-
-                    {/* 이 항목이 어느 템플릿으로 나가는지 — 여기서 바로 바꾼다 */}
-                    <select
-                      className="row-template"
-                      value={'templateId' in item && item.templateId !== undefined ? item.templateId : ''}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? undefined : Number(e.target.value);
-                        patchItems(
-                          items.map((i) => (i.id === item.id ? { ...i, templateId: value } : i)),
-                        );
-                      }}
-                      title="이 항목을 송출할 때 쓸 템플릿"
-                    >
-                      <option value="">템플릿 그대로</option>
-                      {styleTemplates.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-
-                    <span className="actions">
-                      <button
-                        type="button"
-                        className="go"
-                        onClick={(e) => { e.stopPropagation(); void sendItem(item); }}
-                        disabled={!connected}
-                        title="바로 송출"
-                      >
-                        ▶
-                      </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex - 1)); }} disabled={row.itemIndex === 0} title="위로">↑</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(moveItem(items, row.itemIndex, row.itemIndex + 1)); }} disabled={row.itemIndex === items.length - 1} title="아래로">↓</button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); patchItems(removeItem(items, item.id)); }} title="삭제">✕</button>
-                    </span>
-                  </div>
-                );
-              })}
-
-              {previewError && <p className="hintline error">{previewError}</p>}
-            </div>
-          )}
+          <PlanCueList
+            draft={draft}
+            send={sendHook}
+            preview={previewHook}
+            feedback={feedback}
+            rows={rows}
+            activateRow={activateRow}
+            template={template}
+            connected={connected}
+          />
 
           <PlanAddBar add={add} plan={plan} translations={translations} backgrounds={backgrounds} />
         </div>
