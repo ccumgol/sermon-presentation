@@ -55,15 +55,18 @@ export default defineConfig({
          *
          * 2026-09-08 실측: lib 줄 98.1 · server 문장 79.5 · src 문장 25.7
          *
-         * server/ 는 `ws.ts` 통합 검사(2026-09-08)로 문장 77.5 → **79.5** 로 올랐다.
-         * `ws.ts` 자체는 57.3 → 86.0 이다 — 예배 중 화면이 도는 통로다.
+         * server/ 는 2026-09-08 에 두 번 올랐다:
+         *   · `ws.ts` 통합 검사 — 문장 77.5 → 79.5 (`ws.ts` 자체 57.3 → 86.0).
+         *     예배 중 화면이 도는 통로다.
+         *   · 곡집 검사 — 문장 79.5 → **85.1** (`db/songbooks` 36.7 → 96.7 ·
+         *     `routes/songbooks` 36.5 → 97.6). 되돌릴 수 없는 사용자 데이터를 쓰는 길이다.
          *
          * ⚠️ `server/` 가 80% 아래인 것은 새로 생긴 일이 아니다. 전에는 `lib/` 와
          * 한 덩이로 재서 평균 86% 로 통과했고, **낮은 쪽이 가려져 있었다.**
          * 나눠서 재기 시작하니 드러났다.
          */
         'lib/**': { lines: 95, functions: 95, branches: 88, statements: 94 },
-        'server/**': { lines: 79, functions: 83, branches: 71, statements: 78 },
+        'server/**': { lines: 84, functions: 86, branches: 77, statements: 84 },
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *
