@@ -24,6 +24,10 @@ import {
   templateIdFor as pickTemplateId,
 } from '../../../lib/plan-item-template.ts';
 import { PlanItemEditor } from '../components/PlanItemEditor.tsx';
+import { PlanDirtyLine } from '../components/plan/PlanDirtyLine.tsx';
+import { PlanHead } from '../components/plan/PlanHead.tsx';
+import { PlanLoadList } from '../components/plan/PlanLoadList.tsx';
+import { PlanNameBar } from '../components/plan/PlanNameBar.tsx';
 import { BackgroundSelect } from '../components/BackgroundSelect.tsx';
 import {
   ADD_KINDS, MAX_SECONDARY, ORDER_PRESETS,
@@ -137,12 +141,7 @@ export function PlanPanel({
   // ── 순서표 읽기·저장 ────────────────────────────────────────
   // usePlanStorage 로 옮겼다 (2026-09-07 R-4).
   // 여기가 사용자 데이터를 쓰는 길이다 — 잘못 덮어쓰면 지난주 순서가 사라진다.
-  const {
-    templates, saved, reload, openPlan, saveCurrent, duplicateCurrent,
-    removeTemplate, removeSaved,
-    nameBar, setNameBar, nameBarTarget, commitNameBar, nameInputRef,
-    loadOpen, setLoadOpen, planNoun, planNounObj, saveLabel,
-  } = usePlanStorage({
+  const storage = usePlanStorage({
     draft,
     feedback: { setBusy, setError, setNotice },
     // 추가 바의 역본을 이 예배의 기본값에서 시작한다 —
@@ -152,6 +151,12 @@ export function PlanPanel({
       setAddSecondary(target.defaults?.bible?.secondary ?? []);
     },
   });
+  // 화면 컴포넌트에는 **storage 객체째로** 넘긴다 (프롭 일곱을 하나로).
+  // 아직 PlanPanel 안에 남은 JSX 가 쓰는 것만 낱개로 꺼낸다.
+  const {
+    templates, saved, openPlan, saveCurrent, setNameBar, setLoadOpen,
+    loadOpen, saveLabel, planNoun,
+  } = storage;
 
   // ── 항목을 슬라이드로 푼다 (선택했을 때 미리보기용) ──────────
 
@@ -362,85 +367,7 @@ export function PlanPanel({
       {/* 한 열 목록 — 3차 재설계에서 오른쪽 열을 없애고 슬라이드를 이 안으로 넣었다 */}
       <div className="plan-single">
         <div className="card plan-list">
-          <div className="plan-head">
-            {/*
-              **지금 열어 둔 것**을 보여 준다 — 유형이든 저장된 순서든.
-              전에는 유형만 담아서, 저장된 순서를 불러오면 이 칸이 '— 예배 유형 —' 로
-              비어 무엇을 고치고 있는지 화면 어디에도 없었다 (2026-09-03 사용자 보고).
-            */}
-            <select
-              className="grow"
-              value={plan?.id ?? ''}
-              onChange={(e) => {
-                const id = Number(e.target.value);
-                const found = templates.find((p) => p.id === id) ?? saved.find((p) => p.id === id);
-                if (found) openPlan(found);
-              }}
-              title="지금 고치는 중인 예배 유형 또는 저장된 순서"
-            >
-              <option value="">— 예배 유형 —</option>
-              <optgroup label="예배 유형 (매주 고쳐 쓰는 원본)">
-                {templates.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </optgroup>
-              {saved.length > 0 && (
-                <optgroup label="저장된 순서 (회차)">
-                  {saved.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {/* 이름에 이미 날짜가 들어 있으면 앞에 또 붙이지 않는다 */}
-                      {p.serviceDate && !p.name.includes(p.serviceDate) ? `${p.serviceDate} · ` : ''}
-                      {p.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            <button
-              type="button"
-              onClick={() => { setLoadOpen(false); setNameBar({ kind: 'template', value: '' }); }}
-              disabled={busy}
-              title="지금 항목으로 새 예배 유형 만들기"
-            >
-              ＋
-            </button>
-
-            {/*
-              지금 연 것을 관리한다 — 복제·이름 바꾸기·삭제.
-              전에는 유형에만 걸려 있었다. 저장된 순서를 열면 셋이 모두 회색이라,
-              이름을 고칠 길이 없었다 — 사용자가 '제목을 정확히 찾아 저장하기 어렵다'
-              고 한 것이 이것이다 (2026-09-03). 유형·순서 모두 같은 세 버튼으로 다룬다.
-            */}
-            <button
-              type="button"
-              onClick={() => void duplicateCurrent()}
-              disabled={busy || !plan}
-              title={`이 ${planNounObj} 복제합니다 (주일 1부 → 2부)`}
-            >
-              ⧉
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!plan) return;
-                setLoadOpen(false);
-                setNameBar({ kind: plan.kind ?? 'plan', value: plan.name, renameId: plan.id });
-              }}
-              disabled={busy || !plan}
-              title={`이 ${planNoun}의 이름을 바꿉니다`}
-            >
-              ✎
-            </button>
-            <button
-              type="button"
-              className="del"
-              onClick={() => void removeTemplate()}
-              disabled={busy || !plan}
-              title={`이 ${planNounObj} 지웁니다`}
-            >
-              ✕
-            </button>
-          </div>
+          <PlanHead storage={storage} plan={plan} busy={busy} />
 
           {plan && (
             <>
@@ -741,82 +668,11 @@ export function PlanPanel({
             </>
           )}
 
-          {nameBar && (
-            <div className="plan-head">
-              <input
-                className="grow"
-                autoFocus
-                ref={nameInputRef}
-                value={nameBar.value}
-                onChange={(e) => setNameBar({ ...nameBar, value: e.target.value })}
-                onKeyDown={(e) => {
-                  if (isComposing(e)) return; // 한글 조합 확정용 Enter 는 넘긴다
-                  if (e.key === 'Enter') { e.preventDefault(); void commitNameBar(); }
-                  if (e.key === 'Escape') { e.preventDefault(); setNameBar(null); }
-                }}
-                placeholder={
-                  nameBar.renameId !== undefined
-                    ? `새 ${nameBar.kind === 'template' ? '유형' : '순서'} 이름`
-                    : nameBar.kind === 'template'
-                      ? '새 예배 유형 이름'
-                      : '저장할 순서 이름'
-                }
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                className="primary"
-                onClick={() => void commitNameBar()}
-                // 이름을 바꿀 때 다른 유형과 겹치면 막는다 — 이름이 곧 '덮어쓰기' 의 기준이라
-                // 같은 이름이 둘이면 어느 쪽을 덮어쓸지 알 수 없게 된다
-                disabled={
-                  busy ||
-                  nameBar.value.trim().length === 0 ||
-                  (nameBar.renameId !== undefined && nameBarTarget !== undefined)
-                }
-              >
-                {nameBar.renameId !== undefined ? '이름 바꾸기' : nameBarTarget ? '덮어쓰기' : '저장'}
-              </button>
-              <button type="button" onClick={() => setNameBar(null)}>취소</button>
-            </div>
-          )}
+          <PlanNameBar storage={storage} busy={busy} />
 
-          {nameBar && nameBarTarget && (
-            <p className="hintline warn">
-              {nameBar.renameId !== undefined
-                ? `같은 이름의 ${nameBar.kind === 'template' ? '유형' : '순서'}가 이미 있습니다 — 다른 이름을 쓰세요.`
-                : `같은 이름이 이미 있습니다 — 누르면 그 ${
-                    nameBar.kind === 'template' ? '유형' : '순서'
-                  }를 덮어씁니다.`}
-            </p>
-          )}
+          <PlanLoadList storage={storage} />
 
-          {loadOpen && (
-            <div className="candidates plan-saved">
-              {saved.length === 0 && <span className="hintline muted">저장된 순서가 없습니다.</span>}
-              {saved.map((p) => (
-                <span key={p.id} className="saved-row">
-                  <button type="button" onClick={() => openPlan(p)}>
-                    {/* 이름에 이미 날짜가 들어 있으면 앞에 또 붙이지 않는다 */}
-                    {p.serviceDate && !p.name.includes(p.serviceDate) ? `${p.serviceDate} · ` : ''}
-                    {p.name}
-                  </button>
-                  <button type="button" className="del" onClick={() => void removeSaved(p)} title="삭제">✕</button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {plan && dirty && (
-            <p className="hintline muted plan-dirty">
-              {/*
-                어디를 눌러야 하는지 여기서 말해 준다 — 버튼 이름이 열어 둔 것에 따라
-                달라지기 때문이다. '저장 안 됨' 만 있으면 어느 버튼인지 매번 헷갈린다.
-              */}
-              <b>저장 안 됨</b> — <b>{saveLabel}</b> 를 누르면
-              {' '}'{plan.name}' {planNoun}에 남습니다
-            </p>
-          )}
+          <PlanDirtyLine storage={storage} plan={plan} dirty={dirty} />
 
           {!plan && <p className="hintline muted">예배 유형을 고르거나 ＋ 로 새로 만드세요.</p>}
 

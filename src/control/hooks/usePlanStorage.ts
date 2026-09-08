@@ -46,6 +46,10 @@ export interface PlanStorageOptions {
   onOpened: (plan: ServicePlan) => void;
 }
 
+/** `usePlanStorage` 가 내놓는 것. 화면 컴포넌트가 **이 객체째로** 받는다 —
+ * 낱개로 넘기면 프롭 일곱짜리 껍데기가 된다 (R-4 가 멈춘 그 실패). */
+export type PlanStorage = ReturnType<typeof usePlanStorage>;
+
 export function usePlanStorage(options: PlanStorageOptions) {
   const {
     draft: { plan, setPlan, items, setItems, dirty, setDirty, setCursor },

@@ -57,6 +57,10 @@ export interface PlanAddOptions {
   defaultTranslation: string;
 }
 
+/** `usePlanAdd` 가 내놓는 것. 화면 컴포넌트가 **이 객체째로** 받는다 —
+ * 여기 담긴 것이 25개라, 낱개로 넘기면 프롭이 스물다섯이 된다 */
+export type PlanAdd = ReturnType<typeof usePlanAdd>;
+
 export function usePlanAdd(options: PlanAddOptions) {
   const {
     draft: { plan, items, cursor, setCursor, expandedId, patchItems },

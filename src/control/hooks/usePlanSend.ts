@@ -53,6 +53,9 @@ export interface PlanSendOptions {
   feedback: SendFeedback;
 }
 
+/** `usePlanSend` 가 내놓는 것. 화면 컴포넌트가 **이 객체째로** 받는다 */
+export type PlanSend = ReturnType<typeof usePlanSend>;
+
 export function usePlanSend(options: PlanSendOptions) {
   const {
     deck, currentIndex, connected, send, items, plan, resolveItem, templateChoice,
