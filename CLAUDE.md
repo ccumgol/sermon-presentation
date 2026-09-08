@@ -12,6 +12,7 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 언제 | 무엇을 |
 |---|---|
 | **작업을 시작할 때 (매번)** | [docs/collaboration-report.md](docs/collaboration-report.md) — 작업 보드·진행 중 로그·인계 메모. **여기에 착수 기록을 쓴다** |
+| **무엇부터 할지 정할 때** | [docs/PLAN-next-2026-09-08.md](docs/PLAN-next-2026-09-08.md) — 우선순위와 착수 방법. **사용자 결정이 필요해 시작할 수 없는 것**도 갈라 두었다 |
 | 화면·기능이 왜 그렇게 생겼는지 알아야 할 때 | [PLAN.md](PLAN.md) (설계 근거) · [docs/USER-GUIDE.md](docs/USER-GUIDE.md) (탭별 사용법) |
 | 무언가 안 될 때 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — 증상 → 원인 → 조치. **먼저 여기를 본다** |
 | 전에 누가 무엇을 했는지 찾을 때 | [docs/work-log.md](docs/work-log.md) (작업 이력 전체) · [docs/CHANGELOG.md](docs/CHANGELOG.md) (요약) |
