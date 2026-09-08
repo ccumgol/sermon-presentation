@@ -1,24 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import {
-  LANG_LABELS, MAX_LANGS, langChoices, orderLangs, toggleLang as nextLangs,
-} from '../../../lib/lang-select.ts';
+import { LANG_LABELS, MAX_LANGS, langChoices } from '../../../lib/lang-select.ts';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
 import { SongMetaRows } from '../components/SongMetaRows.tsx';
 import { ProjectorSheetToggle } from '../components/ProjectorSheetToggle.tsx';
 
-import type {
-  ClientMsg, Deck, LangCode, Song, Songbook, SongSearchHit, SongSearchResult, Template,
-} from '../../../shared/types.ts';
-import { buildSongDeck, isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
-import { formatLyrics, parseLyrics } from '../../../lib/lyrics-parser.ts';
+import type { ClientMsg, Deck, LangCode, Template } from '../../../shared/types.ts';
+import { formatLyrics } from '../../../lib/lyrics-parser.ts';
+import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import { shortEntryLabel } from '../../../lib/plan-item-view.ts';
-import type { SheetSummary } from '../../../lib/sheet-attach.ts';
 import { api, ApiError } from '../api.ts';
 import { ColumnResizer } from '../components/ColumnResizer.tsx';
 import { useColumnSplit } from '../hooks/useColumnSplit.ts';
 import { useFeedback } from '../hooks/useFeedback.ts';
+import { useSongEditor } from '../hooks/useSongEditor.ts';
 import { FAVORITE_SLOTS, useSongSearch } from '../hooks/useSongSearch.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
@@ -55,30 +51,11 @@ interface Props {
 
 /** 수록 정보를 짧게 — '새305 · 통405' */
 export function SongPanel({ deck, currentIndex, connected, template, send }: Props): React.JSX.Element {
-  /**
-   * 이 곡의 악보 상태 — 곡을 여는 순간 받는다.
-   *
-   * 덱을 만들 때까지 기다리면 '악보가 왜 안 나오지?' 를 **송출하고 나서야** 알게 된다.
-   */
-  const [sheet, setSheet] = useState<SheetSummary | undefined>(undefined);
 
-  /**
-   * 이 탭에서 띄울 때 프로젝터에 악보를 낼지. **기본은 가사**다 (사용자 결정
-   * 2026-09-04 — 단 경계 검출이 아직 불완전하다).
-   *
-   * 곡을 바꾸면 꺼진다. 앞 곡에서 켜 둔 것이 남으면, 검토가 안 된 다음 곡의
-   * 악보가 예고 없이 벽에 걸린다.
-   */
-  const [useSheet, setUseSheet] = useState(false);
 
   /** 왼쪽 '곡집·검색' 열 너비. 곡을 훑을 때와 가사를 고칠 때 원하는 폭이 다르다 */
   const split = useColumnSplit('song', { edge: 'start', min: 260, minNeighbor: 320, label: '곡 목록' });
-  const [song, setSong] = useState<Song | null>(null);
-  const [langs, setLangs] = useState<LangCode[]>(['ko']);
-  const [lines, setLines] = useState('2');
 
-  // 저장된 운율 행을 이 폭에 맞춰 묶는다 (하단 두 줄 템플릿은 넓게, 큰 글씨는 좁게)
-  const maxChars = template?.behavior.maxCharsPerLine;
 
   /**
    * 배너 셋 — 예배 순서 탭과 **같은 훅**을 쓴다 (`useFeedback`).
@@ -88,53 +65,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   const feedback = useFeedback();
   const { error, setError, notice, setNotice, busy, setBusy } = feedback;
 
-  const [editing, setEditing] = useState(false);
   /** '＋ 새 곡' 칸이 열려 있나. 열려 있으면 제목을 받는다 */
-  const [creating, setCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [draftLyrics, setDraftLyrics] = useState('');
 
-  /**
-   * **편집 중인 곡의 슬라이드를 미리 본다.**
-   *
-   * 아래 슬라이드 칸은 지금 송출 중인 곡을 보여 준다. 그래서 다른 곡을 편집하는 동안
-   * 엉뚱한 곡이 남아 있었다 (2026-08-29 사용자). 편집 중에는 **고치고 있는 곡**을 보여야
-   * 줄나눔이 화면에서 어떻게 되는지 알 수 있다.
-   *
-   * **저장 전 원문으로 만든다.** `buildSongDeck` 은 서버가 쓰는 것과 같은 lib 함수라
-   * 여기서 만든 것과 실제로 송출될 것이 같다. 그리고 **라이브 출력은 건드리지 않는다** —
-   * 예배 중에 가사를 손보다가 화면이 바뀌면 안 된다.
-   */
-  const draftDeck = useMemo(() => {
-    if (!editing || !song) return null;
-    const sections = parseLyrics(draftLyrics).map((section, index) => ({
-      ...section,
-      id: -(index + 1),
-      position: index,
-      /*
-       * 편집 중인 가사는 **사람이 치고 있는 줄**이다. 저장하면 `manual` 이 되므로
-       * 미리보기도 같은 규칙으로 그려야 한다 — 여기서 빼면 미리보기에서는 줄이 묶여
-       * 보이다가 저장한 뒤엔 안 묶이는(또는 그 반대) 어긋남이 생긴다.
-       */
-      linesSource: 'manual' as const,
-    }));
-    if (sections.length === 0) return null;
-    /*
-     * **원문에 있는 언어를 모두 보인다.** 표시 언어 설정을 따르면 방금 적은 번역이
-     * 안 보인다 — 그 설정은 저장된 곡을 기준으로 하기 때문이다. 편집 중에 확인하고
-     * 싶은 것은 '내가 적은 두 언어가 줄로 잘 맞았는가' 이므로 둘 다 보여야 한다.
-     */
-    const inDraft = orderLangs([...new Set(sections.flatMap((s) => s.lines.map((l) => l.lang)))]);
-    const built = buildSongDeck(
-      { ...song, sections, langs: inDraft },
-      {
-        langs: inDraft,
-        linesPerSlide: lines === 'section' ? 'section' : (Number(lines) as 1 | 2 | 4),
-        ...(maxChars === undefined ? {} : { maxCharsPerLine: maxChars }),
-      },
-    );
-    return built.slides.length > 0 ? built : null;
-  }, [editing, song, draftLyrics, lines, maxChars]);
   /**
    * 격자에 보일 언어. 곡이 가진 언어에 사람이 더 고른 것을 얹는다.
    *
@@ -157,50 +89,27 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     quickPicks, quickMode, setQuickMode, quickIsFallback, reloadQuickPicks,
   } = search;
 
-
-  const openSong = useCallback(async (id: number) => {
-    setError(null);
-    setNotice(null);
-    setEditing(false);
-    try {
-      const { song: loaded, availableLangs, sheet: found } = await api.song(id);
-      setSong(loaded);
-      setSheet(found);
-      setUseSheet(false);
-      setLangs(availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
-      setDraftLyrics(formatLyrics(loaded.sections));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '곡을 불러오지 못했습니다');
-    }
-  }, []);
+  // 저장된 운율 행을 이 폭에 맞춰 묶는다 (하단 두 줄 템플릿은 넓게, 큰 글씨는 좁게)
+  const maxChars = template?.behavior.maxCharsPerLine;
 
   /**
-   * 악보 모양(겹쳐/이어)을 사람이 고른다. `null` 이면 자동 짐작으로 되돌린다.
+   * 고르고 고치는 곡 — 지금 연 곡·표시 설정·가사 편집을 한 덩이로 (`useSongEditor`).
    *
-   * **송출을 다시 하지 않는다.** 지금 화면에 떠 있는 덱을 다시 보내면 첫 슬라이드로
-   * 되돌아간다 — 예배 중에 3절을 부르다 1절로 튀는 것보다, 다음에 띄울 때 반영되는
-   * 편이 안전하다. 그래서 안내 문구로 알린다.
+   * 오른쪽 열 블록 하나가 컴포넌트 안 상태 **스물다섯**을 쓰고 있었다.
    */
-  const chooseSheetLayout = useCallback(
-    async (layout: 'shared' | 'sequential' | null) => {
-      if (!sheet || !song) return;
-      setError(null);
-      setNotice(null);
-      try {
-        await api.setSheetLayout(sheet.songbookId, sheet.number, layout);
-        const { sheet: found } = await api.song(song.id);
-        setSheet(found);
-        setNotice(
-          layout === null
-            ? '악보 모양을 자동으로 되돌렸습니다 — 다음 송출부터 반영됩니다'
-            : '악보 모양을 바꿨습니다 — 다음 송출부터 반영됩니다',
-        );
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : '악보 모양을 바꾸지 못했습니다');
-      }
-    },
-    [sheet, song],
-  );
+  const editor = useSongEditor({
+    feedback,
+    clearResult: search.clearResult,
+    setQuery: search.setQuery,
+    reloadQuickPicks: search.reloadQuickPicks,
+    maxChars,
+  });
+  const {
+    song, setSong, sheet, useSheet, setUseSheet, langs, toggleLang, lines, setLines,
+    editing, setEditing, draftLyrics, setDraftLyrics, draftDeck,
+    creating, setCreating, newTitle, setNewTitle,
+    openSong, createSong, removeSong, toggleFavorite, saveLyrics, chooseSheetLayout,
+  } = editor;
 
   /**
    * 이 탭의 프리셋·폰트를 얹어 보낸다.
@@ -268,21 +177,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setError(null);
       setNotice(null);
       try {
-        const { song: loaded, availableLangs, sheet: found } = await api.song(id);
-        setSong(loaded);
-        setSheet(found);
-        setUseSheet(false);
-        setDraftLyrics(formatLyrics(loaded.sections));
-
-        // 이 곡이 가진 언어로 맞춘다 — 없는 언어를 켠 채 보내면 화면이 빈다
-        const nextLangs = langs.filter((lang) => loaded.langs.includes(lang));
-        const useLangs = nextLangs.length > 0 ? nextLangs : availableLangs.slice(0, 1);
-        setLangs(useLangs);
+        // 열면서 이 곡이 가진 언어로 맞춘다 — 없는 언어를 켠 채 보내면 화면이 빈다
+        const opened = await editor.openForSend(id);
+        if (!opened) return;
 
         // 번호로 바로 띄우는 길 — 곡을 새로 여는 것이므로 늘 가사다
-        const deckResult = await api.songDeck(id, useLangs, lines, undefined, maxChars, false);
+        const deckResult = await api.songDeck(id, opened.langs, lines, undefined, maxChars, false);
         if (deckResult.deck.slides.length === 0) {
-          setError(`'${loaded.title}' 에 표시할 가사가 없습니다`);
+          setError(`'${opened.song.title}' 에 표시할 가사가 없습니다`);
           return;
         }
         sendWithStyle(deckResult.deck);
@@ -293,113 +195,12 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         setBusy(false);
       }
     },
-    [langs, lines, sendWithStyle, reloadQuickPicks],
+    [editor, lines, maxChars, sendWithStyle, reloadQuickPicks, setBusy, setError, setNotice],
   );
 
-  /**
-   * 새 곡을 만든다 — **곡집을 주지 않으므로 '기타' 에 들어간다.**
-   *
-   * 만든 뒤 곧바로 가사 편집을 연다. 제목만 있는 곡을 목록에 남겨 두면 '가사가 없는
-   * 곡' 이 쌓이고, 무엇을 하려던 것인지 나중에 알 수 없다.
-   */
-  async function createSong(): Promise<void> {
-    const title = newTitle.trim();
-    if (title.length === 0) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const made = await api.createSong(title);
-      setCreating(false);
-      setNewTitle('');
-      setQuery('');
-      search.clearResult();
-      await openSong(made.id);
-      setEditing(true);
-      setNotice(`'${made.title}' 을 기타 곡집에 만들었습니다. 가사를 넣으세요.`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '만들지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  /**
-   * 곡을 지운다 — **되돌릴 수 없다.**
-   *
-   * `data/songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐이다. 그래서 제목을
-   * 보여 주고 한 번 물어본다. 실수로 지우는 길을 열어 두지 않는다.
-   */
-  async function removeSong(): Promise<void> {
-    if (!song) return;
-    const ok = window.confirm(
-      `'${song.title}' 을 지웁니다.\n\n가사와 함께 완전히 사라지고 되돌릴 수 없습니다.`,
-    );
-    if (!ok) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.deleteSong(song.id);
-      setSong(null);
-      setEditing(false);
-      search.clearResult();
-      setQuery('');
-      setNotice('곡을 지웠습니다.');
-      void reloadQuickPicks();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  /** 즐겨찾기에 넣거나 뺀다 — 목록은 곧바로 다시 읽는다 */
-  async function toggleFavorite(): Promise<void> {
-    if (!song) return;
-    try {
-      const result = await api.toggleFavorite(song.id, !song.isFavorite);
-      setSong({ ...song, isFavorite: result.favorite });
-      await reloadQuickPicks();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '즐겨찾기를 바꾸지 못했습니다');
-    }
-  }
 
-  async function saveLyrics(): Promise<void> {
-    if (!song) return;
-    /*
-     * **빈 가사로 덮지 않는다.** 두 칸 중 한국어를 비우고 저장하면 그 곡의 가사가
-     * 통째로 사라진다. `data/songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐이다.
-     * 실수로 지우는 길을 열어 두지 않는다 — 정말 지우려면 곡 삭제를 쓴다.
-     */
-    if (draftLyrics.trim().length === 0) {
-      setError('가사가 비어 있어 저장하지 않았습니다. 지우려면 곡을 삭제하세요.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const { song: updated, availableLangs } = await api.saveLyrics(song.id, draftLyrics);
-      setSong(updated);
-      setDraftLyrics(formatLyrics(updated.sections));
-      setEditing(false);
-      setNotice(`가사를 저장했습니다 (언어: ${availableLangs.map((l) => LANG_LABELS[l] ?? l).join(', ')})`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '저장하지 못했습니다');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * 표시 언어 토글 — 규칙은 `lib/lang-select.ts` 에 있다.
-   *
-   * 전에는 이 파일이 같은 규칙을 자기 안에 또 갖고 있었다. 예배 순서 탭에 같은
-   * 컨트롤을 만들면서 규칙을 공용 모듈로 뺐는데 이 탭만 남아 있었고, 상한이 2 로
-   * 박혀 있어 3언어를 고를 수 없었다. 두 탭이 어긋나지 않게 한 곳만 쓴다.
-   */
-  function toggleLang(lang: LangCode): void {
-    setLangs((prev) => nextLangs(prev, lang));
-  }
 
   if (managing) {
     return (
