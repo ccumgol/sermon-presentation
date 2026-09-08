@@ -33,7 +33,7 @@ import { BUILTIN_TEMPLATES, getBuiltinTemplate } from '../../lib/template-preset
 import { PlanCueList } from '../../src/control/components/plan/PlanCueList.tsx';
 import type { CueItem, ServicePlan, SlidePayload } from '../../shared/types.ts';
 import type { PlanDraft } from '../../src/control/hooks/usePlanDraft.ts';
-import type { PlanFeedback } from '../../src/control/hooks/usePlanFeedback.ts';
+import type { Feedback } from '../../src/control/hooks/useFeedback.ts';
 import type { PlanPreview } from '../../src/control/hooks/usePlanPreview.ts';
 import type { PlanSend } from '../../src/control/hooks/usePlanSend.ts';
 
@@ -97,7 +97,7 @@ function setup(o: {
     preview, previewError: o.previewError ?? null, styleTemplates: BUILTIN_TEMPLATES,
   } as unknown as PlanPreview;
 
-  const feedback = { busy: o.busy ?? false, error: null } as unknown as PlanFeedback;
+  const feedback = { busy: o.busy ?? false, error: null } as unknown as Feedback;
 
   render(
     <PlanCueList

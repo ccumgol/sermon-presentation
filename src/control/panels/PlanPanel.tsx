@@ -33,7 +33,7 @@ import type { ClientMsg, CueItem, Deck, Template, Translation } from '../../../s
 import { api } from '../api.ts';
 import { usePlanBackgrounds } from '../hooks/usePlanBackgrounds.ts';
 import { usePlanDraft } from '../hooks/usePlanDraft.ts';
-import { usePlanFeedback } from '../hooks/usePlanFeedback.ts';
+import { useFeedback } from '../hooks/useFeedback.ts';
 import { usePlanPreview } from '../hooks/usePlanPreview.ts';
 import { usePlanSend } from '../hooks/usePlanSend.ts';
 import { usePlanStorage } from '../hooks/usePlanStorage.ts';
@@ -83,8 +83,8 @@ export function PlanPanel({
    * (2026-08-18 실측). 접을 수 있게 하고 높이도 제한한다.
    */
   const [detailOpen, setDetailOpen] = useState(true);
-  /** 배너 셋 — 화면 블록 아홉 중 일곱이 이걸 쓴다 (usePlanFeedback) */
-  const feedback = usePlanFeedback();
+  /** 배너 셋 — 화면 블록 아홉 중 일곱이 이걸 쓴다 (useFeedback) */
+  const feedback = useFeedback();
   const { busy, setBusy, error, setError, notice, setNotice } = feedback;
 
   /**

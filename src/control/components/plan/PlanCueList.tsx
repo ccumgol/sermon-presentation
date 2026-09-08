@@ -20,7 +20,7 @@ import { describeItem, isExpandable, moveItem, removeItem, type PlanRow } from '
 import { itemIcon, itemMeta, slideSummary } from '../../../../lib/plan-item-view.ts';
 import { AUTO_HOLD_MS_DEFAULT, type CueItem, type Template } from '../../../../shared/types.ts';
 import type { PlanDraft } from '../../hooks/usePlanDraft.ts';
-import type { PlanFeedback } from '../../hooks/usePlanFeedback.ts';
+import type { Feedback } from '../../hooks/useFeedback.ts';
 import type { PlanPreview } from '../../hooks/usePlanPreview.ts';
 import type { PlanSend } from '../../hooks/usePlanSend.ts';
 
@@ -30,7 +30,7 @@ export function PlanCueList({
   draft: PlanDraft;
   send: PlanSend;
   preview: PlanPreview;
-  feedback: PlanFeedback;
+  feedback: Feedback;
   /** 화면에 그릴 줄 목록 — 부모가 만든다 (키보드 처리와 추가 바도 같은 것을 쓴다) */
   rows: readonly PlanRow[];
   /** 줄을 눌렀을 때 — 이 프로젝트의 핵심 규칙이 담긴 함수다 (부모에 둔다) */

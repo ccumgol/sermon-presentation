@@ -45,7 +45,7 @@ import type { PlanDefaults, ServicePlan, Translation } from '../../shared/types.
 import type { PlanAdd } from '../../src/control/hooks/usePlanAdd.ts';
 import type { PlanBackgrounds } from '../../src/control/hooks/usePlanBackgrounds.ts';
 import type { PlanDraft } from '../../src/control/hooks/usePlanDraft.ts';
-import type { PlanFeedback } from '../../src/control/hooks/usePlanFeedback.ts';
+import type { Feedback } from '../../src/control/hooks/useFeedback.ts';
 import type { PlanPreview } from '../../src/control/hooks/usePlanPreview.ts';
 import type { PlanStorage } from '../../src/control/hooks/usePlanStorage.ts';
 
@@ -87,7 +87,7 @@ function setup(o: { defaults?: PlanDefaults; dirty?: boolean; busy?: boolean } =
       add={{ setAddPrimary: spies.setAddPrimary, setAddSecondary: spies.setAddSecondary } as unknown as PlanAdd}
       preview={{ styleTemplates: BUILTIN_TEMPLATES } as unknown as PlanPreview}
       backgrounds={{ library: [], files: [] } as unknown as PlanBackgrounds}
-      feedback={{ busy: o.busy ?? false } as unknown as PlanFeedback}
+      feedback={{ busy: o.busy ?? false } as unknown as Feedback}
       translations={TRANSLATIONS}
       defaultTranslation="nkrv"
     />,

@@ -22,7 +22,7 @@ import type { LangCode, ServicePlan, Translation } from '../../../../shared/type
 import type { PlanAdd } from '../../hooks/usePlanAdd.ts';
 import type { PlanBackgrounds } from '../../hooks/usePlanBackgrounds.ts';
 import type { PlanDraft } from '../../hooks/usePlanDraft.ts';
-import type { PlanFeedback } from '../../hooks/usePlanFeedback.ts';
+import type { Feedback } from '../../hooks/useFeedback.ts';
 import type { PlanPreview } from '../../hooks/usePlanPreview.ts';
 import type { PlanStorage } from '../../hooks/usePlanStorage.ts';
 
@@ -37,7 +37,7 @@ export function PlanDefaultsCard({
   add: PlanAdd;
   preview: PlanPreview;
   backgrounds: PlanBackgrounds;
-  feedback: PlanFeedback;
+  feedback: Feedback;
   translations: Translation[];
   defaultTranslation: string;
 }): React.JSX.Element {

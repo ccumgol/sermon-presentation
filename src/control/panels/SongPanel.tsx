@@ -18,27 +18,11 @@ import type { SheetSummary } from '../../../lib/sheet-attach.ts';
 import { api, ApiError } from '../api.ts';
 import { ColumnResizer } from '../components/ColumnResizer.tsx';
 import { useColumnSplit } from '../hooks/useColumnSplit.ts';
+import { useFeedback } from '../hooks/useFeedback.ts';
+import { FAVORITE_SLOTS, useSongSearch } from '../hooks/useSongSearch.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
 import { SongbookManager } from './SongbookManager.tsx';
-
-/** 즐겨찾기 칸 수 — 한 줄에 들어가고 손이 기억할 수 있는 개수 */
-const FAVORITE_SLOTS = 5;
-
-/**
- * '최근' 에 보여 줄 곡 수.
- *
- * 즐겨찾기(5)보다 하나 많다 — 한 예배에서 4~5곡을 부르므로 5칸이면 이번 주로 꽉 차
- * **지난주가 하나도 안 보인다.**
- *
- * 8칸도 재 봤는데 칩 줄이 129px(세 줄)이 됐다. 곡집 칸은 폭이 596px 로 고정이라
- * (창을 넓혀도 늘지 않는다) 줄 수가 줄지 않고, 그만큼 아래 검색 결과가 밀린다.
- * 6칸이면 두 줄이다 — 더 거슬러 갈 일은 검색이 맡는다.
- */
-const RECENT_SLOTS = 6;
-
-/** 빠른 칩 줄이 무엇을 보여 주는가 */
-type QuickMode = 'favorite' | 'recent';
 
 /**
  * 악보 모양 고르기 — 이름·설명을 한 곳에 둔다.
@@ -71,14 +55,6 @@ interface Props {
 
 /** 수록 정보를 짧게 — '새305 · 통405' */
 export function SongPanel({ deck, currentIndex, connected, template, send }: Props): React.JSX.Element {
-  const [songbooks, setSongbooks] = useState<Songbook[]>([]);
-  const [quickPicks, setQuickPicks] = useState<SongSearchHit[]>([]);
-  const [quickIsFallback, setQuickIsFallback] = useState(false);
-  /**
-   * 즐겨찾기를 기본으로 둔다. 송영·봉헌송처럼 **늘 같은 자리에 있어야 손이 기억하는**
-   * 곡이 여기 있고, '최근' 은 목록이 매주 흔들린다.
-   */
-  const [quickMode, setQuickMode] = useState<QuickMode>('favorite');
   /**
    * 이 곡의 악보 상태 — 곡을 여는 순간 받는다.
    *
@@ -97,26 +73,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
 
   /** 왼쪽 '곡집·검색' 열 너비. 곡을 훑을 때와 가사를 고칠 때 원하는 폭이 다르다 */
   const split = useColumnSplit('song', { edge: 'start', min: 260, minNeighbor: 320, label: '곡 목록' });
-  /**
-   * 대응곡을 붙이는 중이면 검색어. `null` 이면 닫혀 있다.
-   *
-   * 목록을 늘 펼쳐 두지 않는 이유: 대응곡은 자료를 반입할 때 한 번 정해지고 그 뒤로는
-   * 좀처럼 손대지 않는다. 늘 보이면 매번 지나쳐야 하는 줄이 하나 는다.
-   */
-  const [linking, setLinking] = useState<string | null>(null);
-  const [linkHits, setLinkHits] = useState<SongSearchHit[]>([]);
-  /**
-   * 수록 정보(곡집·번호)를 고치는 중이면 초안. `null` 이면 닫혀 있다.
-   *
-   * 번호를 **문자열로** 들고 있는 이유: 칸을 비울 수 있어야 한다('번호 없음').
-   * 숫자로 두면 지우는 순간 0 이나 NaN 이 되어, 비운 것과 0번을 구분할 수 없다.
-   */
-  const [entryDraft, setEntryDraft] = useState<Array<{ songbookId: string; number: string }> | null>(null);
-  const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [managing, setManaging] = useState(false);
-
-  const [query, setQuery] = useState('');
-  const [result, setResult] = useState<SongSearchResult | null>(null);
   const [song, setSong] = useState<Song | null>(null);
   const [langs, setLangs] = useState<LangCode[]>(['ko']);
   const [lines, setLines] = useState('2');
@@ -124,8 +80,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   // 저장된 운율 행을 이 폭에 맞춰 묶는다 (하단 두 줄 템플릿은 넓게, 큰 글씨는 좁게)
   const maxChars = template?.behavior.maxCharsPerLine;
 
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * 배너 셋 — 예배 순서 탭과 **같은 훅**을 쓴다 (`useFeedback`).
+   * 이 값들은 화면 블록 여섯 중 다섯에 흩어져 있어, 블록을 자를 때마다
+   * 프롭이 1~4개씩 늘어난다. 하나로 묶으면 하나다.
+   */
+  const feedback = useFeedback();
+  const { error, setError, notice, setNotice, busy, setBusy } = feedback;
+
   const [editing, setEditing] = useState(false);
   /** '＋ 새 곡' 칸이 열려 있나. 열려 있으면 제목을 받는다 */
   const [creating, setCreating] = useState(false);
@@ -181,80 +143,25 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
    */
   /** 이 탭에서 띄울 때 쓸 프리셋·폰트 — 고르지 않으면 지금 템플릿 그대로 */
   const [outputStyle, setOutputStyle] = useState<OutputStyle>({});
-  const [busy, setBusy] = useState(false);
-
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  const loadSongbooks = useCallback(async () => {
-    try {
-      setSongbooks(await api.songbooks());
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '곡집을 불러오지 못했습니다');
-    }
-  }, []);
 
   /**
-   * 검색 없이 바로 꺼내는 칩 줄.
+   * 곡 찾기 — 곡집 목록·검색·빠른 칩 줄을 한 덩이로 (`useSongSearch`).
    *
-   * **즐겨찾기** — 송영·봉헌송처럼 매주 쓰는 곡. 최근 순으로 두면 목록이 매번 흔들려
-   * 손이 기억하지 못하므로 사람이 지정한다. 아직 지정한 곡이 없으면 자주 쓴 곡을
-   * 대신 보여 준다 — 빈 줄보다 쓸모 있다.
-   *
-   * **최근** — 방금 부른 곡과 지난주 곡. 서버가 덱을 만들 때마다 기록해 두는데
-   * (`song_usage`) 그 기록을 꺼내 보는 길이 화면에 없었다 (§4.6 U-2, 2026-09-03).
-   * '지난주에 뭐 불렀지' 와 '방금 띄운 곡 다시' 가 여기서 해결된다.
+   * 왼쪽 열 블록 하나가 컴포넌트 안 상태 **스물넷**을 쓰고 있었다. 그대로
+   * 컴포넌트로 빼면 프롭 스물넷짜리 껍데기가 된다 — 묶으면 객체 하나다.
    */
-  const loadQuickPicks = useCallback(async () => {
-    try {
-      if (quickMode === 'recent') {
-        setQuickPicks(await api.recentSongs(RECENT_SLOTS));
-        setQuickIsFallback(false);
-        return;
-      }
-      const favorites = await api.favorites(FAVORITE_SLOTS);
-      if (favorites.length > 0) {
-        setQuickPicks(favorites);
-        setQuickIsFallback(false);
-        return;
-      }
-      // 아직 지정한 곡이 없다 — 자주 쓴 곡으로 채워 빈 줄을 만들지 않는다
-      setQuickPicks(await api.frequentSongs(FAVORITE_SLOTS));
-      setQuickIsFallback(true);
-    } catch {
-      // 편의 기능이므로 실패해도 조용히 넘긴다
-    }
-  }, [quickMode]);
+  const search = useSongSearch(setError);
+  const {
+    songbooks, reloadSongbooks, managing, setManaging,
+    selectedBook, setSelectedBook, query, setQuery, result, searchRef,
+    quickPicks, quickMode, setQuickMode, quickIsFallback, reloadQuickPicks,
+  } = search;
 
-  useEffect(() => {
-    void loadSongbooks();
-    void loadQuickPicks();
-  }, [loadSongbooks, loadQuickPicks]);
-
-  /**
-   * 검색 결과를 다시 받아 오는 방아쇠.
-   *
-   * 수록 정보를 고치면 목록에 보이는 번호(`새305`)가 달라진다. 다시 찾지 않으면
-   * 왼쪽 목록만 옛 번호를 들고 있어, 방금 고친 것이 안 먹은 것처럼 보인다.
-   */
-  const [searchKey, setSearchKey] = useState(0);
-
-  // 검색 — 곡집을 고르면 그 범위, 아니면 전체 통합 검색 (디바운스)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      api
-        .songs(query, 60, selectedBook)
-        .then(setResult)
-        .catch((err) => setError(err instanceof ApiError ? err.message : '곡을 찾지 못했습니다'));
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [query, selectedBook, searchKey]);
 
   const openSong = useCallback(async (id: number) => {
     setError(null);
     setNotice(null);
     setEditing(false);
-    setLinking(null);
-    setEntryDraft(null);
     try {
       const { song: loaded, availableLangs, sheet: found } = await api.song(id);
       setSong(loaded);
@@ -339,14 +246,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           setNotice(`이 곡에는 ${names} 가사가 없어 표시되지 않습니다. 편집에서 추가할 수 있습니다.`);
         }
         sendWithStyle(deckResult.deck);
-        void loadQuickPicks();
+        void reloadQuickPicks();
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '송출하지 못했습니다');
       } finally {
         setBusy(false);
       }
     },
-    [song, langs, lines, maxChars, useSheet, sendWithStyle, loadQuickPicks],
+    [song, langs, lines, maxChars, useSheet, sendWithStyle, reloadQuickPicks],
   );
 
   /**
@@ -379,14 +286,14 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           return;
         }
         sendWithStyle(deckResult.deck);
-        void loadQuickPicks();
+        void reloadQuickPicks();
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '송출하지 못했습니다');
       } finally {
         setBusy(false);
       }
     },
-    [langs, lines, sendWithStyle, loadQuickPicks],
+    [langs, lines, sendWithStyle, reloadQuickPicks],
   );
 
   /**
@@ -405,7 +312,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setCreating(false);
       setNewTitle('');
       setQuery('');
-      setResult(null);
+      search.clearResult();
       await openSong(made.id);
       setEditing(true);
       setNotice(`'${made.title}' 을 기타 곡집에 만들었습니다. 가사를 넣으세요.`);
@@ -434,10 +341,10 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       await api.deleteSong(song.id);
       setSong(null);
       setEditing(false);
-      setResult(null);
+      search.clearResult();
       setQuery('');
       setNotice('곡을 지웠습니다.');
-      void loadQuickPicks();
+      void reloadQuickPicks();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '지우지 못했습니다');
     } finally {
@@ -451,7 +358,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     try {
       const result = await api.toggleFavorite(song.id, !song.isFavorite);
       setSong({ ...song, isFavorite: result.favorite });
-      await loadQuickPicks();
+      await reloadQuickPicks();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '즐겨찾기를 바꾸지 못했습니다');
     }
@@ -499,9 +406,9 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       <SongbookManager
         songbooks={songbooks}
         onChanged={() => {
-          void loadSongbooks();
+          void reloadSongbooks();
           // 곡 수가 바뀌었을 수 있으니 목록을 다시 읽는다
-          void api.songs(query, 60, selectedBook).then(setResult).catch(() => undefined);
+          search.refresh();
         }}
         onClose={() => setManaging(false)}
       />
@@ -739,8 +646,8 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
               onError={setError}
               onNotice={setNotice}
               onEntriesSaved={() => {
-                setSearchKey((prev) => prev + 1);
-                void loadSongbooks();
+                search.refresh();
+                void reloadSongbooks();
               }}
             />
 

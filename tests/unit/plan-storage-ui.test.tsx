@@ -25,7 +25,7 @@ import { PlanLoadList } from '../../src/control/components/plan/PlanLoadList.tsx
 import { PlanNameBar } from '../../src/control/components/plan/PlanNameBar.tsx';
 import type { CueItem, ServicePlan } from '../../shared/types.ts';
 import type { PlanDraft } from '../../src/control/hooks/usePlanDraft.ts';
-import type { PlanFeedback } from '../../src/control/hooks/usePlanFeedback.ts';
+import type { Feedback } from '../../src/control/hooks/useFeedback.ts';
 import type { PlanSend } from '../../src/control/hooks/usePlanSend.ts';
 import type { PlanStorage } from '../../src/control/hooks/usePlanStorage.ts';
 
@@ -60,7 +60,7 @@ function storageOf(o: Partial<PlanStorage> & { kind?: 'template' | 'plan' } = {}
 }
 const draftOf = (o: Partial<PlanDraft> = {}): PlanDraft =>
   ({ plan: SUNDAY, items: [item('a')], dirty: false, ...o }) as unknown as PlanDraft;
-const feedbackOf = (busy = false): PlanFeedback => ({ busy } as unknown as PlanFeedback);
+const feedbackOf = (busy = false): Feedback => ({ busy } as unknown as Feedback);
 const sendOf = (): PlanSend => ({ loadForService: spies.loadForService } as unknown as PlanSend);
 
 beforeEach(() => {

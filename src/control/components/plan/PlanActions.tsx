@@ -15,7 +15,7 @@
 import { today } from '../../../../lib/plan-item-view.ts';
 import type { ServicePlan } from '../../../../shared/types.ts';
 import type { PlanDraft } from '../../hooks/usePlanDraft.ts';
-import type { PlanFeedback } from '../../hooks/usePlanFeedback.ts';
+import type { Feedback } from '../../hooks/useFeedback.ts';
 import type { PlanSend } from '../../hooks/usePlanSend.ts';
 import type { PlanStorage } from '../../hooks/usePlanStorage.ts';
 
@@ -27,7 +27,7 @@ export function PlanActions({
   /** 열어 둔 순서표 — 부모가 `{plan && …}` 로 걸러 넣는다 */
   plan: ServicePlan;
   send: PlanSend;
-  feedback: PlanFeedback;
+  feedback: Feedback;
   connected: boolean;
   /** 기본 설정 카드를 펼쳤는지 (카드는 부모가 그린다) */
   defaultsOpen: boolean;

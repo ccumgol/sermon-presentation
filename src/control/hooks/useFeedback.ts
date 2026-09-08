@@ -1,9 +1,12 @@
 /**
- * **화면에 알리는 것** — 예배 순서 탭의 배너 셋.
+ * **화면에 알리는 것** — 배너 셋 (진행 중 · 실패 · 알림).
  *
  * `PlanPanel` 에서 떼어냈다(2026-09-08). 값이 셋뿐인데 훅으로 만든 이유는
  * **이것이 화면 블록 아홉 중 일곱에 흩어져 있었기** 때문이다. 블록을 컴포넌트로
  * 자를 때마다 프롭이 1~4개씩 늘어난다 — 하나로 묶으면 하나다.
+ *
+ * 이름에서 `Plan` 을 뺐다(2026-09-08 SongPanel 작업). 예배 순서에 종속적인 것이
+ * 하나도 없어 찬양 탭도 그대로 쓴다 — **같은 것을 두 벌 두지 않는다.**
  *
  * ## 지키는 것
  *
@@ -17,7 +20,7 @@
 
 import { useState } from 'react';
 
-export interface PlanFeedback {
+export interface Feedback {
   /** 무언가 하는 중 — 버튼을 흐리게 한다 */
   busy: boolean;
   setBusy: (value: boolean) => void;
@@ -29,7 +32,7 @@ export interface PlanFeedback {
   setNotice: (value: string | null) => void;
 }
 
-export function usePlanFeedback(): PlanFeedback {
+export function useFeedback(): Feedback {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
