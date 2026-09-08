@@ -17,13 +17,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import type { CueItem, ServicePlan } from '../../../shared/types.ts';
+import type { CueItem, PlanDefaults, ServicePlan } from '../../../shared/types.ts';
 import { readPlanDraft, writePlanDraft } from '../panels/plan-draft.ts';
 
 export interface PlanDraft {
   /** 지금 편집 중인 것이 어디서 왔는지 (`null` = 아무것도 열지 않았다) */
   plan: ServicePlan | null;
-  setPlan: (plan: ServicePlan | null) => void;
+  setPlan: React.Dispatch<React.SetStateAction<ServicePlan | null>>;
   items: CueItem[];
   setItems: React.Dispatch<React.SetStateAction<CueItem[]>>;
   /** 저장하지 않은 변경이 있는지 — '저장 안 됨' 줄이 이걸 따른다 */
@@ -42,6 +42,13 @@ export interface PlanDraft {
   setExpandedId: (id: string | null) => void;
   /** 항목 목록을 바꾸고 '저장 안 됨' 을 켠다. **항목을 고치는 길은 이것뿐이다** */
   patchItems: (next: CueItem[] | ((prev: CueItem[]) => CueItem[])) => void;
+  /**
+   * 예배 기본 설정을 고치고 '저장 안 됨' 을 켠다.
+   *
+   * 기본 설정은 따로 저장되는 것이 아니라 **순서표 안에**(`service_plans.defaults`)
+   * 담긴다 — 그래서 항목을 고친 것과 같은 저장 버튼을 쓴다.
+   */
+  patchDefaults: (mutate: (current: PlanDefaults) => PlanDefaults) => void;
 }
 
 export function usePlanDraft(): PlanDraft {
@@ -84,12 +91,28 @@ export function usePlanDraft(): PlanDraft {
     setDirty(true);
   }, []);
 
+  /**
+   * 기본 설정을 고친다 — 순서표에 저장되므로 dirty 로 표시된다.
+   *
+   * 의존성에 `plan` 을 **넣어 둔다.** 빼면 memo 가 잡아 둔 옛 렌더의 `plan` 을 읽어
+   * 방금 고친 값이 되돌아간다 — `sendItem` 에서 실제로 그 사고가 났다
+   * (2026-09-07, `lib/plan-item-template.ts` 머리말).
+   */
+  const patchDefaults = useCallback(
+    (mutate: (current: PlanDefaults) => PlanDefaults): void => {
+      if (!plan) return;
+      setPlan({ ...plan, defaults: mutate(plan.defaults ?? {}) });
+      setDirty(true);
+    },
+    [plan],
+  );
+
   return {
     plan, setPlan,
     items, setItems,
     dirty, setDirty,
     cursor, setCursor,
     expandedId, setExpandedId,
-    patchItems,
+    patchItems, patchDefaults,
   };
 }

@@ -32,13 +32,14 @@ import {
 import {
   AUTO_HOLD_MS_DEFAULT,
   type ClientMsg, type CueItem, type Deck, type LangCode,
-  type PlanDefaults,
   type Template, type Translation,
 } from '../../../shared/types.ts';
-import { api, READING_BOOK_LABELS, type BackgroundFile } from '../api.ts';
+import { api, READING_BOOK_LABELS } from '../api.ts';
 import { isComposing } from '../ime.ts';
 import { LITURGY_TEXTS } from '../../../lib/liturgy-texts.ts';
+import { usePlanBackgrounds } from '../hooks/usePlanBackgrounds.ts';
 import { usePlanDraft } from '../hooks/usePlanDraft.ts';
+import { usePlanFeedback } from '../hooks/usePlanFeedback.ts';
 import { usePlanPreview } from '../hooks/usePlanPreview.ts';
 import { usePlanSend } from '../hooks/usePlanSend.ts';
 import { usePlanStorage } from '../hooks/usePlanStorage.ts';
@@ -75,7 +76,7 @@ export function PlanPanel({
   const draft = usePlanDraft();
   const {
     plan, setPlan, items, setItems, dirty, setDirty,
-    cursor, setCursor, expandedId, setExpandedId, patchItems,
+    cursor, setCursor, expandedId, setExpandedId, patchItems, patchDefaults,
   } = draft;
 
   /** 기본 설정 패널을 펼쳤는지 */
@@ -88,9 +89,9 @@ export function PlanPanel({
    * (2026-08-18 실측). 접을 수 있게 하고 높이도 제한한다.
    */
   const [detailOpen, setDetailOpen] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  /** 배너 셋 — 화면 블록 아홉 중 일곱이 이걸 쓴다 (usePlanFeedback) */
+  const feedback = usePlanFeedback();
+  const { busy, setBusy, error, setError, notice, setNotice } = feedback;
 
   /**
    * 단독으로 송출한 항목 — 빨간 점을 켜기 위해 기억한다.
@@ -118,18 +119,6 @@ export function PlanPanel({
    */
   /** 고른 찬양 항목의 곡 정보 — 언어 버튼을 흐리게 하고, 악보가 있는지 알린다 */
   const [songInfo, setSongInfo] = useState<{ id: number; available: string[]; hasSheet: boolean } | null>(null);
-
-  /** `data/backgrounds/` 파일 목록 — 그림·동영상 항목이 여기서 고른다 */
-  const [bgFiles, setBgFiles] = useState<BackgroundFile[]>([]);
-  /** 슬라이드쇼가 가리킬 수 있는 폴더 */
-  const [bgFolders, setBgFolders] = useState<{
-    library: Array<{ name: string; count: number }>;
-    data: Array<{ name: string; count: number }>;
-  }>({ library: [], data: [] });
-  /** 고를 폴더가 없을 때 '어디에 넣어야 하는지' 를 알려 주려고 들고 있는다 */
-  const [bgDirs, setBgDirs] = useState<{ library: string; data: string }>({ library: '', data: '' });
-  /** `~/Desktop/Data/Background` 의 그림들 — 전례문·교독문 배경을 여기서 고른다 */
-  const [bgLibrary, setBgLibrary] = useState<BackgroundFile[]>([]);
 
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -205,6 +194,7 @@ export function PlanPanel({
     liveSlide, liveLabel, slideCount,
     sendItem, sendTitle, refreshLive, restoreBefore, startAuto, loadForService,
     before, auto, setAuto, liveItemId,
+    liveItemIndex, liveSlideIndexInItem, liveViaPlanDeck,
   } = usePlanSend({
     deck, currentIndex, connected, send, items, plan, resolveItem, templateChoice,
     feedback: { setBusy, setError, setNotice },
@@ -241,36 +231,8 @@ export function PlanPanel({
   }, [currentSongId, songInfo?.id]);
 
 
-  /**
-   * 배경 폴더 파일 목록. 템플릿 탭에서 올린 것을 여기서도 골라야 하므로
-   * 그림·동영상 칸을 열 때마다 다시 읽는다.
-   */
-  const reloadBgFiles = useCallback(async () => {
-    try {
-      const result = await api.backgrounds();
-      setBgFiles(result.files);
-      setBgLibrary(result.library ?? []);
-      setBgFolders(result.folders ?? { library: [], data: [] });
-      setBgDirs({ library: result.libraryDir ?? '', data: result.dataDir ?? '' });
-    } catch {
-      // 목록을 못 읽어도 순서표 작업은 계속돼야 한다 — 고를 파일이 없을 뿐이다
-      setBgFiles([]);
-      setBgLibrary([]);
-      setBgFolders({ library: [], data: [] });
-    }
-  }, []);
-
-  useEffect(() => {
-    // 기본 설정 칸에도 배경 드롭다운이 있다. 이걸 빼먹으면 설정을 열었을 때
-    // 목록이 비어 '배경이 없다'고 오해한다.
-    const needsFiles =
-      defaultsOpen ||
-      addKind === 'liturgy' ||
-      addKind === 'reading' ||
-      addKind === 'slideshow' ||
-      items.some((i) => i.type === 'liturgy' || i.type === 'reading');
-    if (needsFiles) void reloadBgFiles();
-  }, [defaultsOpen, addKind, items, reloadBgFiles]);
+  /** 배경으로 쓸 그림 목록 (usePlanBackgrounds) */
+  const backgrounds = usePlanBackgrounds({ defaultsOpen, addKind, items });
 
 
 
@@ -366,57 +328,6 @@ export function PlanPanel({
 
   // ── 렌더 ────────────────────────────────────────────────────
 
-  /** 이 항목이 지금 송출 중인지 */
-  const liveItemIndex = (() => {
-    // 항목 하나만 올린 경우 — groups 가 없어 기억해 둔 id 로 판정한다
-    if (liveItemId) {
-      const index = items.findIndex((item) => item.id === liveItemId);
-      if (index >= 0) return index;
-    }
-    if (!deck?.groups || currentIndex < 0) return -1;
-    let found = -1;
-    deck.groups.forEach((group, index) => {
-      if (group.startIndex <= currentIndex) found = index;
-    });
-    if (found === -1) return -1;
-    // groups 는 divider 를 뺀 순서라 원래 배열 위치로 되돌린다
-    const withoutDividers = items.filter((item) => item.type !== 'divider');
-    const target = withoutDividers[found];
-    return target ? items.findIndex((item) => item.id === target.id) : -1;
-  })();
-
-  /**
-   * 송출 중인 슬라이드가 그 항목의 몇 번째인지 — 펼친 목록에서 빨간 점을 찍을 자리.
-   * 순서표 전체를 올린 경우에는 항목 시작 위치를 빼서 구한다.
-   */
-  const liveSlideIndexInItem = (() => {
-    if (!deck) return -1;
-    if (liveItemId) return currentIndex; // 항목 하나만 올린 경우 덱이 곧 그 항목이다
-    if (!deck.groups || liveItemIndex < 0) return -1;
-    const withoutDividers = items.filter((item) => item.type !== 'divider');
-    const groupIndex = withoutDividers.findIndex((item) => item.id === items[liveItemIndex]?.id);
-    const start = deck.groups[groupIndex]?.startIndex;
-    return start === undefined ? -1 : currentIndex - start;
-  })();
-
-  /**
-   * 순서표 **전체**가 올라간 채로 이 항목이 화면에 나가 있는가.
-   *
-   * 이때는 항목을 고쳐도 화면이 따라오지 않는다 — 덱을 통째로 다시 만들면 예배 중에
-   * 진행 위치를 잃기 때문이다(의도된 제약). ▶ 도 소용없다: 올라간 덱 안에서 goto 로
-   * 자리만 옮기므로 옛 슬라이드가 그대로 나온다(실측 확인). 되살리는 길은 다시 올리기뿐이다.
-   * 그렇다면 최소한 **왜 안 바뀌는지와 무엇을 눌러야 하는지**는 보여야 한다.
-   * 말없이 안 바뀌면 옵션이 고장난 것으로 읽힌다.
-   */
-  const liveViaPlanDeck = liveItemId === null && liveItemIndex >= 0;
-
-  /** 기본 설정을 고친다 — 순서표에 저장되므로 dirty 로 표시된다 */
-  function patchDefaults(mutate: (current: PlanDefaults) => PlanDefaults): void {
-    if (!plan) return;
-    const next = mutate(plan.defaults ?? {});
-    setPlan({ ...plan, defaults: next });
-    setDirty(true);
-  }
 
   const kindHint = ADD_KINDS.find((option) => option.kind === addKind)?.hint ?? '';
   // 순서 표시도 여러 줄이다 — '설교 제목' 아래 줄에 설교자를 넣는다
@@ -629,8 +540,8 @@ export function PlanPanel({
                     <label title="교독문·주기도문·사도신경에 함께 쓰입니다">교독문·전례문 배경</label>
                     <BackgroundSelect
                       value={plan.defaults?.readingBackground}
-                      library={bgLibrary}
-                      uploaded={bgFiles}
+                      library={backgrounds.library}
+                      uploaded={backgrounds.files}
                       onChange={(readingBackground) => patchDefaults((c) => ({ ...c, readingBackground }))}
                     />
                   </div>
@@ -1102,8 +1013,8 @@ export function PlanPanel({
                 */
                 (() => {
                   const all = [
-                    ...bgFolders.library.map((f) => ({ ...f, source: 'library' as const })),
-                    ...bgFolders.data.map((f) => ({ ...f, source: 'data' as const })),
+                    ...backgrounds.folders.library.map((f) => ({ ...f, source: 'library' as const })),
+                    ...backgrounds.folders.data.map((f) => ({ ...f, source: 'data' as const })),
                   ];
                   /*
                     고를 폴더가 하나도 없을 때 빈 드롭다운만 주면 '고장났다' 로 보인다.
@@ -1113,7 +1024,7 @@ export function PlanPanel({
                     return (
                       <span className="hintline muted grow">
                         쓸 수 있는 그림이 없습니다. 아래 폴더에 그림을 넣거나 그 안에 폴더를 만드세요 —{' '}
-                        <code>{bgDirs.library || '~/Desktop/Data/Background'}</code>
+                        <code>{backgrounds.dirs.library || '~/Desktop/Data/Background'}</code>
                       </span>
                     );
                   }
@@ -1346,8 +1257,8 @@ export function PlanPanel({
           detailOpen={detailOpen}
           setDetailOpen={setDetailOpen}
           auto={auto}
-          bgFiles={bgFiles}
-          bgLibrary={bgLibrary}
+          bgFiles={backgrounds.files}
+          bgLibrary={backgrounds.library}
           readingBook={readingBook}
           liturgyDraft={liturgyDraft}
           setLiturgyDraft={setLiturgyDraft}

@@ -346,6 +346,53 @@ export function usePlanSend(options: PlanSendOptions) {
     }
   }
 
+  // ── 지금 무엇이 나가고 있는가 (목록의 빨간 점) ──────────────
+  // 송출 상태를 아는 곳이 여기라 판정도 여기서 한다. 화면은 결과만 받는다.
+
+  /** 이 항목이 지금 송출 중인지 */
+  const liveItemIndex = (() => {
+    // 항목 하나만 올린 경우 — groups 가 없어 기억해 둔 id 로 판정한다
+    if (liveItemId) {
+      const index = items.findIndex((item) => item.id === liveItemId);
+      if (index >= 0) return index;
+    }
+    if (!deck?.groups || currentIndex < 0) return -1;
+    let found = -1;
+    deck.groups.forEach((group, index) => {
+      if (group.startIndex <= currentIndex) found = index;
+    });
+    if (found === -1) return -1;
+    // groups 는 divider 를 뺀 순서라 원래 배열 위치로 되돌린다
+    const withoutDividers = items.filter((item) => item.type !== 'divider');
+    const target = withoutDividers[found];
+    return target ? items.findIndex((item) => item.id === target.id) : -1;
+  })();
+
+  /**
+   * 송출 중인 슬라이드가 그 항목의 몇 번째인지 — 펼친 목록에서 빨간 점을 찍을 자리.
+   * 순서표 전체를 올린 경우에는 항목 시작 위치를 빼서 구한다.
+   */
+  const liveSlideIndexInItem = (() => {
+    if (!deck) return -1;
+    if (liveItemId) return currentIndex; // 항목 하나만 올린 경우 덱이 곧 그 항목이다
+    if (!deck.groups || liveItemIndex < 0) return -1;
+    const withoutDividers = items.filter((item) => item.type !== 'divider');
+    const groupIndex = withoutDividers.findIndex((item) => item.id === items[liveItemIndex]?.id);
+    const start = deck.groups[groupIndex]?.startIndex;
+    return start === undefined ? -1 : currentIndex - start;
+  })();
+
+  /**
+   * 순서표 **전체**가 올라간 채로 이 항목이 화면에 나가 있는가.
+   *
+   * 이때는 항목을 고쳐도 화면이 따라오지 않는다 — 덱을 통째로 다시 만들면 예배 중에
+   * 진행 위치를 잃기 때문이다(의도된 제약). ▶ 도 소용없다: 올라간 덱 안에서 goto 로
+   * 자리만 옮기므로 옛 슬라이드가 그대로 나온다(실측 확인). 되살리는 길은 다시 올리기뿐이다.
+   * 그렇다면 최소한 **왜 안 바뀌는지와 무엇을 눌러야 하는지**는 보여야 한다.
+   * 말없이 안 바뀌면 옵션이 고장난 것으로 읽힌다.
+   */
+  const liveViaPlanDeck = liveItemId === null && liveItemIndex >= 0;
+
   return {
     /** 지금 화면에 나가고 있는 슬라이드·라벨 */
     liveSlide, liveLabel,
@@ -366,5 +413,14 @@ export function usePlanSend(options: PlanSendOptions) {
     before,
     auto, setAuto,
     liveItemId,
+    /** 지금 송출 중인 항목의 배열 위치 (없으면 -1) */
+    liveItemIndex,
+    /** 그 항목의 몇 번째 슬라이드가 나가고 있는지 (없으면 -1) */
+    liveSlideIndexInItem,
+    /**
+     * 순서표 **전체**가 올라간 채로 나가고 있는가.
+     * 이때는 항목을 고쳐도 화면이 따라오지 않는다 — 화면이 그 사정을 알려야 한다.
+     */
+    liveViaPlanDeck,
   };
 }
