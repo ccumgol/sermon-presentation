@@ -118,16 +118,35 @@ afterEach(cleanup);                  ← globals:false 라 자동으로 안 붙�
 실험적 전역이 jsdom 것을 가려서 `--localstorage-file` 없이는 **`undefined`** 다
 (실제로 겪었다). `window.sessionStorage` 처럼 쓰면 jsdom 것이 온다.
 
-**예배 순서 탭의 로직은 훅 다섯에 있다** (`src/control/hooks/usePlan*.ts`).
-`PlanPanel.tsx` 를 고치기 전에 그쪽을 본다 — 검사도 거기에 붙어 있다.
+**예배 순서 탭은 훅 일곱 + 컴포넌트 여덟이다.** `PlanPanel.tsx`(444줄)는
+뼈대와 훅 조립·키보드만 갖는다 — 고칠 것을 아래에서 찾는다. 검사도 거기 붙어 있다.
 
-| 훅 | 무엇 |
+| 로직 (`src/control/hooks/`) | 무엇 |
 |---|---|
-| `usePlanDraft` | 편집 중인 것(척추). 나머지 넷이 이걸 붙잡는다 |
+| `usePlanDraft` | 편집 중인 것(**척추**). 나머지가 이걸 붙잡는다 |
 | `usePlanPreview` | 항목을 슬라이드로 푼다 (`resolveItem`) |
-| `usePlanSend` | 화면으로 내보내는 것 전부 · 자동 넘김 |
+| `usePlanSend` | 화면으로 내보내는 것 전부 · 자동 넘김 · 라이브 판정 |
 | `usePlanStorage` | 순서표 읽기·저장·삭제 (**사용자 데이터를 쓰는 길**) |
 | `usePlanAdd` | 항목 추가 · 검색 디바운스 |
+| `usePlanFeedback` | 배너 셋 (busy · error · notice) |
+| `usePlanBackgrounds` | 배경으로 쓸 그림 목록 |
+
+| 화면 (`src/control/components/plan/`) | 무엇 |
+|---|---|
+| `PlanCueList` | **예배를 진행하는 목록.** 선택(파란 테두리)과 송출(빨간 점)이 갈라져 있다 |
+| `PlanAddBar` | 항목 추가 바 (열 종류) |
+| `PlanDefaultsCard` | 이 예배의 기본값 |
+| `PlanItemEditor` | 고른 항목의 설정 |
+| `PlanHead` · `PlanActions` · `PlanNameBar` · `PlanLoadList` · `PlanDirtyLine` | 열기·저장 |
+
+**여기에 화면을 더 자를 때의 규칙** (R-4 를 끝낸 판단이다):
+
+- **낱개 값이 아니라 훅 객체를 넘긴다.** 추가 바를 낱개로 넘기면 프롭 28개,
+  `add` 객체째로 넘기면 4개다. 훅 분리가 프롭 그룹을 이미 정해 놓았다.
+- **블록당 프롭 10개를 넘으면 자르는 자리가 틀렸다는 신호다.** 프롭을 늘리지 말고
+  덜 자르거나, 훅을 하나 더 만들거나, 부모에 둔다.
+- **자를 수 있다고 자르지 않는다.** 한 폼을 행마다 쪼개면 `<select>` 한 줄짜리
+  껍데기가 된다.
 
 **커버리지는 묶음별로 문턱이 있다** (`lib/` · `server/` · `src/`). 값은 실측한
 지금 값보다 조금 낮게 잡은 **ratchet** 이다 — 내려가지 않게 막는 것이 목적이니,
