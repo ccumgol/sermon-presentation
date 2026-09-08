@@ -45,8 +45,13 @@ export const RECENT_SLOTS = 6;
 /** 빠른 칩 줄이 무엇을 보여 주는가 */
 export type QuickMode = 'favorite' | 'recent';
 
-/** 검색어를 친 뒤 서버를 찌르기까지 기다리는 시간 */
-const DEBOUNCE_MS = 200;
+/**
+ * 검색어를 친 뒤 서버를 찌르기까지 기다리는 시간.
+ *
+ * 내보내는 이유: 검사가 **가짜 시계로** '아직 안 갔다' 를 재려면 이 값을 알아야
+ * 한다. 숫자를 검사에 또 적으면 한쪽만 고쳐 헛돈다.
+ */
+export const DEBOUNCE_MS = 200;
 
 export interface SongSearch {
   songbooks: Songbook[];

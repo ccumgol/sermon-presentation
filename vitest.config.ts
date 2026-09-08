@@ -70,7 +70,7 @@ export default defineConfig({
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *
-         * 지금 값(2026-09-08 실측: 문장 32.8%)보다 조금 낮게 잡아 두고, 검사를
+         * 지금 값(2026-09-08 실측: 문장 37.9%)보다 조금 낮게 잡아 두고, 검사를
          * 더할 때마다 올린다.
          *
          * 예배 순서 탭은 훅 90% 대 + 갈라낸 화면 컴포넌트 60~100% 다:
@@ -82,10 +82,14 @@ export default defineConfig({
          * 않는다. 주요 종류(구분·찬양·성경·순서 표시·교독문·전례문)를 덮었고,
          * 남은 것은 전례문 본문 덮어쓰기 편집기다.
          *
-         * 남은 것은 **아직 검사가 없는 화면들**이다 — BiblePanel · SongPanel ·
+         * 찬양 탭은 훅으로 갈랐다(2026-09-08): useSongSearch 100 · useSongEditor 95.
+         * `SongPanel` 자체는 0% 인데, 위험한 규칙(빈 가사 덮어쓰기 방지·삭제 확인·
+         * 악보 보기 초기화)이 전부 훅으로 내려가 검사가 붙었다.
+         *
+         * 남은 것은 **아직 검사가 없는 화면들**이다 — BiblePanel · SongPanel(JSX) ·
          * TemplatePanel · SongbookManager 등.
          */
-        'src/**': { lines: 32, functions: 27, branches: 32, statements: 32 },
+        'src/**': { lines: 37, functions: 31, branches: 34, statements: 37 },
       },
     },
   },
