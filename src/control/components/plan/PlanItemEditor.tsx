@@ -13,26 +13,26 @@
 
 import type React from 'react';
 
-import { describeItem, itemsInGroup, splitOrderText, type PlanRow } from '../../../lib/plan-deck.ts';
-import { ProjectorSheetToggle } from './ProjectorSheetToggle.tsx';
-import { LANG_LABELS, MAX_LANGS, langChoices, toggleLang } from '../../../lib/lang-select.ts';
+import { describeItem, itemsInGroup, splitOrderText, type PlanRow } from '../../../../lib/plan-deck.ts';
+import { ProjectorSheetToggle } from '../ProjectorSheetToggle.tsx';
+import { LANG_LABELS, MAX_LANGS, langChoices, toggleLang } from '../../../../lib/lang-select.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE, DEFAULT_LITURGY_VERSION, LITURGY_TEXTS, findLiturgy, liturgyLines,
   type LiturgyPerSlide, type LiturgyVersion,
-} from '../../../lib/liturgy-texts.ts';
-import { MAX_SECONDARY, itemIcon } from '../../../lib/plan-item-view.ts';
-import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../lib/order-rhythm.ts';
-import { READING_BOOK_LABELS, type BackgroundFile, type ReadingBook } from '../api.ts';
-import { BackgroundSelect } from './BackgroundSelect.tsx';
-import { DisplayToggles } from './DisplayToggles.tsx';
-import { ItemTextStyleControls } from './ItemTextStyleControls.tsx';
-import { OrderCharTuner } from './OrderCharTuner.tsx';
-import { isComposing } from '../ime.ts';
+} from '../../../../lib/liturgy-texts.ts';
+import { MAX_SECONDARY, itemIcon } from '../../../../lib/plan-item-view.ts';
+import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../../lib/order-rhythm.ts';
+import { READING_BOOK_LABELS, type BackgroundFile, type ReadingBook } from '../../api.ts';
+import { BackgroundSelect } from '../BackgroundSelect.tsx';
+import { DisplayToggles } from '../DisplayToggles.tsx';
+import { ItemTextStyleControls } from '../ItemTextStyleControls.tsx';
+import { OrderCharTuner } from '../OrderCharTuner.tsx';
+import { isComposing } from '../../ime.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
   type CueItem, type ItemBackground, type LangCode, type ServicePlan, type SlidePayload,
   type Template, type Translation,
-} from '../../../shared/types.ts';
+} from '../../../../shared/types.ts';
 
 export interface PlanItemEditorProps {
   plan: ServicePlan;
