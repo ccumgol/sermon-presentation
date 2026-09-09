@@ -7,7 +7,15 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ENV_ITEMS, checkEnv, isAllowedCommand, pickToolPath, platformOf, toolCandidates } from '../../lib/env-check.ts';
+import {
+  ENV_ITEMS,
+  checkEnv,
+  folderOpenCommand,
+  isAllowedCommand,
+  pickToolPath,
+  platformOf,
+  toolCandidates,
+} from '../../lib/env-check.ts';
 
 const nothing = (): boolean => false;
 const everything = (): boolean => true;
@@ -177,5 +185,30 @@ describe('pickToolPath — 설치판의 좁은 PATH 를 견딘다', () => {
       expect(toolCandidates(tool, platform, { LOCALAPPDATA: 'C:\\x' }).length, `${platform}/${tool}`)
         .toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * '데이터 폴더 열기' 는 설치판 사용자가 **백업을 챙기고 배경 그림을 넣는 유일한 길**이다
+ * (포장한 앱의 데이터는 `Application Support`·`AppData` 안이라 찾아갈 수 없다).
+ *
+ * 그런데 명령이 라우트 안에 있을 때는 **지금 도는 PC 의 줄만** 밟혔다. 맥에서
+ * 검사하면 윈도우 줄은 확인되지 않고, 틀린 것은 설치판을 받은 사람이 눌러 보고서야
+ * 드러난다 — 우리에게는 재현할 방법조차 없다. 그래서 판단을 여기로 옮겼다.
+ */
+describe('파일 탐색기를 여는 명령', () => {
+  it('플랫폼마다 다르다', () => {
+    expect(folderOpenCommand('mac')).toBe('open');
+    expect(folderOpenCommand('win')).toBe('explorer');
+    expect(folderOpenCommand('other')).toBe('xdg-open');
+  });
+
+  /** `process.platform` 에서 바로 이어진다 — 중간에 이름이 어긋나면 안 된다 */
+  it('노드가 말하는 이름에서 곧바로 이어진다', () => {
+    expect(folderOpenCommand(platformOf('darwin'))).toBe('open');
+    expect(folderOpenCommand(platformOf('win32'))).toBe('explorer');
+    expect(folderOpenCommand(platformOf('linux'))).toBe('xdg-open');
+    // 모르는 운영체제에서도 무언가는 시도한다 — 빈 명령을 돌리면 무엇이 틀렸는지 모른다
+    expect(folderOpenCommand(platformOf('freebsd')).length).toBeGreaterThan(0);
   });
 });

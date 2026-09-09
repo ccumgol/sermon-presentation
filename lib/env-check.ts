@@ -115,6 +115,22 @@ export function toolCandidates(
 }
 
 /**
+ * 파일 탐색기를 여는 명령 — **판단만** 여기서 한다 (`pickToolPath` 와 같은 방식).
+ *
+ * 라우트에 두면 **지금 도는 PC 의 운영체제 분기만** 밟힌다. 맥에서 검사하면
+ * 윈도우 줄은 한 번도 확인되지 않고, 그 줄이 틀린 것은 **설치판을 받은 사람이
+ * 눌러 보고서야** 드러난다 — 우리에게는 재현할 방법조차 없다.
+ *
+ * 셸 문자열을 만들지 않고 **명령과 인자를 나눠서** 준다. 경로에 공백이나 따옴표가
+ * 들어가면 이어 붙인 문자열은 깨지고, 그 자리가 곧 명령 주입 구멍이 된다.
+ */
+export function folderOpenCommand(platform: Platform): string {
+  if (platform === 'mac') return 'open';
+  if (platform === 'win') return 'explorer';
+  return 'xdg-open';
+}
+
+/**
  * 설치 도구의 실행 경로를 고른다 — **판단만** 여기서 한다.
  *
  * `which`(윈도우는 `where`)를 먼저 믿는다 — 사용자가 다른 자리에 두었을 수 있다.

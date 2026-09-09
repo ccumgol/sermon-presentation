@@ -19,7 +19,13 @@ import { existsSync } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { isPackagedApp } from '../../lib/bible-missing.ts';
-import { checkEnv, isAllowedCommand, pickToolPath, platformOf } from '../../lib/env-check.ts';
+import {
+  checkEnv,
+  folderOpenCommand,
+  isAllowedCommand,
+  pickToolPath,
+  platformOf,
+} from '../../lib/env-check.ts';
 import { isLoopbackAddress } from '../../lib/lan-auth.ts';
 import type { ApiResponse } from '../../shared/types.ts';
 import { clearPassword, hasPassword, setPassword } from '../auth.ts';
@@ -72,13 +78,14 @@ async function findTool(tool: string): Promise<string | undefined> {
 /**
  * 폴더를 파일 탐색기에서 연다.
  *
- * 플랫폼마다 명령이 다르다. **인자로 경로를 넘긴다** — 셸 문자열을 조립하면
- * 공백이나 따옴표가 든 경로에서 깨지고, 그 자리가 곧 명령 주입 구멍이 된다.
+ * 플랫폼마다 명령이 다르다. **어느 명령인지 고르는 것은 `lib/env-check.ts` 가 한다** —
+ * 여기 두면 지금 도는 PC 의 분기만 밟혀서 윈도우 줄이 한 번도 확인되지 않는다.
+ *
+ * **인자로 경로를 넘긴다** — 셸 문자열을 조립하면 공백이나 따옴표가 든 경로에서
+ * 깨지고, 그 자리가 곧 명령 주입 구멍이 된다.
  */
 async function openFolder(target: string): Promise<{ ok: boolean; output: string }> {
-  if (process.platform === 'darwin') return run('open', [target]);
-  if (process.platform === 'win32') return run('explorer', [target]);
-  return run('xdg-open', [target]);
+  return run(folderOpenCommand(platformOf(process.platform)), [target]);
 }
 
 /** 이 PC 에서 온 요청인가 */

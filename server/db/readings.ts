@@ -17,6 +17,8 @@
  * 해서 행으로 쪼갰지만 여기는 그럴 이유가 없다.
  */
 
+import type { DatabaseSync } from 'node:sqlite';
+
 import type { ResponsiveReading } from '../../lib/responsive-parser.ts';
 import { getConnection } from './app.ts';
 
@@ -63,10 +65,12 @@ export function isReadingBook(value: unknown): value is ReadingBook {
  * 그것 말고 들어 있을 수 있는 것이 없다. SQLite 는 PK 를 바꿀 수 없어 표를 다시 만든다.
  *
  * 여러 번 불러도 안전하다 (`book` 열이 이미 있으면 아무것도 하지 않는다).
+ *
+ * @param conn 쓸 연결. 기본은 app.sqlite 다. **검사가 자기 DB 를 넘긴다** —
+ *   이 함수는 사용자의 교독문을 통째로 옮기는데, 실제 DB 로 검사하면 그 자료를
+ *   담보로 잡는 셈이 된다. 옛 스키마를 만들어 넣어 보려면 연결을 고를 수 있어야 한다.
  */
-function migrateToBookKey(): number {
-  const conn = getConnection();
-
+export function migrateToBookKey(conn: DatabaseSync = getConnection()): number {
   const exists = conn
     .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'responsive_readings'")
     .get() as { name: string } | undefined;
@@ -101,9 +105,9 @@ function migrateToBookKey(): number {
   return before;
 }
 
-export function initReadingStore(): void {
-  getConnection().exec(SCHEMA);
-  migrateToBookKey();
+export function initReadingStore(conn: DatabaseSync = getConnection()): void {
+  conn.exec(SCHEMA);
+  migrateToBookKey(conn);
 }
 
 interface Row {

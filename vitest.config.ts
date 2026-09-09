@@ -61,12 +61,22 @@ export default defineConfig({
          *   · 곡집 검사 — 문장 79.5 → **85.1** (`db/songbooks` 36.7 → 96.7 ·
          *     `routes/songbooks` 36.5 → 97.6). 되돌릴 수 없는 사용자 데이터를 쓰는 길이다.
          *
+         * 2026-09-09 에 한 번 더 올랐다 — 문장 85.1 → **86.9**, 분기 78.5 → **80.4**:
+         *   `routes/tablet` 36.4 → 100 (태블릿을 여는 유일한 길인데 **QR 을 만드는 줄이
+         *   한 번도 안 밟혔다**) · `db/readings` 76.8 → 97.1 (스키마 이전) ·
+         *   `routes/backgrounds` 75.9 → 94.3 (분기 51.1 → 97.4) · `lan` 65.6 → 93.8.
+         *
+         * ⚪ `routes/system.ts` 는 74.3 에서 멈춘다 — **일부러 그렇다.** 남은 줄은
+         * 실제로 Finder 창을 띄우거나 `brew install` 을 돌려야 밟힌다. 검사가 남의
+         * 프로그램을 설치하게 둘 수는 없다. 판단(어느 명령·허용된 명령인가)은
+         * `lib/env-check.ts` 로 옮겨 세 플랫폼 모두 검사한다.
+         *
          * ⚠️ `server/` 가 80% 아래인 것은 새로 생긴 일이 아니다. 전에는 `lib/` 와
          * 한 덩이로 재서 평균 86% 로 통과했고, **낮은 쪽이 가려져 있었다.**
          * 나눠서 재기 시작하니 드러났다.
          */
         'lib/**': { lines: 95, functions: 95, branches: 88, statements: 94 },
-        'server/**': { lines: 84, functions: 86, branches: 77, statements: 84 },
+        'server/**': { lines: 87, functions: 88, branches: 79, statements: 86 },
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *

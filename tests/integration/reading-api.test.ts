@@ -9,6 +9,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../../server/app.ts';
+import { getConnection } from '../../server/db/app.ts';
 import * as planStore from '../../server/db/plans.ts';
 import * as store from '../../server/db/readings.ts';
 import type { ApiResponse, CueItem, ServicePlan } from '../../shared/types.ts';
@@ -26,6 +27,12 @@ beforeAll(async () => {
 
   store.initReadingStore();
   store.deleteBySource(SOURCE);
+  /*
+   * 앞선 실행이 중간에 끊기면 900번대가 검사용 DB 에 남는다. 그러면 다음 실행의
+   * 목록 검사가 **엉뚱한 이유로 깨지고**, 고치려는 사람은 코드를 뒤지게 된다
+   * (2026-09-09 실제로 한 번 겪었다). 900번대는 이 파일의 것이니 먼저 비운다.
+   */
+  getConnection().prepare('DELETE FROM responsive_readings WHERE number >= 900').run();
   store.upsertReadings(
     [
       {
@@ -137,6 +144,94 @@ describe('저장소', () => {
   it('없는 번호는 undefined — 던지지 않는다', () => {
     expect(store.getReading(99_999)).toBeUndefined();
     expect(store.getReading(1.5)).toBeUndefined();
+  });
+
+  /**
+   * **줄 목록이 깨져 있어도 목록 전체가 살아 있어야 한다** (`readings.ts` 머리말).
+   *
+   * 줄은 JSON 한 칸에 담긴다. 그 칸이 깨지면(옛 판에서 온 자료·손으로 고친 DB)
+   * `JSON.parse` 가 던지는데, 그것이 위로 새어 나가면 **교독문 하나 때문에 목록이
+   * 통째로 안 열린다.** 예배 준비가 막히는 실패다.
+   *
+   * 그래서 빈 줄 목록으로 두고 넘어간다 — 컨트롤 패널이 '표시할 내용이 없습니다' 로
+   * 알려 주고, 나머지 교독문은 그대로 쓸 수 있다.
+   */
+  it('줄이 깨진 교독문이 있어도 목록이 죽지 않는다', () => {
+    const conn = getConnection();
+    const insert = conn.prepare(
+      `INSERT INTO responsive_readings (book, number, title, lines, source, updated_at)
+       VALUES ('hymn_old', ?, ?, ?, ?, '2026-01-01')
+       ON CONFLICT(book, number) DO UPDATE SET lines = excluded.lines, title = excluded.title`,
+    );
+    insert.run(903, '깨진 교독문', '{이건 JSON 이 아니다', SOURCE);
+    // 배열이 아닌 JSON · 문자열이 아닌 원소도 같은 규칙이다
+    insert.run(904, '배열이 아님', '{"a":1}', SOURCE);
+    insert.run(905, '섞인 배열', '["살아 있는 줄", 42, null]', SOURCE);
+
+    const all = store.listReadings();
+    const find = (number: number) => all.find((one) => one.number === number);
+
+    expect(find(903)?.lines).toEqual([]);
+    expect(find(904)?.lines).toEqual([]);
+    // 문자열이 아닌 것만 걸러 내고 살릴 수 있는 줄은 살린다
+    expect(find(905)?.lines).toEqual(['살아 있는 줄']);
+    // 나머지가 그대로 있는 것이 이 검사의 핵심이다
+    expect(find(901)?.lines.length).toBeGreaterThan(0);
+  });
+
+  /** 고르는 화면이 '빈 쪽' 을 흐리게 하는 데 쓴다 — 두 찬송가를 따로 센다 */
+  it('찬송가별 편수를 센다', () => {
+    store.upsertReadings([{ number: 906, title: '새찬송가용', lines: ['가'] }], SOURCE, 'hymn_new');
+
+    const counts = store.countByBook();
+    expect(counts.hymn_new).toBeGreaterThanOrEqual(1);
+    expect(counts.hymn_old).toBeGreaterThanOrEqual(3);
+
+    // 번호가 같아도 서로 다른 글이다 — 한쪽을 지워도 다른 쪽은 남는다
+    const before = store.countByBook().hymn_old;
+    expect(store.getReading(906, 'hymn_new')?.title).toBe('새찬송가용');
+    expect(store.getReading(906, 'hymn_old')).toBeUndefined();
+    expect(store.countByBook().hymn_old).toBe(before);
+  });
+
+  /**
+   * 번들용 목록은 **모르는 찬송가 이름을 버린다.**
+   *
+   * `(book, number)` 가 열쇠라 DB 에는 어떤 글자든 들어갈 수 있다(옛 판·손으로 고친
+   * DB). 그것을 그대로 번들에 실으면 받는 PC 에서 어디에도 속하지 않는 교독문이
+   * 되고, 화면 어디에도 나타나지 않으면서 자리만 차지한다.
+   */
+  it('모르는 찬송가 이름은 번들 목록에서 뺀다', () => {
+    getConnection()
+      .prepare(
+        `INSERT INTO responsive_readings (book, number, title, lines, source, updated_at)
+         VALUES ('hymn_지어낸것', 907, '어디에도 없는 책', '["가"]', ?, '2026-01-01')`,
+      )
+      .run(SOURCE);
+
+    expect(store.listAllReadings().some((one) => one.number === 907)).toBe(false);
+    // 그래도 DB 에는 남아 있다 — 목록이 조용히 지우지는 않는다
+    expect(store.countReadings()).toBeGreaterThan(store.listAllReadings().length);
+
+    getConnection().prepare("DELETE FROM responsive_readings WHERE book = 'hymn_지어낸것'").run();
+  });
+
+  /**
+   * **되돌릴 수 없는 길이다.** 지운 수를 정확히 돌려주지 않으면 화면이
+   * '몇 편을 지웠다' 를 거짓으로 말한다.
+   */
+  it('출처로 지운다 — 다른 출처는 건드리지 않는다', () => {
+    store.upsertReadings([{ number: 951, title: '남을 것', lines: ['가'] }], '다른-출처');
+    // `source` 를 갖고 오는 것은 번들용 목록이다 — 화면용(`listReadings`)은 버린다
+    const mine = store.listAllReadings().filter((one) => one.source === SOURCE).length;
+
+    expect(store.deleteBySource(SOURCE)).toBe(mine);
+    expect(store.listAllReadings().some((one) => one.source === SOURCE)).toBe(false);
+    expect(store.getReading(951)?.title).toBe('남을 것');
+
+    expect(store.deleteBySource('다른-출처')).toBe(1);
+    // 없는 출처를 지우면 0 — 던지지 않는다
+    expect(store.deleteBySource('있지도-않은-출처')).toBe(0);
   });
 });
 

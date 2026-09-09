@@ -115,6 +115,18 @@ export interface BackgroundFolder {
 }
 
 /**
+ * 그 폴더에 배경으로 쓸 그림이 몇 장인가.
+ *
+ * **나열하는 것과 같은 함수로 센다** (`scanFolder`). 전에는 이름만 훑어 세었는데,
+ * 이름이 `.jpg` 로 끝나는 **폴더**가 한 장으로 잡혔다 (2026-09-09, 검사를 쓰다 발견).
+ * 화면은 '4장' 이라 하고 실제로 넘어가는 것은 3장 — 사람이 세어 보기 전에는 모른다.
+ * 세는 규칙과 나열하는 규칙이 갈리면 언제든 다시 어긋난다.
+ */
+function countImages(dir: string): number {
+  return scanFolder(dir, '').length;
+}
+
+/**
  * 하위 폴더를 나열한다 — **슬라이드쇼가 가리킬 대상.**
  *
  * 그림이 한 장도 없는 폴더는 빼고 개수를 함께 준다. 사람이 고를 때 '몇 장짜리인지'가
@@ -129,9 +141,8 @@ function scanSubfolders(root: string): BackgroundFolder[] {
       const full = path.join(root, name);
       try {
         if (!statSync(full).isDirectory()) return [];
-        const count = readdirSync(full).filter(
-          (f) => !f.startsWith('.') && isBackgroundImage(f),
-        ).length;
+        // 세는 규칙은 **실제로 나열하는 규칙과 같아야 한다** — 아래 주석 참고
+        const count = countImages(full);
         return count > 0 ? [{ name, count }] : [];
       } catch {
         return [];
@@ -150,9 +161,7 @@ function scanSubfolders(root: string): BackgroundFolder[] {
 export function listBackgroundFolders(): { library: BackgroundFolder[]; data: BackgroundFolder[] } {
   const withRoot = (root: string): BackgroundFolder[] => {
     const subs = scanSubfolders(root);
-    const loose = existsSync(root)
-      ? readdirSync(root).filter((f) => !f.startsWith('.') && isBackgroundImage(f)).length
-      : 0;
+    const loose = countImages(root);
     return loose > 0 ? [{ name: '', count: loose }, ...subs] : subs;
   };
   return { library: withRoot(paths.backgroundSourceDir), data: withRoot(paths.backgroundsDir) };
