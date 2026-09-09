@@ -61,9 +61,11 @@ jobs:
     name: Node ${{ matrix.node }}
 
     steps:
-      - uses: actions/checkout@v4
+      # 액션 판을 올릴 때는 **CI 가 스스로 검증한다** — 올리고 초록인지 보면 된다.
+      # v4 는 Node 20 위에서 돌아 폐기 경고가 떴다 (2026-09-09). v7 은 node24 다.
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
