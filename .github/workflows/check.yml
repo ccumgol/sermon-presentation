@@ -1,0 +1,83 @@
+# 밀 때마다 검사한다 — `tsc` · `vitest` · `vite build`.
+#
+# ## 왜 필요한가
+#
+# 이 저장소는 **여러 계정이 이어달리기**로 작업한다(Agent C · Agent J …). 지금까지
+# 검사는 Agent 가 손으로 돌리고 "검증했습니다" 라고 보고했다 — 믿는 수밖에 없는
+# 구조다. 여기서 돌리면 **기록으로 남는다.**
+#
+# `main` 직통이 이 프로젝트의 규칙이므로(예배 직전 수정에 병합 단계를 끼우지 않는다)
+# 막는 문(gate)이 아니라 **드러내는 기록**이다. 깨져도 푸시는 이미 들어가 있다 —
+# 그래도 '언제부터 깨졌는지' 를 아는 것이 아무것도 없는 것보다 낫다.
+#
+# ## 설치 파일 빌드(`build.yml`)와 무엇이 다른가
+#
+# 저쪽은 맥·윈도우 러너로 **20분**이 걸려서 태그를 밀 때만 돈다. 이쪽은 **1분**
+# 남짓이라 매번 돌려도 부담이 없다.
+#
+# ## ⚠️ 여기서 커버리지를 돌리지 않는다 (2026-09-09 실측)
+#
+# `data/bible.sqlite` 는 **git 에 없다** — 개역개정 등 저작권 자료다. 그래서 CI 에는
+# 성경 DB 가 없고, `server/db/bible.ts` 와 `server/routes/bible.ts` 가 거의 통째로
+# 미커버가 되어 **문턱이 반드시 깨진다**:
+#
+#     server 문장 86.9% → 81.2% (문턱 86) · 줄 88.6 → 82.6 (문턱 87)
+#
+# 문턱을 그 값까지 내리면 ratchet 이 뜻을 잃는다(로컬에서 내려가는 것을 못 막는다).
+# 그래서 **커버리지는 로컬·수동으로 남긴다**: `npx vitest run --coverage`.
+#
+# ## 검사 31개가 건너뛰는 것은 정상이다
+#
+# `tests/integration/bible-api.test.ts` 가 `describe.skipIf(!hasBibleDb)` 로 스스로
+# 물러난다. 로그에 `31 skipped` 로 그대로 드러나므로 숨겨지지 않는다.
+# **0 skipped 가 되면** 오히려 이 파일을 다시 봐야 한다 — 성경 DB 가 CI 에 들어왔거나
+# 건너뛰기 장치가 사라진 것이다.
+name: 검사
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# 같은 가지에 연달아 밀면 앞의 것은 취소한다 — 마지막 것만 알면 된다
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    strategy:
+      # 한쪽이 깨져도 다른 쪽 결과는 끝까지 본다 — 어느 판에서만 깨지는지가 곧 단서다
+      fail-fast: false
+      matrix:
+        # 24 = **지원 하한**. Electron 44 가 싣고 도는 판이라 설치판이 이걸로 돈다.
+        # 26 = 개발용. 둘을 함께 도는 이유는, 개발 판에서만 되는 코드가 설치판에서
+        # 깨지는 것이 이 프로젝트가 실제로 겪은 종류이기 때문이다 (하한이 세 곳에서
+        # 달랐던 일 · 설치판에서만 나타난 PATH 함정).
+        node: ['24', '26']
+
+    name: Node ${{ matrix.node }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # Electron 바이너리(수백 MB)는 여기서 쓰지 않는다 — 포장은 build.yml 이 한다
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: 타입
+        run: npx tsc --noEmit
+
+      - name: 검사
+        run: npx vitest run
+
+      - name: 조작 화면 빌드
+        run: npx vite build
