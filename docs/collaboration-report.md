@@ -444,10 +444,14 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 | 5 | `SongPanel.tsx` 1,022줄 분할 | 800 규칙 위반 + 검사 0%. **R-4 의 방법이 그대로 통한다** |
 
 **사용자 결정이 있어야 움직이는 것** — Agent 가 시작할 수 없습니다:
-**lint 도구 도입** · **CI** · **D-6 악보 155장 훑기**.
+**CI**(매 푸시마다 tsc + vitest + build) · **D-6 악보 155장 훑기**.
 물어야 할 것을 계획서 6장에 적어 두었습니다.
 
-> **D-7 은 2026-09-09 에 사용자가 정해 닫혔습니다** — 일괄 재분할을 하지 않습니다.
+> **lint 는 2026-09-09 에 최소안으로 도입했습니다** — `tsconfig` 두 줄
+> (`noUnusedLocals` · `noUnusedParameters`). 새 의존성 0. ESLint·Prettier 는
+> 도입하지 않습니다.
+>
+> **D-7 도 2026-09-09 에 사용자가 정해 닫혔습니다** — 일괄 재분할을 하지 않습니다.
 > 찬양 탭에서 필요한 곡만 그때그때 손으로 맞춥니다. **Agent 가 영어 줄을 자동으로
 > 다시 나누는 일은 없습니다.** 자세한 것은 아래 '사용자가 정한 것'.
 
@@ -545,6 +549,38 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 > 완료되면 이 항목을 지우고 4장 보드를 `🟢 완료` 로 바꾸고 3장에 결과를 요약합니다.
 
 ### 현재 진행 중
+
+- [완료 2026-09-09 / Agent C] lint 도입 — 최소안 (사용자 결정: 1번)
+  물었던 셋 중 **①최소**: 새 도구 없이 tsconfig 두 줄(`noUnusedLocals` ·
+  `noUnusedParameters`)만 켠다. ESLint·Prettier 는 도입하지 않는다
+  (Prettier 는 사람이 공들여 배치한 주석 표를 흐트러뜨리고 저장소 전체 diff 를 만든다).
+  실측(2026-09-09): 죽은 것 **35건** — noUnusedLocals 28 · noUnusedParameters 7.
+    src/ 29 · scripts/ 3 · tests/ 1 · server/ 1 · lib/ 1
+  커밋 순서: **정리 먼저, 설정 나중.** 설정을 먼저 켜면 그 커밋에서 typecheck 가
+    깨진 채로 남는다 — 어느 커밋을 집어도 초록이어야 한다.
+  ⚠️ 기계적으로 지우지 않는다. `server/db/bible.ts` 의 안 쓰이는 `limit` 처럼
+    **진짜 버그일 수 있는 것**이 섞여 있다 — 하나씩 본다.
+  ✅ 커밋 둘로 나눴다 — `a9fc600`(정리 35건) → `tsconfig` 두 줄. 동작 변화 0, 전부 삭제.
+     대부분 **R-4 · SongPanel 리팩터링의 잔재**였다: 훅 객체째로 넘기게 바꾼 뒤로
+     아무도 안 쓰는 낱개 이름들(PlanPanel 의 storage 낱개 아홉 줄은 통째로) ·
+     죽은 프롭 다섯(PlanCueList.template · PlanItemEditor.plan/rows/auto/readingBook —
+     선언·전달·검사 세 곳에 있었다) · `SONG_HIT_LIMIT` 은 **설명 주석까지 두 벌**.
+  ⚠️ 하나씩 확인한 보람이 있었다:
+     · `bible.ts` 의 안 쓰이는 `limit` → 버그가 아니라 중복 (searchLike·searchFts 가 각자 계산)
+     · 검사의 `verseSections(source)` → `createSong` 이 `linesSource` 를 따로 넘긴다.
+       검사는 멀쩡하고 인자만 군더더기였다
+     · PlanAddBar 에서 **줄 번호를 잘못 짚어** `LITURGY_TEXTS` 를 지웠다가 tsc 가 즉시 잡았다.
+       TS 가 가리킨 22번 줄은 `lang-select` import 였다
+     · 죽은 함수를 걷어내니 **그것만 쓰던 import 둘이 새로 드러났다**(카스케이드).
+       한 번 돌리고 끝나지 않는다 — 0 이 될 때까지 돌린다
+  설정이 진짜 도는지 확인: 일부러 죽은 변수를 넣으면 TS6133 으로 잡히고,
+    `_` 로 시작하는 인자는 면제된다. `npm run build:server`(포장용, 같은 tsconfig 를
+    상속한다)도 통과.
+  검증: tsc 0 · vitest 2,044 · vite build (번들 415.59 → 415.20 kB).
+    브라우저(격리 서버 7863, 사용자 DB 사본): 예배 순서 항목 설정 · 교독문 추가 →
+    송출 · 찬양 탭 검색 → 곡 열기 → 두 칸 가사 편집기 전부 정상.
+  ⚪ **ESLint · Prettier 는 도입하지 않는다** (사용자 결정). 필요해지면 그때 얹는다 —
+    ①과 충돌하지 않는다.
 
 - [완료 2026-09-09 / Agent C] D-7 한/영 병기 — **사용자가 방식을 정했다**
   물었던 세 가지에 대한 답:

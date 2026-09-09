@@ -19,6 +19,25 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
+
+    // 죽은 코드를 쌓이지 않게 막는다 (2026-09-09, 사용자 결정: lint 최소안).
+    //
+    // 왜 ESLint 가 아닌가: 이 하나가 실제로 아팠던 곳이다. R-4 리팩터링 중에
+    // 죽은 import 를 14 + 9 + 7 개 걷어냈고, 켜기 직전 실측에서 35건이 남아
+    // 있었다 — 훅으로 옮긴 뒤 아무도 안 쓰게 된 이름, 두 벌이 된 상수,
+    // 전달만 되고 쓰이지 않는 프롭. 전부 조용히 쌓인 것이다.
+    //
+    // 이것들은 화면을 멈추지 않는다. 문제는 **다음에 그 파일을 고치는 사람이
+    // 살아 있는 규칙인 줄 알고 읽는다**는 것이다.
+    //
+    // 새 의존성은 하나도 늘지 않는다 — `npm run typecheck` 에 그대로 딸려 온다.
+    // Prettier 는 도입하지 않기로 했다: 이 저장소의 주석은 표·문단으로 사람이
+    // 읽으라고 배치한 것이고, 자동 포맷은 저장소 전체를 한 커밋으로 흔들어
+    // 앞으로의 `git blame` 과 diff 를 그 커밋에 걸리게 한다.
+    //
+    // 일부러 안 쓰는 인자는 `_` 로 시작하면 통과한다 (`(_index, value) => …`).
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
