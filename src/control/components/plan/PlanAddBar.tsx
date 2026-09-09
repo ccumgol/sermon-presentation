@@ -16,12 +16,9 @@
  * | 가져오기를 안 했으면 **무엇을 해야 하는지** 알려 준다 | 빈 목록만 보여 주면 고장으로 보인다 |
  */
 
-import {
-  ADD_KINDS, MAX_SECONDARY, ORDER_PRESETS, itemIcon,
-} from '../../../../lib/plan-item-view.ts';
-import { ACTIVE_LANGS, LANG_LABELS, toggleLang } from '../../../../lib/lang-select.ts';
+import { ADD_KINDS, MAX_SECONDARY, ORDER_PRESETS } from '../../../../lib/plan-item-view.ts';
 import { LITURGY_TEXTS } from '../../../../lib/liturgy-texts.ts';
-import { READING_BOOK_LABELS, type ReadingBook } from '../../api.ts';
+import { READING_BOOK_LABELS } from '../../api.ts';
 import { isComposing } from '../../ime.ts';
 import type { ServicePlan, Translation } from '../../../../shared/types.ts';
 import type { PlanAdd } from '../../hooks/usePlanAdd.ts';

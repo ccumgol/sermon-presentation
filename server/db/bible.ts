@@ -337,7 +337,6 @@ export function search(term: string, options: SearchOptions): SearchResult {
   }
 
   const { rows, total } = strategy === 'like' ? searchLike(trimmed, options) : searchFts(trimmed, options);
-  const limit = options.limit ?? SEARCH_LIMIT;
 
   return {
     term: trimmed,

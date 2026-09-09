@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { Songbook } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';

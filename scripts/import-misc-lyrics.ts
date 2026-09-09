@@ -32,7 +32,7 @@
  * 규칙이 헛돌았다). `imported` 도 자동 작업에서는 똑같이 보호된다.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { parseLyrics } from '../lib/lyrics-parser.ts';

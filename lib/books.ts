@@ -217,16 +217,16 @@ export function lookupBook(input: string): BookLookup {
   }
 
   // 접두 일치 — '고린도' 처럼 여러 권에 걸리면 후보로 돌려준다
-  const prefixHits = matchBy(key, (candidate) => candidate.startsWith(key));
+  const prefixHits = matchBy((candidate) => candidate.startsWith(key));
   if (prefixHits.length === 1) return { code: prefixHits[0]!.code, candidates: prefixHits };
   if (prefixHits.length > 1) return { candidates: prefixHits };
 
-  const partialHits = matchBy(key, (candidate) => candidate.includes(key));
+  const partialHits = matchBy((candidate) => candidate.includes(key));
   if (partialHits.length === 1) return { code: partialHits[0]!.code, candidates: partialHits };
   return { candidates: partialHits };
 }
 
-function matchBy(key: string, predicate: (candidate: string) => boolean): Array<{ code: number; matched: string }> {
+function matchBy(predicate: (candidate: string) => boolean): Array<{ code: number; matched: string }> {
   const found = new Map<number, string>();
   for (const [code, nameKo, abbrKo, nameEn, abbrEn, , aliases] of ROWS) {
     for (const name of [nameKo, abbrKo, nameEn, abbrEn, ...aliases]) {

@@ -58,7 +58,7 @@ import path from 'node:path';
 import { isAmenSection, stripAmenEnglish, stripAmenMarker } from '../lib/hymn-amen.ts';
 import { stripSyllableHyphens, type Dictionary } from '../lib/hymn-hyphen.ts';
 import { stripScrapeArtifacts } from '../lib/hymn-scrape-clean.ts';
-import { formatLyrics, parseLyrics } from '../lib/lyrics-parser.ts';
+import { parseLyrics } from '../lib/lyrics-parser.ts';
 import * as songs from '../server/db/songs.ts';
 import { snapshotDatabases } from '../server/db/snapshot.ts';
 import type { SongLine, SongSection } from '../shared/types.ts';
@@ -67,7 +67,6 @@ import type { SongLine, SongSection } from '../shared/types.ts';
 type NewSection = { kind: SongSection['kind']; label: string; lines: SongLine[] };
 
 const SONGBOOK_ID = 'hymn_new';
-const SONGBOOK = '새찬송가';
 const DICT_PATHS = ['/usr/share/dict/words', '/usr/share/dict/web2'];
 
 function argValue(name: string): string | undefined {

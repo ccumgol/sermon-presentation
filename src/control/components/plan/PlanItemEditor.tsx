@@ -17,37 +17,32 @@ import { describeItem, itemsInGroup, splitOrderText, type PlanRow } from '../../
 import { ProjectorSheetToggle } from '../ProjectorSheetToggle.tsx';
 import { LANG_LABELS, MAX_LANGS, langChoices, toggleLang } from '../../../../lib/lang-select.ts';
 import {
-  DEFAULT_LITURGY_PER_SLIDE, DEFAULT_LITURGY_VERSION, LITURGY_TEXTS, findLiturgy, liturgyLines,
+  DEFAULT_LITURGY_PER_SLIDE, findLiturgy, liturgyLines,
   type LiturgyPerSlide, type LiturgyVersion,
 } from '../../../../lib/liturgy-texts.ts';
 import { MAX_SECONDARY, itemIcon } from '../../../../lib/plan-item-view.ts';
 import { PRESENTER_SCALE_MAX, PRESENTER_SCALE_MIN, STROKE_MIN } from '../../../../lib/order-rhythm.ts';
-import { READING_BOOK_LABELS, type BackgroundFile, type ReadingBook } from '../../api.ts';
+import { READING_BOOK_LABELS, type BackgroundFile } from '../../api.ts';
 import { BackgroundSelect } from '../BackgroundSelect.tsx';
 import { DisplayToggles } from '../DisplayToggles.tsx';
 import { ItemTextStyleControls } from '../ItemTextStyleControls.tsx';
 import { OrderCharTuner } from '../OrderCharTuner.tsx';
-import { isComposing } from '../../ime.ts';
 import {
   AUTO_HOLD_MS_DEFAULT,
-  type CueItem, type ItemBackground, type LangCode, type ServicePlan, type SlidePayload,
+  type CueItem, type LangCode, type SlidePayload,
   type Template, type Translation,
 } from '../../../../shared/types.ts';
 
 export interface PlanItemEditorProps {
-  plan: ServicePlan;
   current: CueItem;
   currentRow: PlanRow;
   items: readonly CueItem[];
-  rows: readonly PlanRow[];
   translations: readonly Translation[];
   connected: boolean;
   detailOpen: boolean;
   setDetailOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  auto: { dividerId: string; holdMs: number; loop: boolean } | null;
   bgFiles: BackgroundFile[];
   bgLibrary: BackgroundFile[];
-  readingBook: ReadingBook;
   liturgyDraft: { id: string; text: string } | null;
   setLiturgyDraft: React.Dispatch<React.SetStateAction<{ id: string; text: string } | null>>;
   songInfo: { id: number; available: string[]; hasSheet: boolean } | null;
@@ -66,8 +61,8 @@ export interface PlanItemEditorProps {
 }
 
 export function PlanItemEditor({
-  plan, current, currentRow, items, rows, translations, connected,
-  detailOpen, setDetailOpen, auto, bgFiles, bgLibrary, readingBook,
+  current, currentRow, items, translations, connected,
+  detailOpen, setDetailOpen, bgFiles, bgLibrary,
   liturgyDraft, setLiturgyDraft, songInfo, liveItemId, liveItemIndex, liveViaPlanDeck,
   patchItems, itemTemplateFor, baseFontSizeFor, sendItem, refreshLive, refreshQuotePreview,
   restoreBefore, before,

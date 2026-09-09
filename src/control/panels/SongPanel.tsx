@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { LANG_LABELS, MAX_LANGS, langChoices } from '../../../lib/lang-select.ts';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
@@ -6,7 +6,7 @@ import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
 import { SongMetaRows } from '../components/SongMetaRows.tsx';
 import { ProjectorSheetToggle } from '../components/ProjectorSheetToggle.tsx';
 
-import type { ClientMsg, Deck, LangCode, Template } from '../../../shared/types.ts';
+import type { ClientMsg, Deck, Template } from '../../../shared/types.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import { shortEntryLabel } from '../../../lib/plan-item-view.ts';

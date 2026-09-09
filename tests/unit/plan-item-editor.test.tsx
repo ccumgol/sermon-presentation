@@ -81,19 +81,15 @@ function setup(
 
   render(
     <PlanItemEditor
-      plan={PLAN}
       current={current}
       currentRow={rows[0]!}
       items={items}
-      rows={rows}
       translations={TRANSLATIONS}
       connected={o.connected ?? true}
       detailOpen={o.detailOpen ?? true}
       setDetailOpen={spies.setDetailOpen}
-      auto={null}
       bgFiles={[]}
       bgLibrary={[]}
-      readingBook="hymn_new"
       liturgyDraft={null}
       setLiturgyDraft={spies.setLiturgyDraft}
       songInfo={o.songInfo ?? null}
@@ -436,10 +432,8 @@ describe('교독문', () => {
     spies.patchItems.mockImplementation(() => undefined);
     const rows = buildPlanRows([item], null, 0);
     render(
-      <PlanItemEditor
-        plan={PLAN} current={item} currentRow={rows[0]!} items={[item]} rows={rows}
-        translations={TRANSLATIONS} connected detailOpen setDetailOpen={spies.setDetailOpen}
-        auto={null} bgFiles={[]} bgLibrary={[]} readingBook="hymn_new"
+      <PlanItemEditor current={item} currentRow={rows[0]!} items={[item]}
+        translations={TRANSLATIONS} connected detailOpen setDetailOpen={spies.setDetailOpen} bgFiles={[]} bgLibrary={[]}
         liturgyDraft={null} setLiturgyDraft={spies.setLiturgyDraft} songInfo={null}
         liveItemId={null} liveItemIndex={0} liveViaPlanDeck
         patchItems={spies.patchItems} itemTemplateFor={() => BOTTOM}

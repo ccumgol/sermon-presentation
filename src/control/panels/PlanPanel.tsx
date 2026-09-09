@@ -18,7 +18,6 @@ import { buildPlanRows, describeItem, isExpandable, type PlanRow } from '../../.
 import {
   baseFontSizeFor,
   itemTemplateFor,
-  templateIdFor as pickTemplateId,
 } from '../../../lib/plan-item-template.ts';
 import { PlanItemEditor } from '../components/plan/PlanItemEditor.tsx';
 import { PlanActions } from '../components/plan/PlanActions.tsx';
@@ -29,7 +28,7 @@ import { PlanDirtyLine } from '../components/plan/PlanDirtyLine.tsx';
 import { PlanHead } from '../components/plan/PlanHead.tsx';
 import { PlanLoadList } from '../components/plan/PlanLoadList.tsx';
 import { PlanNameBar } from '../components/plan/PlanNameBar.tsx';
-import type { ClientMsg, CueItem, Deck, Template, Translation } from '../../../shared/types.ts';
+import type { ClientMsg, Deck, Template, Translation } from '../../../shared/types.ts';
 import { api } from '../api.ts';
 import { usePlanBackgrounds } from '../hooks/usePlanBackgrounds.ts';
 import { usePlanDraft } from '../hooks/usePlanDraft.ts';
@@ -38,12 +37,6 @@ import { usePlanPreview } from '../hooks/usePlanPreview.ts';
 import { usePlanSend } from '../hooks/usePlanSend.ts';
 import { usePlanStorage } from '../hooks/usePlanStorage.ts';
 import { usePlanAdd } from '../hooks/usePlanAdd.ts';
-
-/**
- * 찬양 검색에서 한 번에 보여 줄 곡 수. '찬양' 탭(60)보다 적은 이유는
- * 추가 바 아래 한 줄짜리 후보 띠라서 30개 남짓이 두세 줄로 들어가는 한계다.
- */
-const SONG_HIT_LIMIT = 30;
 
 interface Props {
   deck: Deck | null;
@@ -69,8 +62,7 @@ export function PlanPanel({
    */
   const draft = usePlanDraft();
   const {
-    plan, setPlan, items, setItems, dirty, setDirty,
-    cursor, setCursor, expandedId, setExpandedId, patchItems, patchDefaults,
+    plan, items, dirty, cursor, setCursor, expandedId, setExpandedId, patchItems,
   } = draft;
 
   /** 기본 설정 패널을 펼쳤는지 */
@@ -142,11 +134,7 @@ export function PlanPanel({
     },
   });
   // 화면 컴포넌트에는 **storage 객체째로** 넘긴다 (프롭 일곱을 하나로).
-  // 아직 PlanPanel 안에 남은 JSX 가 쓰는 것만 낱개로 꺼낸다.
-  const {
-    templates, saved, openPlan, saveCurrent, setNameBar, setLoadOpen,
-    loadOpen, saveLabel, planNoun,
-  } = storage;
+  // PlanPanel 안에 남은 JSX 가 낱개로 쓰는 것은 이제 없다.
 
   // ── 항목을 슬라이드로 푼다 (선택했을 때 미리보기용) ──────────
 
@@ -161,11 +149,6 @@ export function PlanPanel({
     () => ({ defaults: plan?.defaults, styleTemplates, template }),
     [plan?.defaults, styleTemplates, template],
   );
-  const templateIdFor = useCallback(
-    (item: CueItem) => pickTemplateId(item, templateChoice),
-    [templateChoice],
-  );
-
   // ── 항목 추가 ───────────────────────────────────────────────
   // usePlanAdd 로 옮겼다 (2026-09-07 R-4).
   const add = usePlanAdd({
@@ -177,7 +160,7 @@ export function PlanPanel({
   });
   // 추가 바에는 **add 객체째로** 넘긴다 (프롭 스물다섯을 하나로).
   // 아직 PlanPanel 안에 남은 JSX 가 쓰는 것만 낱개로 꺼낸다.
-  const { addKind, setAddPrimary, setAddSecondary, readingBook, refreshQuotePreview } = add;
+  const { addKind, setAddPrimary, setAddSecondary, refreshQuotePreview } = add;
 
   // ── 송출 ────────────────────────────────────────────────────
   // 화면으로 내보내는 것 전부는 usePlanSend 로 옮겼다 (2026-09-07 R-4).
@@ -186,7 +169,7 @@ export function PlanPanel({
     feedback: { setBusy, setError, setNotice },
   });
   const {
-    sendItem, sendTitle, refreshLive, restoreBefore, loadForService,
+    sendItem, sendTitle, refreshLive, restoreBefore,
     before, auto, setAuto, liveItemId, liveItemIndex, liveViaPlanDeck,
   } = sendHook;
 
@@ -388,7 +371,6 @@ export function PlanPanel({
             feedback={feedback}
             rows={rows}
             activateRow={activateRow}
-            template={template}
             connected={connected}
           />
 
@@ -402,19 +384,15 @@ export function PlanPanel({
       */}
       {plan && current && currentRow && (
         <PlanItemEditor
-          plan={plan}
           current={current}
           currentRow={currentRow}
           items={items}
-          rows={rows}
           translations={translations}
           connected={connected}
           detailOpen={detailOpen}
           setDetailOpen={setDetailOpen}
-          auto={auto}
           bgFiles={backgrounds.files}
           bgLibrary={backgrounds.library}
-          readingBook={readingBook}
           liturgyDraft={liturgyDraft}
           setLiturgyDraft={setLiturgyDraft}
           songInfo={songInfo}

@@ -18,14 +18,14 @@ import { useEffect, useRef } from 'react';
 
 import { describeItem, isExpandable, moveItem, removeItem, type PlanRow } from '../../../../lib/plan-deck.ts';
 import { itemIcon, itemMeta, slideSummary } from '../../../../lib/plan-item-view.ts';
-import { AUTO_HOLD_MS_DEFAULT, type CueItem, type Template } from '../../../../shared/types.ts';
+import { AUTO_HOLD_MS_DEFAULT } from '../../../../shared/types.ts';
 import type { PlanDraft } from '../../hooks/usePlanDraft.ts';
 import type { Feedback } from '../../hooks/useFeedback.ts';
 import type { PlanPreview } from '../../hooks/usePlanPreview.ts';
 import type { PlanSend } from '../../hooks/usePlanSend.ts';
 
 export function PlanCueList({
-  draft, send, preview: previewHook, feedback, rows, activateRow, template, connected,
+  draft, send, preview: previewHook, feedback, rows, activateRow, connected,
 }: {
   draft: PlanDraft;
   send: PlanSend;
@@ -35,8 +35,6 @@ export function PlanCueList({
   rows: readonly PlanRow[];
   /** 줄을 눌렀을 때 — 이 프로젝트의 핵심 규칙이 담긴 함수다 (부모에 둔다) */
   activateRow: (row: PlanRow | undefined) => void;
-  /** 지금 화면이 쓰는 템플릿 */
-  template: Template | null;
   connected: boolean;
 }): React.JSX.Element {
   const {
@@ -46,7 +44,7 @@ export function PlanCueList({
     auto, setAuto, sendItem, startAuto, liveItemIndex, liveSlideIndexInItem,
   } = send;
   const { preview, previewError, styleTemplates } = previewHook;
-  const { busy, error } = feedback;
+  const { busy } = feedback;
 
   const listRef = useRef<HTMLDivElement>(null);
 

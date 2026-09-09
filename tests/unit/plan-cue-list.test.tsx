@@ -103,7 +103,7 @@ function setup(o: {
     <PlanCueList
       draft={draft} send={send} preview={previewHook} feedback={feedback}
       rows={rows} activateRow={spies.activateRow}
-      template={BOTTOM} connected={o.connected ?? true}
+      connected={o.connected ?? true}
     />,
   );
   return { rows };

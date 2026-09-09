@@ -20,7 +20,7 @@ const BADLY_SPLIT = [
   ['눈물로 주께 아룁니다 그 피로 이', '몸 사셨으니 충성된 종이 되게', '하사 주 위해 살게 하옵소서'],
 ];
 
-function verseSections(source: 'auto' | 'manual') {
+function verseSections() {
   return BADLY_SPLIT.map((lines, index) => ({
     kind: 'verse' as const,
     label: `${index + 1}절`,
@@ -40,7 +40,7 @@ beforeAll(() => {
     title: '자동 분할된 곡',
     source: 'realign-test',
     entries: [{ songbookId: 'misc' }],
-    sections: verseSections('auto'),
+    sections: verseSections(),
     linesSource: 'auto',
   });
 
@@ -48,7 +48,7 @@ beforeAll(() => {
     title: '사람이 손본 곡',
     source: 'realign-test',
     entries: [{ songbookId: 'misc' }],
-    sections: verseSections('manual'),
+    sections: verseSections(),
     linesSource: 'manual',
   });
 
@@ -122,7 +122,7 @@ describe('재정렬 적용', () => {
       title: '적용 대상',
       source: 'realign-test',
       entries: [{ songbookId: 'misc' }],
-      sections: verseSections('auto'),
+      sections: verseSections(),
       linesSource: 'auto',
     });
 

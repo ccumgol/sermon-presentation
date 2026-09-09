@@ -17,7 +17,7 @@
  * | 종류를 바꾸면 입력칸에 **포커스를 돌려준다** | 입력 요소가 교체되므로 그 뒤에 줘야 한다 |
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   buildPlanRows, insertIndexFor, newItemId, type PlanRow,

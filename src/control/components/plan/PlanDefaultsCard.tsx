@@ -41,7 +41,7 @@ export function PlanDefaultsCard({
   translations: Translation[];
   defaultTranslation: string;
 }): React.JSX.Element {
-  const { saveCurrent, saveLabel, planNoun, templates } = storage;
+  const { saveCurrent, saveLabel, planNoun } = storage;
   const { dirty, patchDefaults } = draft;
   const { setAddPrimary, setAddSecondary } = add;
   const { styleTemplates } = preview;

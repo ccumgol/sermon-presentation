@@ -6,7 +6,7 @@
 
 import type React from 'react';
 
-import { CHAR_WIDTH_EM, SAFE_WIDTH_PX, wrapsAtScale } from '../../../lib/plan-item-view.ts';
+import { wrapsAtScale } from '../../../lib/plan-item-view.ts';
 import type { ItemTextStyle } from '../../../shared/types.ts';
 
 export function ItemTextStyleControls({
