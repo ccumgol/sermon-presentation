@@ -81,6 +81,41 @@ mac:
   # 안내는 README '설치판으로 쓰기' 와 docs/TROUBLESHOOTING 2.4.16 에 있다.
   identity: null
 
+# ## DMG 안에 **첫 실행 준비 스크립트**를 함께 넣는다 (2026-09-10, 사용자 요청)
+#
+# 공증을 받지 않았으므로 받는 사람은 **한 번** 격리 표시를 지워야 한다. 그동안은
+# README 를 읽고 터미널에 명령을 붙여넣게 했는데, 봉사자에게는 그 자체가 벽이다.
+#
+# **앱이 스스로 할 수는 없다** — 막는 시점이 앱이 뜨기 **전**이라 앱 안의 코드는
+# 한 줄도 돌지 않는다. 그래서 앱 바깥에서 도는 것이 있어야 하고, 그것이 이 스크립트다.
+#
+# 창 배치: 위쪽에 [앱] → [응용 프로그램], 그 아래에 스크립트. **끌어다 놓기가
+# 먼저**라는 것이 눈에 보이게 둔다 (스크립트가 앱을 `/Applications` 에서 찾는다).
+dmg:
+  window:
+    width: 620
+    height: 480
+  contents:
+    - x: 165
+      y: 190
+      type: file
+    - x: 455
+      y: 190
+      type: link
+      path: /Applications
+    - x: 165
+      y: 350
+      type: file
+      path: build-resources/mac-first-run.command
+      name: 맥에서 처음 열기.command
+    # 스크립트도 macOS 가 한 번 막을 수 있다(2026-09-10 실측). 그때 **읽고 붙여넣을**
+    # 것이 창 안에 있어야 한다 — 텍스트 파일은 막히지 않는다.
+    - x: 455
+      y: 350
+      type: file
+      path: build-resources/mac-readme.txt
+      name: 읽어보세요.txt
+
 win:
   icon: build-resources/icon.ico
   target:
@@ -88,6 +123,11 @@ win:
       arch: [x64]
 
 nsis:
+  # 설치 중에 OBS·Chrome 도 함께 깔 수 있게 한다 (2026-09-10, 사용자 요청).
+  # 물어보는 화면과 winget 호출이 그 안에 있고, **실패해도 설치는 끝난다.**
+  # ⚠️ 그 스크립트는 실행해 본 적이 없다 — 만든 사람에게 윈도우가 없다.
+  #    CI 는 **컴파일되는 것까지만** 확인해 준다. 머리말 참고.
+  include: build-resources/installer.nsh
   oneClick: false
   # 관리자 권한 없이 설치할 수 있게 한다. 교회 PC 는 관리자 계정이 아닐 때가 많다
   perMachine: false
