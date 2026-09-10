@@ -113,8 +113,19 @@ export function registerSystemRoutes(app: FastifyInstance): void {
   /** 예배를 진행하려면 이 PC 에 무엇이 더 있어야 하는가 */
   app.get('/api/system/env', async () => {
     const platform = platformOf(process.platform);
-    const tools = new Map<string, boolean>();
-    for (const tool of ['brew', 'winget']) tools.set(tool, (await findTool(tool)) !== undefined);
+
+    /*
+     * 도구를 **함께** 찾는다 (2026-09-10).
+     *
+     * 전에는 `for` 로 하나씩 기다렸다. 도구를 못 찾을 때 `which`/`where` 가
+     * 시간 제한(3초)까지 가므로 **둘이면 6초**가 된다 — 화면이 그만큼 빈 채로 있다.
+     * 실제로 윈도우 CI 에서 이 라우트를 부르는 검사가 5초를 넘겨 실패했다.
+     *
+     * 서로 아무 상관이 없는 두 번의 조회라 함께 하면 3초로 줄어든다.
+     */
+    const toolNames = ['brew', 'winget'];
+    const foundPaths = await Promise.all(toolNames.map((tool) => findTool(tool)));
+    const tools = new Map(toolNames.map((tool, at) => [tool, foundPaths[at] !== undefined]));
 
     return ok({
       platform,

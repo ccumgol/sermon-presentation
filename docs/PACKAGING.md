@@ -161,9 +161,34 @@ electron-builder 가 `default_app.asar` 을 지우면서도 `Info.plist` 의
 
 ### 여는 방법 (받는 쪽에서 한 번만)
 
+**DMG 안에 두 파일을 함께 넣습니다** (2026-09-10 부터):
+
+| 파일 | 무엇 |
+|---|---|
+| `맥에서 처음 열기.command` | 두 번 누르면 앱을 찾아 격리 표시를 지우고 연다 |
+| `먼저 읽어보세요.txt` | 위가 막혔을 때 **붙여넣을** 명령과 순서 |
+
 ```bash
 xattr -dr com.apple.quarantine /Applications/SermonPresentation.app
 ```
+
+> ⚠️ **스크립트도 막힌다** (2026-09-10 실측). 격리된 `.command` 를 더블클릭하면
+> *"…을(를) 열지 않음 / Apple은 … 악성 코드가 없음을 확인할 수 없습니다"* 가 뜨고
+> 버튼은 `[휴지통으로 이동]` `[완료]` 뿐이다. `[완료]` → **시스템 설정 →
+> 개인정보 보호 및 보안 → `그래도 열기`** → 다시 두 번 누르면 된다.
+>
+> 대조군(격리 없는 같은 스크립트)은 정상 실행되므로 원인은 격리가 맞다.
+> 그래서 **텍스트 안내문을 함께 넣는다** — 텍스트 파일은 막히지 않는다.
+
+### 🥇 가장 좋은 전달 방법 — USB (2026-09-10 실측)
+
+격리 표시를 붙이는 것은 **파일을 밖에서 받아 오는 프로그램**이다 —
+브라우저·메일·메신저·에어드롭. 그러니:
+
+- ✅ **빌드한 맥에서 곧바로 USB 로 복사해 건네준다** → 표시가 아예 없다.
+  받는 사람은 끌어다 놓고 그냥 열면 된다. 위의 모든 과정이 필요 없다
+- ❌ **내려받은 파일을 USB 에 옮기는 것은 소용없다** — 표시가 파일에 붙어
+  함께 따라간다 (`cp`·`ditto` 모두 유지되는 것을 확인했다)
 
 **받는 사람에게 이 문서를 주지 마세요.** 이 문서는 배포판을 만드는 사람 것입니다.
 받는 사람이 볼 곳은 두 군데입니다 — 보낼 때 이쪽을 함께 알려 주세요.
@@ -198,6 +223,48 @@ notarize:
 ⚠️ `codesign --deep` 은 쓰지 않습니다 (Electron 에서 깨집니다). **깊은 곳부터
 바깥으로** 하나씩 서명합니다 — 순서를 지키지 않으면
 `In subcomponent: .../chrome_crashpad_handler` 로 실패합니다.
+
+2026-09-10 실측 — 서명 신원이 제대로 붙습니다:
+
+```
+Identifier=org.jiwumission.sermon-presentation   ← 09-07 판은 Identifier=Electron 이었다
+Signature=adhoc
+codesign --verify --deep --strict → valid on disk · satisfies its Designated Requirement
+```
+
+---
+
+## 윈도우 — 설치 중에 다른 프로그램까지 (2026-09-10)
+
+`build-resources/installer.nsh` 가 설치 과정에 **물어보는 화면**을 하나 넣습니다 —
+OBS Studio(기본 켬·필수)와 Chrome(기본 켬·선택). 설치는 **winget** 이 합니다.
+명령은 `lib/env-check.ts` 의 `ENV_ITEMS` 와 **같은 것**을 씁니다 — 한쪽만 고치면
+설치 관리자와 앱 안의 '이 PC 준비 상태' 가 서로 다른 말을 하게 됩니다.
+
+**실패해도 설치를 멈추지 않습니다.** winget 이 없는 PC·막힌 교회 망·회사 정책은
+드문 일이 아닙니다. 빠진 것은 앱의 **설정 탭 → 이 PC 준비 상태**가 다시 알려 주고
+거기서도 설치할 수 있습니다.
+
+### ⚠️ 이 스크립트를 고칠 때 알아야 할 것
+
+- **실행해 본 적이 없습니다** — 만든 사람에게 윈도우가 없습니다. CI 는
+  **컴파일되는 것까지만** 확인해 줍니다. 실제 동작은 받은 사람이 눌러 봐야 압니다
+- **`MUI_HEADER_TEXT` 를 쓸 수 없습니다.** 이 파일은 electron-builder 가 MUI2 를
+  넣기 **전에** 끼워 넣으므로 그 매크로가 아직 없습니다 —
+  `macro named "MUI_HEADER_TEXT" not found!` 로 **빌드가 깨집니다** (2026-09-10 CI 가 잡음)
+- 로컬 맥에서 `makensis` 로 미리 볼 수 없습니다. 캐시의 mac 판은
+  ANSI(`NSIS_CHAR_SIZE=1`)라 한글 include 를 못 읽고, ASCII 로 바꿔도 죽습니다.
+  **검증은 CI 로 합니다**
+
+---
+
+## CI 로 만들 때 — `--publish never`
+
+`dist` · `dist:mac` · `dist:win` 에 `--publish never` 가 붙어 있습니다.
+없으면 CI 에서 electron-builder 가 **GitHub Releases 에 자동으로 올리려 하고**
+토큰이 없어 마지막에 죽습니다 (`GitHub Personal Access Token is not set`).
+DMG·EXE 는 이미 다 만들어진 뒤라 더 헷갈립니다. 산출물은 workflow 의
+artifact 로만 올립니다 (2026-09-10, build.yml 을 처음 돌려 보고 발견).
 
 ---
 

@@ -24,6 +24,16 @@ afterAll(async () => {
 });
 
 describe('환경 점검', () => {
+  /**
+   * ⏱ 기본 5초 → 20초.
+   *
+   * 이 라우트는 `which`/`where` 로 설치 도구를 실제로 찾는다. **없는 도구**를 찾을 때는
+   * 시간 제한(3초)까지 간다. 윈도우 CI 에서 이 검사가 5초를 넘겨 깨졌다
+   * (2026-09-10). 조회를 함께 하도록 고쳐 3초로 줄였지만, 느린 러너에서 또 아슬아슬해지면
+   * **CI 가 빨간불이 되는 이유가 이것 하나**가 된다 — 여유를 준다.
+   *
+   * 여기서 확인하려는 것은 '목록의 모양' 이지 '얼마나 빠른가' 가 아니다.
+   */
   it('무엇이 필요한지 목록으로 준다', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/system/env' });
     const body = res.json() as ApiResponse<{
@@ -36,7 +46,7 @@ describe('환경 점검', () => {
     // 왜 필요한지가 함께 와야 화면이 설명할 수 있다
     expect(body.data!.items.find((one) => one.id === 'obs')!.why).toContain('OBS');
     expect(body.data!.dataDir.length).toBeGreaterThan(0);
-  });
+  }, 20_000);
 });
 
 /**
