@@ -27,8 +27,11 @@
 ; (문법이 틀리면 빌드가 깨진다), 실제로 눌렀을 때의 동작은 사용자가 확인해야 한다.
 ; 그래서 **아무것도 강제하지 않고**, 실패를 전부 무시하도록 짰다.
 
+; nsDialogs = 물어보는 화면 · LogicLib = ${If} · WinMessages = ${BST_CHECKED}
+; (모두 중복 include 방지 장치가 있어 electron-builder 가 또 넣어도 괜찮다)
 !include LogicLib.nsh
 !include nsDialogs.nsh
+!include WinMessages.nsh
 
 Var PrereqPage
 Var CheckObs
@@ -40,26 +43,30 @@ Var InstallChrome
 ; 묻지 않고 깔면 '내가 시키지도 않은 프로그램이 설치됐다' 가 된다.
 ; 기본값은 켜 둔다 — 대부분은 이게 필요해서 받은 것이다.
 Function PrereqPageShow
-  !insertmacro MUI_HEADER_TEXT "함께 설치할 프로그램" "예배를 진행하려면 이것들이 필요합니다."
-
+  ; ⚠️ `MUI_HEADER_TEXT` 를 쓰지 않는다 — 이 파일은 electron-builder 가 MUI2 를
+  ; 넣기 **전에** 끼워 넣으므로 그 매크로가 아직 없다. 그대로 두면
+  ; `macro named "MUI_HEADER_TEXT" not found!` 로 **빌드가 깨진다** (2026-09-10 CI 가 잡았다).
+  ; 제목은 아래 라벨로 직접 그린다.
   nsDialogs::Create 1018
   Pop $PrereqPage
   ${If} $PrereqPage == error
     Abort
   ${EndIf}
 
-  ${NSD_CreateLabel} 0 0 100% 24u "아래 프로그램을 함께 설치할 수 있습니다. 이미 깔려 있으면 건너뜁니다.$\r$\n나중에 앱의 '설정 탭 → 이 PC 준비 상태' 에서도 설치할 수 있습니다."
+  ${NSD_CreateLabel} 0 0 100% 12u "함께 설치할 프로그램"
+  Pop $0
+  ${NSD_CreateLabel} 0 14u 100% 24u "예배를 진행하려면 아래 프로그램이 필요합니다. 이미 깔려 있으면 건너뜁니다.$\r$\n나중에 앱의 '설정 탭 → 이 PC 준비 상태' 에서도 설치할 수 있습니다."
   Pop $0
 
-  ${NSD_CreateCheckbox} 0 32u 100% 12u "OBS Studio — 예배 영상을 송출합니다 (필수)"
+  ${NSD_CreateCheckbox} 0 44u 100% 12u "OBS Studio — 예배 영상을 송출합니다 (필수)"
   Pop $CheckObs
   ${NSD_Check} $CheckObs
 
-  ${NSD_CreateCheckbox} 0 48u 100% 12u "Google Chrome — 프로젝터 창을 주소줄 없이 띄웁니다 (선택)"
+  ${NSD_CreateCheckbox} 0 60u 100% 12u "Google Chrome — 프로젝터 창을 주소줄 없이 띄웁니다 (선택)"
   Pop $CheckChrome
   ${NSD_Check} $CheckChrome
 
-  ${NSD_CreateLabel} 0 72u 100% 32u "설치는 윈도우의 winget 이 합니다. 인터넷이 필요하고 몇 분 걸릴 수 있습니다.$\r$\nwinget 이 없거나 실패해도 예배 프레젠테이션 설치는 그대로 끝납니다."
+  ${NSD_CreateLabel} 0 84u 100% 32u "설치는 윈도우의 winget 이 합니다. 인터넷이 필요하고 몇 분 걸릴 수 있습니다.$\r$\nwinget 이 없거나 실패해도 예배 프레젠테이션 설치는 그대로 끝납니다."
   Pop $0
 
   nsDialogs::Show
