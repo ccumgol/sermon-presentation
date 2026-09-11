@@ -58,29 +58,49 @@ export function BackgroundPicker({ background, onChange }: Props): React.JSX.Ele
     void reload();
   }, [reload]);
 
-  const known =
-    background.src.length === 0 ||
-    library.some((f) => f.name === background.src) ||
-    files.some((f) => f.name === background.src);
+  const inLibrary = library.some((f) => f.name === background.src);
+  const inData = files.some((f) => f.name === background.src);
+  const known = background.src.length === 0 || inLibrary || inData;
   const empty = library.length === 0 && files.length === 0;
+
+  /*
+   * **어느 폴더에서 골랐는지 함께 담는다** (2026-09-11 버그 수정).
+   *
+   * 전에는 파일 이름만 담아서, 출력 페이지가 늘 `/backgrounds/`(데이터 폴더)로
+   * 주소를 만들었다 — 내 배경 폴더에서 고른 그림은 **404 로 조용히 사라졌다.**
+   * 목록이 두 폴더를 함께 보여 주므로 이름만으로는 어느 쪽인지 알 수 없다.
+   *
+   * 그래서 `<option>` 값에 폴더를 붙여 두고 여기서 갈라 읽는다.
+   */
+  const pick = (value: string): void => {
+    const at = value.indexOf(':');
+    if (at < 0) {
+      onChange({ ...background, src: '', source: 'data' });
+      return;
+    }
+    const source = value.slice(0, at) === 'library' ? 'library' : 'data';
+    onChange({ ...background, src: value.slice(at + 1), source });
+  };
+
+  /** 지금 고른 것을 드롭다운 값으로 — 저장된 폴더가 목록에 없으면 실제 자리를 따른다 */
+  const selected =
+    background.src.length === 0
+      ? ''
+      : `${background.source ?? (inLibrary && !inData ? 'library' : 'data')}:${background.src}`;
 
   return (
     <>
       <div className="field">
         <label>파일</label>
         <div className="row file-row">
-          <select
-            className="grow"
-            value={background.src}
-            onChange={(e) => onChange({ ...background, src: e.target.value })}
-          >
+          <select className="grow" value={selected} onChange={(e) => pick(e.target.value)}>
             <option value="">— 고르세요 —</option>
             {/* 목록에 없는 파일도 값으로 남긴다 — 지우면 무엇을 쓰려 했는지 사라진다 */}
-            {!known && <option value={background.src}>{background.src} (없음)</option>}
+            {!known && <option value={selected}>{background.src} (없음)</option>}
             {library.length > 0 && (
               <optgroup label="내 배경 폴더">
                 {library.map((file) => (
-                  <option key={`lib:${file.name}`} value={file.name}>
+                  <option key={`lib:${file.name}`} value={`library:${file.name}`}>
                     {file.name} ({formatSize(file.bytes)})
                   </option>
                 ))}
@@ -89,7 +109,7 @@ export function BackgroundPicker({ background, onChange }: Props): React.JSX.Ele
             {files.length > 0 && (
               <optgroup label="data/backgrounds">
                 {files.map((file) => (
-                  <option key={`data:${file.name}`} value={file.name}>
+                  <option key={`data:${file.name}`} value={`data:${file.name}`}>
                     {file.name} ({formatSize(file.bytes)})
                   </option>
                 ))}

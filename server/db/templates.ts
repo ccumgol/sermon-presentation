@@ -27,7 +27,11 @@ import {
   getBuiltinTemplate,
   LEGACY_FONT_CHAINS,
 } from '../../lib/template-presets.ts';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
 import type { Template } from '../../shared/types.ts';
+import { paths } from '../paths.ts';
 import { getConnection } from './app.ts';
 
 const SCHEMA = `
@@ -43,6 +47,7 @@ CREATE TABLE IF NOT EXISTS templates (
 export function initTemplateStore(): void {
   getConnection().exec(SCHEMA);
   upgradeLegacyFontChains();
+  fillMissingBackgroundSource();
 }
 
 /**
@@ -85,6 +90,64 @@ function upgradeLegacyFontChains(): number {
 
     if (!touched) continue;
     update.run(JSON.stringify({ ...config, overridesByLang: next }), row.id);
+    changed++;
+  }
+
+  return changed;
+}
+
+/**
+ * 저장된 템플릿의 **그림 배경이 어느 폴더에서 왔는지** 채운다 (2026-09-11 버그 수정).
+ *
+ * ## 무엇이 잘못됐었나
+ *
+ * 템플릿의 그림 배경은 **파일 이름만** 담았다. 그런데 고르는 목록은 두 폴더를
+ * 함께 보여 준다 — `~/Desktop/Data/Background`(내 배경 폴더)와 `data/backgrounds/`.
+ * 출력 페이지는 앞머리를 늘 `/backgrounds/` 로 만들었으므로, 내 배경 폴더에서 고른
+ * 그림은 **404 가 나고 배경이 조용히 사라졌다.**
+ *
+ * 데이터 폴더를 안 쓰는 사용자에게는 **한 번도 뜬 적이 없다** (2026-09-11 신고).
+ *
+ * ## 어떻게 채우나
+ *
+ * 파일이 실제로 어느 폴더에 있는지 본다. **두 곳에 다 있으면 `data` 를 고른다** —
+ * 지금까지의 동작이 그쪽이었으므로, 여태 잘 쓰던 사람의 화면을 바꾸지 않는다.
+ * 어디에도 없으면 **건드리지 않는다** — 없는 파일에 폴더를 정해 주면, 나중에
+ * 파일을 제자리에 넣었을 때 엉뚱한 쪽을 가리킨다.
+ *
+ * 여러 번 불러도 안전하다 (`source` 가 이미 있으면 넘어간다).
+ */
+function fillMissingBackgroundSource(): number {
+  const conn = getConnection();
+  const rows = conn.prepare('SELECT id, config FROM templates').all() as unknown as Array<{
+    id: number;
+    config: string;
+  }>;
+  const update = conn.prepare('UPDATE templates SET config = ? WHERE id = ?');
+  let changed = 0;
+
+  for (const row of rows) {
+    let config: Template;
+    try {
+      config = JSON.parse(row.config) as Template;
+    } catch {
+      continue; // 깨진 JSON 은 parseRow 가 이미 걸러낸다
+    }
+
+    const background = config.canvas?.background;
+    if (!background || background.mode !== 'image' || !background.src) continue;
+    if (background.source) continue;
+
+    const name = background.src;
+    const inData = existsSync(path.join(paths.backgroundsDir, name));
+    const inLibrary = existsSync(path.join(paths.backgroundSourceDir, name));
+    if (!inData && !inLibrary) continue;
+
+    const source = inData ? 'data' : 'library';
+    update.run(
+      JSON.stringify({ ...config, canvas: { ...config.canvas, background: { ...background, source } } }),
+      row.id,
+    );
     changed++;
   }
 

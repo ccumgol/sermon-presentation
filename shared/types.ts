@@ -444,7 +444,27 @@ export type CanvasBackground =
   | { mode: 'transparent' }
   | { mode: 'color'; color: string; opacity: number }
   | { mode: 'chroma'; color: string }
-  | { mode: 'image'; src: string; fit?: BackgroundFit; opacity?: number };
+  | {
+      mode: 'image';
+      src: string;
+      /**
+       * **어느 폴더에서 온 그림인가** (2026-09-11 버그 수정).
+       *
+       * 없으면 출력 페이지가 주소를 `/backgrounds/`(데이터 폴더)로 만든다. 그런데
+       * 고르는 목록은 **두 폴더를 함께** 보여 준다 — `~/Desktop/Data/Background`
+       * (내 배경 폴더)에서 고른 그림은 그 주소에 없어서 **404 로 조용히 사라졌다.**
+       * 실제로 그 폴더만 쓰는 사용자에게는 배경 그림이 한 번도 뜬 적이 없었다.
+       *
+       * `ItemBackground.source` 와 같은 값이다 — 항목 배경에는 처음부터 있었고
+       * 템플릿 쪽만 빠져 있었다.
+       *
+       * **선택 항목이다** — 저장된 옛 템플릿에는 이 칸이 없다. 기동할 때
+       * `server/db/templates.ts` 가 파일을 찾아 한 번 채운다.
+       */
+      source?: 'library' | 'data';
+      fit?: BackgroundFit;
+      opacity?: number;
+    };
 
 /** 화면을 채울지(잘림), 다 보이게 넣을지(여백) */
 export type BackgroundFit = 'cover' | 'contain';

@@ -106,8 +106,10 @@ describe('templateToCssVars', () => {
       },
     };
     const vars = templateToCssVars(template);
-    // 편집 중 style:set 만으로도 미리보기에 반영되려면 이 키가 함께 나가야 한다
-    expect(vars['backdrop']).toBe('{"mode":"image","src":"sanctuary.png"}');
+    // 편집 중 style:set 만으로도 미리보기에 반영되려면 이 키가 함께 나가야 한다.
+    // `source` 는 2026-09-11 에 들어왔다 — 없으면 출력 페이지가 주소를 늘
+    // `/backgrounds/` 로 만들어 **내 배경 폴더 그림이 404 로 사라진다** (아래 절 참고)
+    expect(vars['backdrop']).toBe('{"mode":"image","src":"sanctuary.png","source":"data"}');
     expect(vars['--backdrop-fit']).toBe('contain');
     expect(vars['--backdrop-opacity']).toBe('0.6');
   });
@@ -570,5 +572,57 @@ describe('단색 배경의 투명도', () => {
     expect(isHexColor('rgba(0,0,0,0.5)')).toBe(false);
     expect(isHexColor('#000')).toBe(false);
     expect(isHexColor('black')).toBe(false);
+  });
+});
+
+/**
+ * **그림 배경이 어느 폴더에서 왔는지** (2026-09-11 버그 수정).
+ *
+ * ## 무엇이 잘못됐었나
+ *
+ * 템플릿의 그림 배경은 **파일 이름만** 담았다. 그런데 고르는 목록은 두 폴더를 함께
+ * 보여 준다 — `~/Desktop/Data/Background`(내 배경 폴더)와 `data/backgrounds/`.
+ * 출력 페이지는 앞머리를 늘 `/backgrounds/` 로 만들었으므로, 내 배경 폴더에서 고른
+ * 그림은 **404 가 나고 배경이 조용히 사라졌다** (2026-09-11 사용자 신고,
+ * 격리 서버에서 `GET /backgrounds/Jesus.png → 404` 로 재현).
+ *
+ * 데이터 폴더를 안 쓰는 사용자에게는 **한 번도 뜬 적이 없다.**
+ */
+describe('그림 배경의 폴더', () => {
+  function backdrop(background: Template['canvas']['background']): string {
+    const template = base();
+    return templateToCssVars({ ...template, canvas: { ...template.canvas, background } })['backdrop']!;
+  }
+
+  it('내 배경 폴더에서 고른 그림은 library 로 나간다', () => {
+    expect(JSON.parse(backdrop({ mode: 'image', src: 'Jesus.png', source: 'library' }))).toEqual({
+      mode: 'image',
+      src: 'Jesus.png',
+      source: 'library',
+    });
+  });
+
+  it('데이터 폴더에서 고른 그림은 data 로 나간다', () => {
+    expect(JSON.parse(backdrop({ mode: 'image', src: 'bg_1.png', source: 'data' })).source).toBe('data');
+  });
+
+  /**
+   * 저장된 옛 템플릿에는 이 칸이 없다. **지금까지의 동작(`data`)을 그대로** 둔다 —
+   * 여태 잘 쓰던 사람의 화면을 바꾸지 않는다. 실제 자리를 찾아 채우는 것은
+   * 기동할 때 서버가 한 번 한다 (`fillMissingBackgroundSource`).
+   */
+  it('칸이 없는 옛 템플릿은 data 로 둔다 — 오늘 화면이 안 바뀐다', () => {
+    expect(JSON.parse(backdrop({ mode: 'image', src: 'bg_1.png' })).source).toBe('data');
+  });
+
+  it('모르는 값도 data 로 떨어진다 — 주소가 통째로 정해지면 안 된다', () => {
+    const weird = { mode: 'image', src: 'x.png', source: '../../etc' } as unknown as Template['canvas']['background'];
+    expect(JSON.parse(backdrop(weird)).source).toBe('data');
+  });
+
+  it('그림이 아니면 빈 문자열 — 요소를 만들지 않는다', () => {
+    expect(backdrop({ mode: 'transparent' })).toBe('');
+    expect(backdrop({ mode: 'color', color: '#000000', opacity: 1 })).toBe('');
+    expect(backdrop({ mode: 'image', src: '' })).toBe('');
   });
 });

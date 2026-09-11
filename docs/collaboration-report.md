@@ -554,6 +554,43 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 
+- [완료 2026-09-11 / Agent C] 템플릿 배경 그림이 안 뜬다 (사용자 신고)
+  증상: `~/Desktop/Data/Background` 에 `Jesus.png` 를 넣었는데 배경으로 안 불러와진다.
+  **서버는 멀쩡하다** (읽기로만 확인): 목록에 있고(`/api/backgrounds`),
+  `/background-library/Jesus.png` 가 200 에 2,079,608 바이트로 나간다.
+  화면에서 재현(격리 서버 7865, 같은 원본 폴더): 템플릿 탭 목록에도 **보인다.**
+  고르면 `#backdrop` 이 빈 채로 남고 — 네트워크를 보니
+    **GET /backgrounds/Jesus.png → 404**
+  원인: 템플릿의 그림 배경은 **어느 폴더에서 왔는지를 안 담는다**(`src` 만 있다).
+    `output.js` 의 `restoreTemplateBackdrop` 이 앞머리 없이 `applyBackdrop` 을 불러
+    기본값 `/backgrounds/`(데이터 폴더)로 주소를 만든다.
+    항목 배경(`ItemBackground`)에는 `source: 'library' | 'data'` 가 **이미 있다** —
+    템플릿 쪽만 빠져 있었다.
+  ⚠️ 이 사용자의 `data/backgrounds/` 는 **비어 있다**(0개). 그림 14장이 전부
+    라이브러리 폴더에 있다 → **템플릿 배경 그림은 여태 한 번도 뜬 적이 없다.**
+    이미 그 상태로 템플릿(id 6)을 저장해 두셨다.
+  계획: ① `CanvasBackground` 그림 갈래에 `source?` 추가(선택 — 옛 JSON 이 그대로 읽힌다)
+        ② `backdropValue` 가 실어 보내고 `output.js` 가 앞머리를 고른다 (양쪽 함께)
+        ③ `BackgroundPicker` 가 고를 때 어느 폴더인지 담는다
+        ④ 이미 저장된 템플릿은 **기동 때 한 번 채운다** (`upgradeLegacyFontChains` 와 같은 자리)
+  한 것: 계획 ①~④ 그대로. `output.js` 와 `lib/template-css.ts` 를 **함께** 고쳤다.
+    `BackgroundPicker` 는 `<option>` 값에 폴더를 붙여(`library:이름`) 갈라 읽는다.
+    이주(`fillMissingBackgroundSource`)는 `upgradeLegacyFontChains` 옆에 뒀다.
+    **두 폴더에 다 있으면 `data`** — 지금까지의 동작이라 잘 쓰던 화면을 안 바꾼다.
+    **어디에도 없으면 건드리지 않는다** — 나중에 제자리에 넣었을 때 엉뚱한 쪽을 가리킨다.
+    **이미 채워져 있으면 그대로 둔다** — 사람이 고른 것이 이주보다 세다.
+  검사 13개(단위 5 + 이주 8) · **변이 6개 전부 잡힘.**
+    '이미 채운 것도 덮어씀' 은 **처음에 못 잡았다** — 다시 돌려도 같은 값이 나와서다.
+    두 폴더에 다 있는데 사람이 `library` 를 골라 둔 경우를 만들어서 잡았다.
+  검증: tsc 0 · vitest 2,067 · vite build.
+    브라우저(격리 서버 7865, 사용자 DB 사본): 고치기 전 `GET /backgrounds/Jesus.png → 404`
+    로 재현 → 고친 뒤 `/background-library/Jesus.png` 1672x941 로드, 미리보기에 그림이 깔린다.
+    **사용자 DB 사본을 처음 상태로 되돌려 다시 띄워** 이주가 자동으로 도는 것까지 봤다.
+  ⚠️ **내가 규칙을 어겼다** — 이주 검사를 쓰면서 `~/Desktop/Data/Background`(읽기 전용
+    원본)에 파일을 만들었다. 검사가 끝나며 지웠고 사용자 파일 15개는 그대로지만,
+    그럴 일이 아니었다. **`vitest.config.ts` 에 `SERMON_BACKGROUND_DIR` 을 넣어
+    앞으로 어떤 검사도 그 폴더에 닿지 못하게 막았다** — 검사마다 조심하는 것보다 확실하다.
+
 - [완료 2026-09-11 / Agent C] 배경 레이어 둘 (사용자 요청)
   왜: 전체화면 송출 때 **OBS 카메라 영상 위의 글자가 안 읽힌다.**
   ① 전체 프리셋 — 화면 전체에 색+투명도 레이어

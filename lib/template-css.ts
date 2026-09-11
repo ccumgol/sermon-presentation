@@ -174,7 +174,21 @@ export function isAllowedStyleKey(key: string): boolean {
 export function backdropValue(background: CanvasBackground): string {
   // 그림 배경만 요소를 만든다 — 색·투명·크로마는 CSS 변수로 충분하다
   if (background.mode !== 'image' || !background.src) return '';
-  return JSON.stringify({ mode: 'image', src: background.src });
+  /*
+   * **어느 폴더에서 왔는지 함께 싣는다** (2026-09-11 버그 수정).
+   *
+   * 없으면 출력 페이지가 `/backgrounds/`(데이터 폴더)로 주소를 만드는데, 고르는
+   * 목록은 두 폴더를 함께 보여 준다 — 내 배경 폴더에서 고른 그림이 **404 로
+   * 조용히 사라졌다.** `ItemBackground` 는 처음부터 이 값을 실어 보냈다.
+   *
+   * 옛 템플릿(칸이 없는 것)은 `data` 로 둔다 — 지금까지의 동작 그대로다.
+   * 실제 자리를 찾아 채우는 것은 기동할 때 서버가 한 번 한다.
+   */
+  return JSON.stringify({
+    mode: 'image',
+    src: background.src,
+    source: background.source === 'library' ? 'library' : 'data',
+  });
 }
 
 function backdropFit(background: CanvasBackground): string {

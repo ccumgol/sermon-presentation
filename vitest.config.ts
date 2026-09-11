@@ -21,6 +21,17 @@ export default defineConfig({
     env: {
       SERMON_DATA_DIR: path.join(repoRoot, '.test-data'),
       SERMON_BIBLE_DB: path.join(repoRoot, 'data', 'bible.sqlite'),
+      /*
+       * **원본 배경 폴더를 검사가 못 건드리게 막는다** (2026-09-11).
+       *
+       * 기본값은 `~/Desktop/Data/Background` 다 — 사용자가 모아 둔 **읽기 전용**
+       * 자료다(CLAUDE.md). 그런데 검사 환경이 그것을 덮지 않아서, 배경 이주 검사를
+       * 쓰다가 **실제로 그 폴더에 파일을 만들었다** (지우긴 했지만 그럴 일이 아니다).
+       *
+       * 여기서 막으면 앞으로 어떤 검사도 그 폴더에 닿지 않는다 —
+       * 검사 하나하나가 조심하는 것보다 이쪽이 확실하다.
+       */
+      SERMON_BACKGROUND_DIR: path.join(repoRoot, '.test-data', 'background-source'),
     },
     /**
      * 테스트 파일을 직렬로 돌린다.

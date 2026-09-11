@@ -630,9 +630,20 @@
     el.backdrop.style.removeProperty('--backdrop-opacity');
     // 템플릿 값은 CSS 패치로도 오므로(`applyStylePatch`) 기억해 둔 것을 쓴다.
     // `template.canvas` 만 보면 편집 중 값과 어긋난다.
-    applyBackdrop(
-      templateBackdrop || (template && template.canvas && template.canvas.background),
-    );
+    var background = templateBackdrop || (template && template.canvas && template.canvas.background);
+    /*
+     * **어느 폴더에서 온 그림인지 보고 앞머리를 고른다** (2026-09-11 버그 수정).
+     *
+     * 전에는 앞머리를 안 넘겨서 늘 `/backgrounds/`(데이터 폴더)가 됐다. 그런데
+     * 고르는 목록은 **두 폴더를 함께** 보여 준다 — 내 배경 폴더에서 고른 그림은
+     * 그 주소에 없어서 **404 가 나고 배경이 조용히 사라졌다.** 데이터 폴더를
+     * 안 쓰는 사용자에게는 템플릿 배경 그림이 한 번도 뜬 적이 없었다.
+     *
+     * 항목 배경(`applyItemBackground`)은 처음부터 이 표를 썼다 — 같은 규칙으로 맞춘다.
+     * 값이 없거나 모르는 것이면 `/backgrounds/` 로 — 지금까지의 동작 그대로다.
+     */
+    var prefix = (background && BACKDROP_PREFIX[background.source]) || '/backgrounds/';
+    applyBackdrop(background, prefix);
   }
 
   /**
