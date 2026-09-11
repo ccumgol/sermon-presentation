@@ -61,11 +61,20 @@ function backgroundValue(background: CanvasBackground): string {
   }
 }
 
+/**
+ * `#RRGGBB` 인가 — **투명도를 따로 곱할 수 있는 색인가**.
+ *
+ * `withAlpha` 가 이 판정으로 갈라지고, 템플릿 탭의 투명도 슬라이더도 같은 것을 봐야
+ * 한다("이 값이 쓰이는가"를 사람에게 알려 준다). 두 곳에 적으면 한쪽이 뒤처진다.
+ */
+export function isHexColor(color: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(color.trim());
+}
+
 /** #RRGGBB + 알파 → rgba(). 이미 rgba/hsl 형태면 그대로 둔다. */
 export function withAlpha(color: string, alpha: number): string {
-  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
-  if (!match) return color;
-  const hex = match[1]!;
+  if (!isHexColor(color)) return color;
+  const hex = color.trim().slice(1);
   const r = Number.parseInt(hex.slice(0, 2), 16);
   const g = Number.parseInt(hex.slice(2, 4), 16);
   const b = Number.parseInt(hex.slice(4, 6), 16);
@@ -209,6 +218,17 @@ export function templateToCssVars(template: Template): CssVars {
     // 레이아웃
     '--justify': justify,
     '--align': align,
+    /*
+     * **글자 덩어리 뒤 네모** (2026-09-11). `.slide` 한 요소에 그려진다 —
+     * `TextStyle.bgBox`(줄마다)와 달리 소제목·본문·참조를 한 네모가 감싼다.
+     *
+     * 없으면 `transparent` + 여백 0 이라 **아무것도 안 그린 것과 같다.**
+     * 저장된 옛 템플릿에는 이 칸이 없으므로 `?.` 로 읽는다.
+     */
+    '--slide-box-bg': layout.box ? layout.box.color : 'transparent',
+    '--slide-box-pad-x': px(layout.box?.paddingX ?? 0),
+    '--slide-box-pad-y': px(layout.box?.paddingY ?? 0),
+    '--slide-box-radius': px(layout.box?.radius ?? 0),
     '--offset-x': px(layout.offsetX),
     '--offset-y': px(layout.offsetY),
     '--block-width': size(layout.width),

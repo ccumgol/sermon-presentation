@@ -26,6 +26,15 @@
   --block-gap: 24px;
   --fit-scale: 1; /* autoFit 축소 배율 */
 
+  /*
+   * 글자 덩어리 뒤 네모 (2026-09-11). 기본은 **아무것도 안 그린 것과 같다** —
+   * 투명 + 여백 0 이라 옛 템플릿의 화면이 한 픽셀도 달라지지 않는다.
+   */
+  --slide-box-bg: transparent;
+  --slide-box-pad-x: 0px;
+  --slide-box-pad-y: 0px;
+  --slide-box-radius: 0px;
+
   /* ── 주 역본 / 주 언어 ── */
   --primary-font: system-ui, sans-serif;
   --primary-size: 64px;
@@ -178,6 +187,23 @@ body.preview #preview-bg {
   width: var(--block-width);
   max-width: 100%;
   max-height: var(--block-max-height);
+  /*
+   * 글자 덩어리 뒤 네모 (2026-09-11 사용자 요청).
+   *
+   * 왜 여기인가: `.slide` 는 소제목·본문·참조·저작권을 **감싸고 내용 크기에 맞는다**
+   * (`--block-width` 기본이 auto). 그래서 글자가 있는 자리에만 네모가 생긴다.
+   * `TextStyle.bgBox` 는 `.line-*` 에 붙어 **줄마다** 그려져 끝이 들쭉날쭉하다.
+   *
+   * ⚠️ `box-sizing: border-box` 가 필요하다. 없으면 여백을 준 만큼 폭이 커져서
+   * `--block-width` 를 숫자로 지정한 템플릿이 밀린다.
+   *
+   * ⚠️ 자동 축소(`--fit-scale`)는 이 요소의 `scrollHeight` 로 재므로
+   * (`output.js` measure) **여백까지 함께 계산된다** — 따로 할 일이 없다.
+   */
+  box-sizing: border-box;
+  background: var(--slide-box-bg);
+  padding: var(--slide-box-pad-y) var(--slide-box-pad-x);
+  border-radius: var(--slide-box-radius);
   text-align: var(--text-align);
   transform: translate(var(--offset-x), var(--offset-y)) scale(var(--fit-scale));
   transform-origin: center;

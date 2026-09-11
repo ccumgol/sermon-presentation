@@ -376,6 +376,26 @@ export type Anchor =
   | 'mid-left' | 'center' | 'mid-right'
   | 'bottom-left' | 'bottom-center' | 'bottom-right';
 
+/**
+ * **글자 뒤에 까는 네모** — 색·여백·모서리.
+ *
+ * 두 군데가 같은 모양을 쓴다. 이름이 하나여야 둘이 같은 것임이 보인다.
+ *
+ * | 쓰는 곳 | 어디에 그려지나 |
+ * |---|---|
+ * | `TextStyle.bgBox` | **줄마다** (`.line-primary` · `.line-secondary`) — 줄 끝이 들쭉날쭉하다 |
+ * | `TemplateLayout.box` | **글자 덩어리 하나에** (`.slide`) — 소제목·본문·참조를 한 네모가 감싼다 |
+ *
+ * 색에 `rgba(...)` 를 그대로 쓴다 — 투명도가 값 안에 들어 있어야 색과 따로 놀지 않는다.
+ */
+export interface BoxStyle {
+  /** `rgba(0,0,0,0.55)` 처럼 투명도를 담을 수 있다 */
+  color: string;
+  paddingX: number;
+  paddingY: number;
+  radius: number;
+}
+
 export interface TextStyle {
   fontFamily: string;
   fontSize: number; // px @1080p
@@ -403,7 +423,7 @@ export interface TextStyle {
   opacity: number;
   stroke: { width: number; color: string } | null;
   shadow: { x: number; y: number; blur: number; color: string } | null;
-  bgBox: { color: string; paddingX: number; paddingY: number; radius: number } | null;
+  bgBox: BoxStyle | null;
   italic: boolean;
   textTransform: 'none' | 'uppercase';
   wordBreak: 'normal' | 'keep-all';
@@ -513,6 +533,20 @@ export interface TemplateLayout {
   /** 다역본/다언어 블록 배치 방향 */
   direction: 'column' | 'row';
   gap: number;
+  /**
+   * **글자 덩어리 뒤에 까는 네모** (2026-09-11 사용자 요청).
+   *
+   * 왜 필요한가: 전체화면으로 송출하면 OBS 의 **카메라 영상 위에 글자가 얹혀** 잘 안
+   * 읽힌다. 화면 전체를 덮는 것(`canvas.background`)은 영상을 통째로 가리므로,
+   * **글자가 있는 자리만** 어둡게 깔 수 있어야 한다.
+   *
+   * `TextStyle.bgBox` 와 다르다 — 그쪽은 **줄마다** 그려서 줄 끝이 들쭉날쭉하다.
+   * 이것은 `.slide` 한 요소에 그려 **덩어리 하나**를 감싼다.
+   *
+   * 없거나 `null` 이면 안 그린다. **저장된 옛 템플릿에는 이 칸이 없으므로
+   * 선택 항목이어야 한다** — 있다고 보고 읽으면 기존 템플릿이 깨진다.
+   */
+  box?: BoxStyle | null;
 }
 
 export type TextRole = 'primary' | 'secondary' | 'verseNum' | 'reference' | 'heading' | 'credit';

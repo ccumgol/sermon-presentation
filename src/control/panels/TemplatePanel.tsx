@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { templateToCssVars } from '../../../lib/template-css.ts';
+import { isHexColor, templateToCssVars } from '../../../lib/template-css.ts';
 import type { CanvasBackground, ClientMsg, Template, TextStyle } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
 import { AnchorGrid } from '../components/AnchorGrid.tsx';
 import { BackgroundPicker } from '../components/BackgroundPicker.tsx';
-import { ColorField, NumberField, TextStyleFields } from '../components/StyleFields.tsx';
+import { BoxFields, ColorField, NumberField, TextStyleFields } from '../components/StyleFields.tsx';
 
 interface Props {
   /** 현재 송출에 적용된 템플릿 (서버가 WS 로 밀어 준다) */
@@ -418,6 +418,51 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
           <NumberField label="블록 간격" value={draft.layout.gap} min={0} max={120} suffix="px"
             onChange={(gap) => patchDraft((c) => ({ ...c, layout: { ...c.layout, gap } }))} />
         </div>
+
+        {/*
+          **글자 덩어리 뒤 네모** (2026-09-11 사용자 요청).
+
+          전체화면으로 송출하면 OBS 의 카메라 영상 위에 글자가 얹혀 잘 안 읽힌다.
+          화면 전체를 덮는 것(아래 '배경' 카드)은 영상을 통째로 가리므로,
+          **글자가 있는 자리만** 어둡게 깔 수 있어야 한다.
+
+          글자 카드의 '글자 뒤 상자' 와 다르다 — 그쪽은 **줄마다** 그려서 줄 끝이
+          들쭉날쭉하다. 이것은 소제목·본문·참조를 **한 네모**가 감싼다.
+        */}
+        <label className="check" title="카메라 영상 위에서 글자를 읽히게 한다">
+          <input
+            type="checkbox"
+            checked={draft.layout.box != null}
+            onChange={(e) =>
+              patchDraft((c) => ({
+                ...c,
+                layout: {
+                  ...c.layout,
+                  box: e.target.checked
+                    ? { color: 'rgba(0,0,0,0.55)', paddingX: 48, paddingY: 32, radius: 16 }
+                    : null,
+                },
+              }))
+            }
+          />
+          글자 영역 뒤에 네모 깔기
+        </label>
+
+        {draft.layout.box != null && (
+          <>
+            <BoxFields
+              box={draft.layout.box}
+              colorLabel="네모 색 (rgba 로 투명도)"
+              onChange={(box) => patchDraft((c) => ({ ...c, layout: { ...c.layout, box } }))}
+            />
+            <p className="hintline muted">
+              투명도는 색에 담습니다 — <code>rgba(0,0,0,0.55)</code> 는 검정 55%,{' '}
+              <code>rgba(10,20,60,0.6)</code> 는 짙은 파랑 60%입니다.
+              네모는 <strong>글자 폭을 따라가고</strong> 안전 영역 끝에서 멈춥니다 —
+              짧은 찬양 줄은 글자만큼, 긴 성경 본문은 대개 끝까지 넓어집니다.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="card">
@@ -471,6 +516,51 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
                 OBS 에서 이 색으로 크로마키 필터를 걸어야 합니다. 글자 색과 겹치지 않게 하세요.
               </p>
             )}
+          </>
+        )}
+
+        {/*
+          **투명도** (2026-09-11 사용자 요청).
+
+          여기가 없어서 모드를 고르면 0.5 로 굳어 있었다 — 엔진은 처음부터 받고
+          있었는데(`backgroundValue` 가 `withAlpha` 로 rgba 를 만든다) 고칠 길이
+          화면에 없었다.
+
+          ⚠️ 색 칸에 `rgba(...)` 를 직접 치면 **이 값은 무시된다** —
+          `withAlpha` 가 `#RRGGBB` 가 아닌 값은 그대로 통과시킨다. 둘을 곱하지
+          않는 것이 맞다(두 번 어두워지면 무엇이 이겼는지 알 수 없다).
+          아래 안내가 그것을 말해 준다.
+        */}
+        {background.mode === 'color' && (
+          <>
+            <div className="field">
+              <label htmlFor="canvas-bg-opacity">
+                투명도 <span className="muted">{Math.round(background.opacity * 100)}%</span>
+              </label>
+              <input
+                id="canvas-bg-opacity"
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={background.opacity}
+                onChange={(e) => {
+                  const opacity = Number(e.target.value);
+                  patchDraft((c) => ({
+                    ...c,
+                    canvas: {
+                      ...c.canvas,
+                      background: { mode: 'color', color: (c.canvas.background as { color?: string }).color ?? '#000000', opacity },
+                    },
+                  }));
+                }}
+              />
+            </div>
+            <p className="hintline muted">
+              {isHexColor(background.color)
+                ? '화면 전체를 덮습니다. 카메라 영상 위에 글자를 올릴 때 0.4~0.6 이 읽기 좋습니다.'
+                : '색을 rgba 로 직접 쓰셨습니다 — 그 값의 투명도가 쓰이고 이 슬라이더는 무시됩니다.'}
+            </p>
           </>
         )}
 

@@ -1,4 +1,4 @@
-import type { TextStyle } from '../../../shared/types.ts';
+import type { BoxStyle, TextStyle } from '../../../shared/types.ts';
 import { FontChainStatus } from './FontChainStatus.tsx';
 
 interface NumberFieldProps {
@@ -106,6 +106,62 @@ interface TextStyleFieldsProps {
 }
 
 /** 한 역할(주 역본·보조 역본 등)의 글자 스타일 편집 묶음 */
+/**
+ * **네모 상자 편집** — 색·여백·모서리. 두 군데가 같은 것을 쓴다.
+ *
+ * | 부르는 곳 | 무엇을 고치나 |
+ * |---|---|
+ * | 글자 카드 (`TextStyleFields`) | `TextStyle.bgBox` — **줄마다** 그려진다 |
+ * | 템플릿 탭 배치 카드 | `TemplateLayout.box` — **글자 덩어리 하나**에 그려진다 |
+ *
+ * 둘이 같은 모양(`BoxStyle`)이라 편집 화면도 하나여야 한다 — 두 벌을 두면
+ * 한쪽만 고쳐져 서로 다르게 동작한다.
+ */
+export function BoxFields({
+  box,
+  onChange,
+  colorLabel = '상자 색 (rgba 가능)',
+}: {
+  box: BoxStyle;
+  onChange: (next: BoxStyle) => void;
+  colorLabel?: string;
+}): React.JSX.Element {
+  return (
+    <div className="box-fields">
+      {/* rgba 를 쓰므로 색 고르기가 아니라 글자로도 받는다 (투명도가 값에 들어 있다) */}
+      <ColorField label={colorLabel} value={box.color} onChange={(color) => onChange({ ...box, color })} />
+      <div className="row">
+        <NumberField
+          label="좌우 여백"
+          value={box.paddingX}
+          min={0}
+          max={200}
+          step={2}
+          suffix="px"
+          onChange={(paddingX) => onChange({ ...box, paddingX })}
+        />
+        <NumberField
+          label="위아래 여백"
+          value={box.paddingY}
+          min={0}
+          max={160}
+          step={2}
+          suffix="px"
+          onChange={(paddingY) => onChange({ ...box, paddingY })}
+        />
+      </div>
+      <NumberField
+        label="모서리 둥글기"
+        value={box.radius}
+        min={0}
+        max={80}
+        suffix="px"
+        onChange={(radius) => onChange({ ...box, radius })}
+      />
+    </div>
+  );
+}
+
 export function TextStyleFields({
   title,
   style,
@@ -318,42 +374,7 @@ export function TextStyleFields({
           </label>
 
           {style.bgBox && (
-            <div className="box-fields">
-              {/* rgba 를 쓰므로 색 고르기가 아니라 글자로 받는다 (투명도가 값에 들어 있다) */}
-              <ColorField
-                label="상자 색 (rgba 가능)"
-                value={style.bgBox.color}
-                onChange={(color) => onChange({ bgBox: { ...style.bgBox!, color } })}
-              />
-              <div className="row">
-                <NumberField
-                  label="좌우 여백"
-                  value={style.bgBox.paddingX}
-                  min={0}
-                  max={120}
-                  step={2}
-                  suffix="px"
-                  onChange={(paddingX) => onChange({ bgBox: { ...style.bgBox!, paddingX } })}
-                />
-                <NumberField
-                  label="위아래 여백"
-                  value={style.bgBox.paddingY}
-                  min={0}
-                  max={80}
-                  step={2}
-                  suffix="px"
-                  onChange={(paddingY) => onChange({ bgBox: { ...style.bgBox!, paddingY } })}
-                />
-              </div>
-              <NumberField
-                label="모서리 둥글기"
-                value={style.bgBox.radius}
-                min={0}
-                max={40}
-                suffix="px"
-                onChange={(radius) => onChange({ bgBox: { ...style.bgBox!, radius } })}
-              />
-            </div>
+            <BoxFields box={style.bgBox} onChange={(bgBox) => onChange({ bgBox })} />
           )}
         </details>
       )}

@@ -115,6 +115,8 @@ function preset(input: PresetInput): Template {
       verticalAlign: 'bottom',
       direction: 'column',
       gap: 24,
+      // 글자 덩어리 뒤 네모 — 기본은 안 그린다. 켜면 카메라 영상 위에서도 읽힌다
+      box: null,
       ...input.layout,
     },
     text: {

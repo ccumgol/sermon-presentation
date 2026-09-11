@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_TEMPLATES, SHARED_PRESET_IDS, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
-import { MAX_TITLE_RHYTHM, anchorToAlignment, clampRhythm, diffCssVars, isAllowedStyleKey, overrideVarsFor, templateToCssVars, withAlpha } from '../../lib/template-css.ts';
+import { MAX_TITLE_RHYTHM, anchorToAlignment, clampRhythm, diffCssVars, isAllowedStyleKey, isHexColor, overrideVarsFor, templateToCssVars, withAlpha } from '../../lib/template-css.ts';
 import type { Anchor, Template } from '../../shared/types.ts';
 
 function base(): Template {
@@ -466,5 +466,109 @@ describe('isAllowedStyleKey', () => {
         expect(isAllowedStyleKey(key), `${preset.name} 의 ${key}`).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * **글자 덩어리 뒤 네모** (2026-09-11 사용자 요청).
+ *
+ * 왜 이 검사가 값이 있나: 전체화면 송출에서 **OBS 카메라 영상 위의 글자가 안 읽히는**
+ * 문제를 푸는 장치다. 여기가 조용히 어긋나면 예배 중에 글자가 묻힌다.
+ *
+ * 못 박는 것 둘:
+ *  - **없을 때는 아무것도 안 그린 것과 같아야 한다** — 옛 템플릿 화면이 달라지면 안 된다
+ *  - **저장된 옛 템플릿에는 이 칸이 아예 없다**(선택 항목). 그래도 던지지 않아야 한다
+ */
+describe('글자 덩어리 뒤 네모 (layout.box)', () => {
+  it('없으면 투명 + 여백 0 — 안 그린 것과 같다', () => {
+    const vars = templateToCssVars(base());
+    expect(vars['--slide-box-bg']).toBe('transparent');
+    expect(vars['--slide-box-pad-x']).toBe('0px');
+    expect(vars['--slide-box-pad-y']).toBe('0px');
+    expect(vars['--slide-box-radius']).toBe('0px');
+  });
+
+  it('켜면 색·여백·모서리가 그대로 나간다', () => {
+    const template = base();
+    const vars = templateToCssVars({
+      ...template,
+      layout: { ...template.layout, box: { color: 'rgba(0,0,0,0.55)', paddingX: 48, paddingY: 32, radius: 16 } },
+    });
+    expect(vars['--slide-box-bg']).toBe('rgba(0,0,0,0.55)');
+    expect(vars['--slide-box-pad-x']).toBe('48px');
+    expect(vars['--slide-box-pad-y']).toBe('32px');
+    expect(vars['--slide-box-radius']).toBe('16px');
+  });
+
+  /**
+   * **저장된 옛 템플릿에는 `box` 칸이 없다.** DB 는 JSON 을 그대로 읽어 오므로
+   * `undefined` 가 들어온다 — 있다고 보고 읽으면 그 템플릿이 통째로 깨진다.
+   */
+  it('칸이 아예 없는 옛 템플릿도 던지지 않는다', () => {
+    const template = base();
+    const legacyLayout = { ...template.layout };
+    delete (legacyLayout as { box?: unknown }).box;
+
+    const vars = templateToCssVars({ ...template, layout: legacyLayout });
+    expect(vars['--slide-box-bg']).toBe('transparent');
+    expect(vars['--slide-box-pad-x']).toBe('0px');
+  });
+
+  /** 껐다 켜는 것이 `null` 이다 — 그것도 '안 그림' 이어야 한다 */
+  it('null 도 안 그림이다', () => {
+    const template = base();
+    const vars = templateToCssVars({ ...template, layout: { ...template.layout, box: null } });
+    expect(vars['--slide-box-bg']).toBe('transparent');
+  });
+
+  it('프리셋 여덟 개 모두 기본은 안 그림이다 — 오늘 화면이 하나도 안 바뀐다', () => {
+    for (const template of BUILTIN_TEMPLATES) {
+      const vars = templateToCssVars(template);
+      expect(vars['--slide-box-bg'], template.name).toBe('transparent');
+      expect(vars['--slide-box-pad-x'], template.name).toBe('0px');
+      expect(vars['--slide-box-pad-y'], template.name).toBe('0px');
+    }
+  });
+});
+
+/**
+ * **전체 화면 색 레이어의 투명도** (2026-09-11 사용자 요청).
+ *
+ * 엔진은 처음부터 받고 있었는데 화면에 고칠 길이 없었다(모드를 고르면 0.5 로 굳었다).
+ * 슬라이더를 붙이면서 **어떤 값이 실제로 먹는지**를 못 박는다.
+ */
+describe('단색 배경의 투명도', () => {
+  function canvasBg(background: Template['canvas']['background']): string {
+    const template = base();
+    return templateToCssVars({ ...template, canvas: { ...template.canvas, background } })['--canvas-bg']!;
+  }
+
+  it('#RRGGBB 는 투명도와 합쳐 rgba 가 된다', () => {
+    expect(canvasBg({ mode: 'color', color: '#000000', opacity: 0.55 })).toBe('rgba(0, 0, 0, 0.55)');
+    expect(canvasBg({ mode: 'color', color: '#0a143c', opacity: 0.6 })).toBe('rgba(10, 20, 60, 0.6)');
+  });
+
+  it('1 이면 색 그대로 — 쓸데없이 rgba 로 바꾸지 않는다', () => {
+    expect(canvasBg({ mode: 'color', color: '#000000', opacity: 1 })).toBe('#000000');
+  });
+
+  it('0 이면 완전히 투명하다 — 켜 두고 끌 수 있어야 한다', () => {
+    expect(canvasBg({ mode: 'color', color: '#000000', opacity: 0 })).toBe('rgba(0, 0, 0, 0)');
+  });
+
+  /**
+   * 색을 rgba 로 직접 쓰면 **투명도는 무시된다** — 두 번 곱하지 않는다.
+   * 두 번 어두워지면 사람이 무엇이 이겼는지 알 수 없다. 화면도 이렇게 안내한다.
+   */
+  it('rgba 를 직접 쓰면 그 값이 이긴다', () => {
+    expect(canvasBg({ mode: 'color', color: 'rgba(10,20,60,0.6)', opacity: 0.2 })).toBe('rgba(10,20,60,0.6)');
+  });
+
+  it('투명도를 곱할 수 있는 색인지 알려 준다 — 화면이 이 판정으로 안내를 가린다', () => {
+    expect(isHexColor('#000000')).toBe(true);
+    expect(isHexColor('  #0A143C  ')).toBe(true);
+    expect(isHexColor('rgba(0,0,0,0.5)')).toBe(false);
+    expect(isHexColor('#000')).toBe(false);
+    expect(isHexColor('black')).toBe(false);
   });
 });
