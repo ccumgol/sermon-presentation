@@ -222,9 +222,31 @@
     // 브라우저에서 하면 자동 재생 차단·코덱 문제를 우리가 떠안는다.
     var node = document.createElement('img');
 
+    /*
+     * **한 번은 다른 폴더도 찾아본다** (2026-09-11).
+     *
+     * 그림이 어느 폴더에서 왔는지(`source`)는 **조작 화면이 계산해 보낸다.** 그래서
+     * 판이 섞이면(옛 조작 화면 · 옛 설치판 · 옛 순서표 파일) 그 값이 빠진 채로 오고,
+     * 우리는 `/backgrounds/` 로 찾다가 404 를 내고 **배경이 사라진다.**
+     * 실제로 그 일을 겪었다 — 파일은 내 배경 폴더에 멀쩡히 있었다.
+     *
+     * 여기서 한 번 더 찾아보면 **보내는 쪽이 옛 판이어도 화면은 살아난다.**
+     * 예배 중에 배경이 빠지는 것보다 요청 한 번이 낫다.
+     *
+     * `source` 를 **명시적으로 준 경우에는 시도하지 않는다** — 사람이 고른 폴더를
+     * 우리가 뒤집으면, 같은 이름이 두 폴더에 있을 때 엉뚱한 그림이 나간다.
+     */
+    var triedOther = false;
+    var explicit = background && background.source;
+
     // 파일이 없거나 코덱을 못 읽어도 **화면을 비우지 않는다** — 배경만 빠진다.
     // 대신 컨트롤 패널이 알 수 있게 오류로 올린다.
     node.addEventListener('error', function () {
+      if (!triedOther && !explicit && prefix === '/backgrounds/') {
+        triedOther = true;
+        node.src = '/background-library/' + encodeURIComponent(src);
+        return;
+      }
       clearChildren(el.backdrop);
       backdropKey = '';
       diag.errors++;
