@@ -554,6 +554,13 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 
+- [완료 2026-09-12 / Agent C] 설치 파일 1.0.0 (CI 34706400655, 커밋 f6e7121)
+    · SermonPresentation-1.0.0-arm64.dmg  124M · SermonPresentation-1.0.0.dmg  131M
+    · SermonPresentation Setup 1.0.0.exe  109M
+  마운트해 확인: DMG 네 항목 · `codesign --verify --deep --strict` 통과 ·
+  **앱 안의 package.json 이 1.0.0** · 높이 잡이 CSS · 글자 영역 네모 · 배경 폴더 대체
+  — 번들만 새로 만들어지고 옛 코드가 들어가는 일이 없도록 파일을 열어 봤다.
+
 - [완료 2026-09-12 / Agent C] 항목 설정 칸 높이 조절 + 판 1.0.0 (사용자 요청)
   ① 높이 잡이: `useColumnSplit` 에 `axis: 'x' | 'y'` 를 더했다. 셈(`lib/column-split.ts`)은
      가로세로가 같아 그대로 쓰고, 달라지는 것은 **무엇을 재고 무엇을 듣는가**뿐이다.
