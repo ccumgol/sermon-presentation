@@ -15,10 +15,53 @@ import { isSectionStart, verseNumberPrefix } from './song-slides.ts';
 export const MAX_SECONDARY = 2;
 
 /**
- * 곡집·번호 표기 — `새찬송가 1장`. 제목 슬라이드에 쓴다.
+ * **찬송가**인 곡집들 (2026-09-12 사용자 결정).
  *
- * 번호가 있는 **첫** 수록만 쓴다. 한 곡이 새찬송가·통일찬송가에 함께 실린 경우가 있는데
- * 둘을 다 적으면 화면 한 줄이 길어진다. 번호 없는 곡집('기타')은 건너뛴다.
+ * 이 둘만 제목 화면에 번호를 적는다 — 회중이 **손에 든 책**을 펴야 하기 때문이다.
+ * 경배와찬양 계열(많은물소리·시와찬미·찬미예수)은 회중에게 책이 없어 번호가
+ * 뜻이 없고, 제목 앞에 붙은 글자가 길수록 정작 제목이 작아진다.
+ *
+ * **id 로 가른다 — 이름으로 가르지 않는다.** 내장 곡집도 이름을 바꿀 수 있다
+ * (`updateSongbook` 은 `isBuiltin` 이어도 `name` 을 받는다). 이름을 보면
+ * 바꾸는 순간 번호가 사라진다.
+ *
+ * 교독문도 같은 두 id 를 '찬송가' 로 쓴다 (`server/db/readings.ts` 의 `READING_BOOKS`) —
+ * 같은 낱말이 같은 뜻이어야 한다.
+ */
+export const HYMNAL_SONGBOOK_IDS = ['hymn_new', 'hymn_old'] as const;
+
+export function isHymnalSongbook(songbookId: string | undefined): boolean {
+  return songbookId !== undefined && (HYMNAL_SONGBOOK_IDS as readonly string[]).includes(songbookId);
+}
+
+/**
+ * 제목 슬라이드에 쓸 **찬송가 수록** — `{ label: '새찬송가 1장', songbookId: 'hymn_new' }`.
+ *
+ * **찬송가에 실린 곡만 돌려준다.** 다른 곡집의 번호는 제목 화면에 나가지 않는다
+ * (위 `HYMNAL_SONGBOOK_IDS` 참고).
+ *
+ * 찬송가 수록이 둘이면(새·통 양쪽) **새찬송가를 먼저** 쓴다 — 둘을 다 적으면 화면
+ * 한 줄이 길어지고, 요즘 예배당에 놓인 책이 새찬송가다.
+ *
+ * `songbookId` 를 함께 돌려주는 이유: 항목에 담아 두어야 **나중에도** 이 곡이
+ * 찬송가였는지 알 수 있다. 이름만 담으면 곡집 이름을 바꾼 뒤 판정할 길이 없다.
+ */
+export function hymnalEntryOf(
+  entries: readonly SongEntry[],
+): { label: string; songbookId: string } | undefined {
+  for (const id of HYMNAL_SONGBOOK_IDS) {
+    const found = entries.find((entry) => entry.songbookId === id && entry.number !== undefined);
+    if (found) return { label: `${found.songbookName} ${found.number}장`, songbookId: id };
+  }
+  return undefined;
+}
+
+/**
+ * 곡집·번호 표기 — `새찬송가 1장`.
+ *
+ * ⚠️ **제목 슬라이드는 이제 `hymnalEntryOf` 를 쓴다** (2026-09-12). 이 함수는
+ * 찬송가가 아닌 곡집도 적으므로 화면에 내보내면 안 된다 — 남겨 둔 것은 조작 화면처럼
+ * '어느 곡집 몇 번인가' 를 사람이 봐야 하는 자리를 위해서다.
  */
 export function songLabelOf(entries: readonly SongEntry[]): string | undefined {
   const numbered = entries.find((entry) => entry.number !== undefined);

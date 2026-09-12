@@ -21,6 +21,7 @@
  */
 
 import { findLiturgy } from './liturgy-texts.ts';
+import { isHymnalSongbook } from './plan-item-view.ts';
 import type { CueItem } from '../shared/types.ts';
 
 /**
@@ -49,23 +50,31 @@ export function itemTitle(item: CueItem): string | undefined {
 
     case 'song': {
       /*
-       * **곡집·번호는 적지 않는다** (2026-09-12 사용자 요청).
+       * **찬송가만 번호를 적는다** (2026-09-12 사용자 결정, 두 번에 걸쳐 정해졌다).
        *
-       * 전에는 '많은물소리 265장 이 땅의 황무함을 보소서' 처럼 나갔다. 회중에게
-       * 곡집 이름과 번호는 뜻이 없다 — 손에 든 것이 없으면 찾아볼 데도 없고,
-       * 제목 앞에 붙은 글자가 길수록 정작 제목이 작아진다.
+       * 처음 요청은 '곡집·번호를 빼 달라' 였다 — '많은물소리 265장 이 땅의 황무함을
+       * 보소서' 처럼 나가던 것이 계기다. 그다음 '찬송가만은 번호가 나오게' 로 좁혀졌다.
        *
-       * 교독문·주기도문이 이미 같은 규칙이다 (아래 `reading`·`liturgy` 참고) —
-       * 찬양만 예외였다.
+       * 가르는 기준은 **회중이 손에 든 책이 있는가**다. 찬송가는 번호로 펴야 하니
+       * 번호가 일이고, 경배와찬양 계열은 책이 없어 번호가 글자만 차지한다.
        *
-       * 곡집·번호가 필요하면 **슬라이드 안의 저작권 줄**에 나온다
-       * (`lib/song-slides.ts` 의 `creditOf`, 템플릿의 '저작권 표기').
+       * 곡집 id 로 가른다 — 이름은 바꿀 수 있다 (`isHymnalSongbook` 머리말).
+       * **옛 순서표에는 `songbookId` 가 없어 번호가 빠진다.** 모를 때 빼는 쪽이
+       * 맞다: 찬송가가 아닌 번호가 나가는 것이 애초의 불만이었다.
        *
-       * 제목이 비어 있을 때만 곡집·번호라도 띄운다 — 빈 화면보다는 낫다.
+       * 교독문·주기도문은 출처를 아예 적지 않는다 (아래 `reading`·`liturgy`).
+       * 찬송가 번호만 예외인 셈인데, 그 번호는 **회중이 실제로 쓰는 정보**다.
        */
       const title = item.songTitle.trim();
-      if (title.length > 0) return title;
       const label = item.songLabel?.trim();
+      const hymnNumber = isHymnalSongbook(item.songbookId) && label ? label : undefined;
+
+      const parts = [hymnNumber, title].filter(
+        (part): part is string => part !== undefined && part.length > 0,
+      );
+      if (parts.length > 0) return parts.join(' ');
+
+      // 제목이 비어 있으면 곡집·번호라도 띄운다 — 빈 화면보다는 낫다
       return label !== undefined && label.length > 0 ? label : undefined;
     }
 

@@ -292,10 +292,35 @@ describe('종류별 목록', () => {
     expect(spies.addText).toHaveBeenCalledWith(ORDER_PRESETS[0], 'order');
   });
 
-  it('찬양 검색 결과를 누르면 넣는다', () => {
+  /**
+   * 네 번째 인자가 **찬송가 수록**이다 (2026-09-12). 제목 화면에 번호를 적을지가
+   * 여기서 갈린다 — 찬미예수는 찬송가가 아니므로 `undefined` 가 맞다.
+   */
+  it('찬양 검색 결과를 누르면 넣는다 — 찬송가가 아니면 수록을 주지 않는다', () => {
     setup({ kind: 'song', songHits: [{ id: 7, title: '주께와 엎드려', label: '찬7', songLabel: '찬미예수 7장' }], songTotal: 1 });
     fireEvent.click(screen.getByRole('button', { name: /주께와 엎드려/ }));
-    expect(spies.addSong).toHaveBeenCalledWith(7, '주께와 엎드려', '찬미예수 7장');
+    expect(spies.addSong).toHaveBeenCalledWith(7, '주께와 엎드려', '찬미예수 7장', undefined);
+  });
+
+  it('찬송가면 수록을 함께 넘긴다 — 제목 화면의 번호가 여기서 나온다', () => {
+    setup({
+      kind: 'song',
+      songHits: [
+        {
+          id: 9,
+          title: '나 같은 죄인 살리신',
+          label: '새305',
+          songLabel: '새찬송가 305장',
+          hymnal: { label: '새찬송가 305장', songbookId: 'hymn_new' },
+        },
+      ],
+      songTotal: 1,
+    });
+    fireEvent.click(screen.getByRole('button', { name: /나 같은 죄인 살리신/ }));
+    expect(spies.addSong).toHaveBeenCalledWith(9, '나 같은 죄인 살리신', '새찬송가 305장', {
+      label: '새찬송가 305장',
+      songbookId: 'hymn_new',
+    });
   });
 
   /** 결과가 잘렸다는 것을 알려야 '왜 안 나오지' 를 피한다 */

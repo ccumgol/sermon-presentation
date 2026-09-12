@@ -697,6 +697,17 @@ export type CueItem =
        * 떠야 한다. 옛 순서표에는 없으므로 그때는 제목만 띄운다.
        */
       songLabel?: string;
+      /**
+       * 위 `songLabel` 이 **어느 곡집**의 것인가 (2026-09-12).
+       *
+       * 제목 화면에 번호를 적을지 여기서 갈린다 — **찬송가만 적는다**
+       * (`lib/plan-item-view.ts` 의 `isHymnalSongbook`). 곡집 이름은 바꿀 수 있어
+       * 이름으로는 판정할 수 없다.
+       *
+       * 옛 순서표에는 없다. 그때는 **번호를 적지 않는다** — 찬송가가 아닌 곡집의
+       * 번호가 화면에 나가는 것이 이 변경의 계기였으므로, 모를 때는 빼는 쪽이 맞다.
+       */
+      songbookId?: string;
       langs: LangCode[];
       lines?: string;
       /**

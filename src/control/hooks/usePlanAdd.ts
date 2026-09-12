@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   buildPlanRows, insertIndexFor, newItemId, type PlanRow,
 } from '../../../lib/plan-deck.ts';
-import { songLabelOf, type AddKind } from '../../../lib/plan-item-view.ts';
+import { hymnalEntryOf, songLabelOf, type AddKind } from '../../../lib/plan-item-view.ts';
 import { DEFAULT_LITURGY_VERSION } from '../../../lib/liturgy-texts.ts';
 import { verseQuotes } from '../../../lib/verse-quotes.ts';
 import type { CueItem } from '../../../shared/types.ts';
@@ -72,7 +72,14 @@ export function usePlanAdd(options: PlanAddOptions) {
   const [addKind, setAddKind] = useState<AddKind>('bible');
   const [addInput, setAddInput] = useState('');
   const [songHits, setSongHits] = useState<
-    Array<{ id: number; title: string; label?: string; songLabel?: string }>
+    Array<{
+      id: number;
+      title: string;
+      label?: string;
+      songLabel?: string;
+      /** 찬송가 수록이면 그 표기와 곡집 id (제목 화면에 번호를 적을지 가른다) */
+      hymnal?: { label: string; songbookId: string };
+    }>
   >([]);
   /** 일치한 곡이 몇 개였는지 — 잘렸으면 안내를 띄운다 */
   const [songTotal, setSongTotal] = useState(0);
@@ -157,6 +164,12 @@ export function usePlanAdd(options: PlanAddOptions) {
                 .map((e) => `${e.songbookShortLabel}${e.number}`)[0],
               // 제목 슬라이드용 — 짧은 라벨('새305')과 달리 회중이 읽는 형태다
               songLabel: songLabelOf(hit.entries),
+              /*
+               * **찬송가 수록**이면 그 곡집 id 를 함께 들고 온다 (2026-09-12).
+               * 제목 화면에 번호를 적을지가 여기서 갈린다 — 항목에 담아 두어야
+               * 나중에도 판정할 수 있다 (곡집 이름은 바뀔 수 있다).
+               */
+              hymnal: hymnalEntryOf(hit.entries),
             })),
           );
         })
@@ -355,7 +368,8 @@ export function usePlanAdd(options: PlanAddOptions) {
       return;
     }
     // 찬양은 검색 결과에서 고른다
-    if (addKind === 'song' && songHits[0]) addSong(songHits[0].id, songHits[0].title, songHits[0].songLabel);
+    if (addKind === 'song' && songHits[0])
+      addSong(songHits[0].id, songHits[0].title, songHits[0].songLabel, songHits[0].hymnal);
   }
 
   /**
@@ -431,14 +445,24 @@ export function usePlanAdd(options: PlanAddOptions) {
     setAddInput('');
   }
 
-  function addSong(songId: number, songTitle: string, songLabel?: string): void {
+  /**
+   * @param hymnal 찬송가 수록이면 그 표기와 곡집 id. **제목 화면의 번호가 여기서 나온다** —
+   *   찬송가가 아니면 주지 않으므로 번호가 붙지 않는다 (2026-09-12 사용자 결정).
+   */
+  function addSong(
+    songId: number,
+    songTitle: string,
+    songLabel?: string,
+    hymnal?: { label: string; songbookId: string },
+  ): void {
     // 찬양의 언어·줄 수도 예배 기본 설정을 따른다 — 매번 같은 값을 다시 고르지 않게
     insertItem({
       id: newItemId(),
       type: 'song',
       songId,
       songTitle,
-      ...(songLabel ? { songLabel } : {}),
+      // 찬송가면 그 표기를 쓴다 — 제목 화면에 나가는 것은 새·통 번호뿐이다
+      ...(hymnal ? { songLabel: hymnal.label, songbookId: hymnal.songbookId } : songLabel ? { songLabel } : {}),
       langs: plan?.defaults?.song?.langs ?? ['ko'],
       lines: plan?.defaults?.song?.lines ?? '2',
     });

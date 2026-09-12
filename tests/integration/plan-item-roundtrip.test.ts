@@ -104,6 +104,7 @@ describe('찬양', () => {
     songId: 42,
     songTitle: '나 같은 죄인 살리신',
     songLabel: '새찬송가 305장',
+    songbookId: 'hymn_new',
     langs: ['ko', 'en'],
     lines: '2',
     sheet: true,
@@ -121,6 +122,25 @@ describe('찬양', () => {
    * **기본(가사)은 값이 없는 상태다.** `false` 를 적어 두면 나중에 기본을 바꿔도
    * 옛 순서표가 옛 기본에 묶인다 — 항목마다 끄고 켠 흔적과 구별되지 않는다.
    */
+  /**
+   * **제목 화면에 번호를 적을지가 이 값 하나에 달려 있다** (2026-09-12).
+   *
+   * 순서표를 저장하는 함수는 칸을 **골라 담는다** — 여기 적지 않으면 화면에서
+   * 잘 담아 보내도 저장 뒤 다시 열면 사라진다. 조용한 실패라 검사로 못 박는다.
+   */
+  it('찬송가 곡집 id 가 살아남는다', () => {
+    const after = roundTrip(item);
+    if (after.type !== 'song') throw new Error('song 이어야 한다');
+    expect(after.songbookId).toBe('hymn_new');
+  });
+
+  /** 찬송가가 아닌 곡집은 담지 않는다 — 담아 두면 제목 화면에 번호가 나간다 */
+  it('찬송가가 아닌 곡집 id 는 버린다', () => {
+    const after = roundTrip({ ...item, songbookId: 'many_waters' });
+    if (after.type !== 'song') throw new Error('song 이어야 한다');
+    expect(after.songbookId).toBeUndefined();
+  });
+
   it('악보를 켜지 않으면 값을 남기지 않는다', () => {
     const after = roundTrip({ ...item, sheet: false });
     if (after.type !== 'song') throw new Error('song 이어야 한다');

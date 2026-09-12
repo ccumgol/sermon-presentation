@@ -286,7 +286,7 @@ export function PlanAddBar({
           <>
             <div className="candidates">
               {songHits.map((hit) => (
-                <button key={hit.id} type="button" onClick={() => addSong(hit.id, hit.title, hit.songLabel)}>
+                <button key={hit.id} type="button" onClick={() => addSong(hit.id, hit.title, hit.songLabel, hit.hymnal)}>
                   {hit.label ? `${hit.label} ` : ''}{hit.title}
                 </button>
               ))}

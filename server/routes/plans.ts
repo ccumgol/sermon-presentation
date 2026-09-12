@@ -6,6 +6,7 @@
  */
 
 import { MAX_LANGS } from '../../lib/lang-select.ts';
+import { isHymnalSongbook } from '../../lib/plan-item-view.ts';
 import { PREVIEW_MAX } from '../../lib/verse-quotes.ts';
 import type { FastifyInstance } from 'fastify';
 
@@ -223,6 +224,18 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           // 제목 슬라이드용 곡집 표기. 길이를 자른다 — 화면 한 줄에 들어가야 한다
           ...(typeof song.songLabel === 'string' && song.songLabel.trim().length > 0
             ? { songLabel: song.songLabel.trim().slice(0, 40) }
+            : {}),
+          /*
+           * 위 표기가 **어느 곡집**의 것인가 (2026-09-12).
+           *
+           * 제목 화면에 번호를 적을지 이 값이 가른다 — **찬송가만 적는다**
+           * (`lib/plan-item-view.ts` 의 `isHymnalSongbook`).
+           *
+           * ⚠️ **여기에 적지 않으면 저장할 때 조용히 사라진다.** 이 함수는 칸을
+           * 골라 담는다 — 화면에서 잘 담아 보내도 저장 뒤 다시 열면 없다.
+           */
+          ...(isHymnalSongbook(typeof song.songbookId === 'string' ? song.songbookId : undefined)
+            ? { songbookId: song.songbookId }
             : {}),
           langs: Array.isArray(song.langs) ? song.langs.filter((l) => typeof l === 'string').slice(0, MAX_LANGS) : ['ko'],
           ...(typeof song.lines === 'string' ? { lines: song.lines } : {}),
