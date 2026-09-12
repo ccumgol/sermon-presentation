@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { versionLabel } from '../../../lib/version-label.ts';
 import { api, ApiError, type ServerInfo } from '../api.ts';
 import { EnvSetupCard } from '../components/EnvSetupCard.tsx';
 import { FontSetupCard } from '../components/FontSetupCard.tsx';
@@ -325,10 +326,13 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
 
             판 번호는 빌드마다 바뀌지 않으므로 **만든 시각**을 함께 낸다 —
             실제로 두 빌드를 가르는 것은 이쪽이다.
+
+            보여 주는 번호는 `1.04` 꼴이다 (2026-09-12 사용자 결정). 저장은 semver
+            (`1.4.0`)로 한다 — semver 가 앞자리 0 을 금지한다 (`lib/version-label.ts`).
           */}
           <dt>판</dt>
           <dd>
-            {info.version}
+            {versionLabel(info.version)}
             {info.builtAt !== undefined && (
               <>
                 {' '}

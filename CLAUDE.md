@@ -184,14 +184,21 @@ PORT=7810 SERMON_DATA_DIR=$SCRATCH SERMON_BIBLE_DB=$PWD/data/bible.sqlite node s
 
 **코드를 고쳤으면 판을 올린다** (2026-09-12 사용자 결정):
 
-| 무엇 | 어떻게 | 보기 |
+| 무엇 | 저장(semver) | 표기 |
 |---|---|---|
-| 간단한 고침 | 가운데 자리 | `1.0.0` → `1.1.0` |
-| 중요한 변경 | 앞자리, 나머지는 0 | `1.9.0` → `2.0.0` |
+| 간단한 고침 | `1.4.0` → `1.5.0` | `1.04` → `1.05` |
+| 중요한 변경 | `1.9.0` → `2.0.0` | `1.09` → `2.00` |
+
+⚠️ **저장과 표기가 다르다.** semver 는 앞자리 0 을 금지해서(`1.04.0` 은 규격 위반)
+`package.json` 에는 `1.4.0` 으로 적고, 보여 줄 때만 `1.04` 로 바꾼다 —
+그 규칙은 `lib/version-label.ts` **한 곳**에 있다.
 
 `package.json` 의 `version` 과 [docs/VERSION-HISTORY.md](docs/VERSION-HISTORY.md) 를
 **함께** 고친다. 문서만 고친 커밋은 올리지 않는다 — 프로그램이 그대로다.
-판 번호는 설치 파일 이름과 설정 탭의 '서버 정보 → 판' 에 그대로 나온다.
+
+⚠️ 설치 파일은 **반드시 `npm run dist:mac` · `dist:win`** 으로 만든다.
+`electron-builder` 를 직접 부르면 파일 이름의 판 표기가 빈 채로 나간다
+(`scripts/dist.ts` 가 `DISPLAY_VERSION` 을 넘긴다).
 
 ```bash
 git diff --name-only origin/main..HEAD   # data/ 나 settings.local.json 이 섞였는지 확인

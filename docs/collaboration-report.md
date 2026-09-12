@@ -554,6 +554,25 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
 
 ### 현재 진행 중
 
+- [완료 2026-09-12 / Agent C] 판 표기를 `1.04` 꼴로 (사용자 요청)
+  ⚠️ **`1.04.0` 은 semver 가 아니다** — 실측: `semver.valid('1.04.0')` 이 `null`.
+    npm 과 electron-builder 가 그 규격을 요구하므로 그대로 쓸 수 없다.
+  그래서 **저장은 `1.4.0`, 표기만 `1.04`** 로 갈랐다. 바꾸는 곳은
+    `lib/version-label.ts` 하나 — 출처는 `package.json` 뿐이라 어긋날 일이 없다.
+  붙인 곳 셋:
+    · 설정 탭 '서버 정보 → 판' (`versionLabel(info.version)`)
+    · 설치 파일 이름 — `electron-builder.yml` 의 `artifactName` 이
+      `${env.DISPLAY_VERSION}` 을 읽는다 (`macroExpander.js:44` 에서 확인)
+    · 문서 (VERSION-HISTORY 제목 1.00~1.04 · CLAUDE.md · README)
+  ⚠️ **윈도우 CI 때문에 한 겹 감쌌다.** `DISPLAY_VERSION=$(node ...) electron-builder`
+    는 POSIX 셸 문법이라 윈도우(cmd)에서 깨진다 → `scripts/dist.ts` 가 값을 계산해
+    넘긴다. 맥·윈도우가 같은 길을 쓴다.
+    부작용: `electron-builder` 를 **직접 부르면 이름이 빈다** — CLAUDE.md·VERSION-HISTORY
+    에 '반드시 npm run dist:mac/win' 을 적었다.
+  검증: 실제 빌드 → `SermonPresentation-1.04-arm64.dmg` · `-x64.dmg`.
+    격리 서버 7873 화면 → 판이 **1.04 (…에 만들어짐)** 로 보인다.
+    변이 3가지 잡힘(기준선 먼저). 검사 5개. tsc 0 · vitest 2,093 · vite build.
+
 - [완료 2026-09-12 / Agent C] 순서 표시 담당자 — 친 대로 줄바꿈 · 넘치면 축소 (사용자 요청) — 1.4.0
   증상: 담당자에 이름+직분을 넣으면 자리가 넘쳤고, 순서 이름('성경봉독')까지
     '성경 / 봉독' 으로 접혔다.

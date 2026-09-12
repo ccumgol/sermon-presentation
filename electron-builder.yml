@@ -33,6 +33,18 @@ appId: org.jiwumission.sermon-presentation
 productName: SermonPresentation
 copyright: Copyright © 2026 지우선교회
 
+# ## 파일 이름의 판 표기 (2026-09-12 사용자 결정)
+#
+# `${version}` 은 semver(`1.4.0`)다. 사람에게 보여 줄 것은 `1.04` 인데 semver 는
+# 앞자리 0 을 금지해서(`1.04.0` 은 규격 위반) 저장과 표기가 갈렸다.
+#
+# `DISPLAY_VERSION` 은 **`scripts/dist.ts` 가 `package.json` 에서 계산해** 넘긴다 —
+# 어딘가에 따로 적어 두면 판을 올릴 때 한쪽만 고쳐 어긋난다.
+#
+# ⚠️ `electron-builder` 를 **직접** 부르면 이 값이 비어 파일 이름이 `--arm64.dmg`
+# 처럼 된다. 반드시 `npm run dist:mac` · `dist:win` 으로 부른다.
+artifactName: ${productName}-${env.DISPLAY_VERSION}-${arch}.${ext}
+
 directories:
   output: release
   # `build/` 가 아니라 `build-resources/` 인 이유: `.gitignore` 가 `build/` 를
