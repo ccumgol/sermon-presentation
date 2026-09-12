@@ -426,3 +426,45 @@ describe('sectionStart — 출력 페이지가 절 첫 장을 알 수 있어야 
     }
   });
 });
+
+/**
+ * **슬라이드가 어느 곡인지 싣고 간다** (2026-09-12 사용자 요청).
+ *
+ * 예배 중에 오타를 발견하면 찬양 탭에서 **곧바로** 고칠 수 있어야 한다. 전에는
+ * 덱이 제목만 싣고 있어서 조작자가 같은 곡을 제목으로 **다시 검색해** 들어가야 했다 —
+ * 가장 급한 순간에 가장 느린 길이다. 이 값이 그 길을 없앤다.
+ */
+describe('슬라이드에 곡 id 를 싣는다', () => {
+  it('모든 장에 붙는다 — 어느 자리에서 눌러도 그 곡을 연다', () => {
+    const target = song([VERSE]);
+    // 묶기를 끄면 네 줄이 두 장으로 갈린다 — 여러 장에 다 붙는지 보려는 것이다
+    const slides = buildSectionSlides(target, VERSE, { langs: ['ko'], linesPerSlide: 2, ...NO_MERGE });
+
+    expect(slides.length).toBeGreaterThan(1);
+    for (const slide of slides) {
+      expect(slide.kind).toBe('song');
+      if (slide.kind === 'song') expect(slide.songId).toBe(target.id);
+    }
+  });
+
+  /** 제목이 같은 곡이 둘 있어도 갈린다 — 제목으로 찾던 옛 길의 약점이 이것이다 */
+  it('같은 제목이라도 곡마다 다른 값이다', () => {
+    const one = song([VERSE], { id: 11 });
+    const two = song([VERSE], { id: 22 });
+
+    const a = buildSectionSlides(one, VERSE, { langs: ['ko'] })[0]!;
+    const b = buildSectionSlides(two, VERSE, { langs: ['ko'] })[0]!;
+
+    expect(one.title).toBe(two.title);
+    expect(a.kind === 'song' && a.songId).toBe(11);
+    expect(b.kind === 'song' && b.songId).toBe(22);
+  });
+
+  /** 예배 순서로 올린 덱도 마찬가지다 — 거기가 이 기능이 필요한 자리다 */
+  it('덱으로 묶어도 남는다', () => {
+    const target = song([VERSE], { id: 77 });
+    const { slides } = buildSongDeck(target, { langs: ['ko'] });
+    expect(slides.length).toBeGreaterThan(0);
+    expect(slides.every((s) => s.kind === 'song' && s.songId === 77)).toBe(true);
+  });
+});

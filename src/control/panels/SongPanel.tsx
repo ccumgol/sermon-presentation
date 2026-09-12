@@ -166,6 +166,26 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
   );
 
   /**
+   * **지금 송출 중인 슬라이드가 어느 곡인가** (2026-09-12).
+   *
+   * 덱 전체가 아니라 **지금 자리**를 본다 — 예배 순서로 올린 덱에는 찬양이 여럿이라
+   * 첫 곡을 열어 주면 엉뚱한 곡을 고치게 된다.
+   */
+  const liveSlide = deck?.slides[currentIndex];
+  const liveSongId = liveSlide?.kind === 'song' ? liveSlide.songId : undefined;
+  const liveSongTitle = liveSlide?.kind === 'song' ? liveSlide.title : undefined;
+
+  /**
+   * 송출 중인 곡을 열고 **곧바로 편집 상태로** 만든다.
+   *
+   * 여기까지 누른 사람은 고치러 온 것이다 — 곡만 열어 두고 '가사 편집' 을 한 번 더
+   * 누르게 하면 예배 중에 한 박자가 더 든다.
+   *
+   * **화면에 나가는 것은 건드리지 않는다.** 곡을 여는 것은 이 탭 안의 일이고,
+   * 저장한 뒤 사람이 '곡 전체 송출' 을 눌러야 화면이 바뀐다 — 예배 중에 화면이
+   * 저절로 바뀌면 부르던 자리를 잃는다.
+   */
+  /**
    * 곡을 열고 곧바로 송출한다 — 번호 즉시 송출 경로.
    *
    * 곡집 버튼을 누르고 번호를 치고 Enter 를 누르면 여기로 온다.
@@ -663,6 +683,28 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
           <h2>
             슬라이드 — {preview ? `${song?.title ?? ''} (편집 중)` : deck?.reference}
           </h2>
+
+          {/*
+            **지금 화면에 있는 곡을 곧바로 고친다** (2026-09-12 사용자 요청).
+
+            예배 순서 탭에서 찬양을 송출하면 이 탭에는 슬라이드만 보였다. 오타를
+            발견해도 **같은 곡을 제목으로 다시 검색해** 들어가야 했다 — 예배 중에
+            가장 급한 순간에 가장 느린 길이다.
+
+            송출 중인 슬라이드가 그 곡의 id 를 싣고 오므로(`songId`), 이미 열어 둔
+            곡과 다를 때만 단추를 보인다. 같은 곡이면 아래 곡 카드에 '가사 편집' 이
+            이미 있다.
+          */}
+          {!preview && liveSongId !== undefined && liveSongId !== song?.id && (
+            <p className="hintline">
+              <button type="button" onClick={() => void openSong(liveSongId, true)} disabled={busy}>
+                ✎ 이 곡 가사 수정
+              </button>{' '}
+              <span className="muted">
+                {liveSongTitle ? `‘${liveSongTitle}’ 을(를) 열어 바로 고칩니다` : '송출 중인 곡을 열어 바로 고칩니다'}
+              </span>
+            </p>
+          )}
           {preview && (
             <p className="hintline muted">
               저장하기 전 모습입니다. 화면에는 아직 나가지 않았습니다 — 보내려면 위의

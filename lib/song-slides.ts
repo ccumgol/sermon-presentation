@@ -189,6 +189,8 @@ export function buildSectionSlides(
 
   return pages.map((lines, index) => ({
     kind: 'song',
+    // 찬양 탭이 '지금 화면에 있는 이 곡' 을 곧바로 열 수 있게 한다 (2026-09-12)
+    songId: song.id,
     title: song.title,
     sectionLabel: section.label,
     // 절 번호는 첫 장에만 — 출력 페이지는 슬라이드 하나만 받아 앞뒤를 볼 수 없다

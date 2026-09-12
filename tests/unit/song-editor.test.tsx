@@ -144,6 +144,45 @@ describe('곡 열기', () => {
   });
 });
 
+/**
+ * **송출 중인 곡을 곧바로 고치러 들어가는 길** (2026-09-12 사용자 요청).
+ *
+ * 예배 중에 오타를 발견하면 찬양 탭의 '이 곡 가사 수정' 을 누른다. 여기까지 누른
+ * 사람은 고치러 온 것이므로, 곡만 열어 두고 '가사 편집' 을 한 번 더 누르게 하면
+ * 가장 급한 순간에 한 박자가 더 든다.
+ */
+describe('열면서 곧바로 편집 펼치기', () => {
+  it('두 번째 인자를 주면 편집이 열린다', async () => {
+    const { result } = setup();
+    await act(async () => { await result.current.openSong(7, true); });
+
+    expect(result.current.editing).toBe(true);
+    expect(result.current.song?.title).toBe('주께와 엎드려');
+    // 고칠 거리가 칸에 들어와 있어야 한다 — 빈 칸이면 저장이 가사를 날린다
+    expect(result.current.draftLyrics).toContain('가사 한 줄');
+  });
+
+  it('안 주면 그대로 닫혀 있다 — 목록에서 눌러 여는 길은 달라지지 않는다', async () => {
+    const { result } = setup();
+    await act(async () => { await result.current.openSong(7); });
+    expect(result.current.editing).toBe(false);
+  });
+
+  /**
+   * ⚠️ **못 불러왔으면 켜지 않는다.** 빈 편집 칸이 열린 채로 저장을 누르면
+   * 가사를 통째로 날린다 — 되돌릴 방법은 백업뿐이다.
+   */
+  it('곡을 못 불러오면 편집을 켜지 않는다', async () => {
+    song.mockRejectedValueOnce(new FakeApiError('서버가 죽었다'));
+    const { result } = setup();
+    await act(async () => { await result.current.openSong(7, true); });
+
+    expect(result.current.editing).toBe(false);
+    expect(result.current.song).toBeNull();
+    expect(feedback.read().error).toBe('서버가 죽었다');
+  });
+});
+
 // ─────────────────────────────────────────────────────────────
 /**
  * 번호 즉시 송출은 열면서 **그 곡이 가진 언어로** 맞춰야 한다 —

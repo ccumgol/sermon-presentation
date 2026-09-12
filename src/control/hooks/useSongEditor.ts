@@ -63,7 +63,11 @@ export interface SongEditor {
   newTitle: string;
   setNewTitle: (value: string) => void;
 
-  openSong: (id: number) => Promise<void>;
+  /**
+   * 곡을 연다. `startEditing` 을 주면 **가사 편집까지 펼친다** —
+   * 예배 중 오타를 고치러 온 사람에게 한 박자를 덜어 준다 (2026-09-12).
+   */
+  openSong: (id: number, startEditing?: boolean) => Promise<void>;
   /** 열되 화면 설정은 이 곡에 맞춰 고친다 — 번호 즉시 송출이 쓴다 */
   openForSend: (id: number) => Promise<{ song: Song; langs: LangCode[] } | null>;
   createSong: () => Promise<void>;
@@ -139,14 +143,20 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
     setDraftLyrics(formatLyrics(loaded.sections));
   }, []);
 
+  /**
+   * @param startEditing 열자마자 가사 편집을 펼칠지. 기본은 아니다.
+   *
+   * **실패하면 켜지 않는다** — 곡을 못 불러왔는데 편집 칸만 열리면 빈 칸에 쓰게 된다.
+   */
   const openSong = useCallback(
-    async (id: number) => {
+    async (id: number, startEditing = false) => {
       setError(null);
       setNotice(null);
       setEditing(false);
       try {
         const { song: loaded, availableLangs, sheet: found } = await api.song(id);
         adopt(loaded, found, availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
+        if (startEditing) setEditing(true);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '곡을 불러오지 못했습니다');
       }
