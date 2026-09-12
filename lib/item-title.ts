@@ -48,11 +48,25 @@ export function itemTitle(item: CueItem): string | undefined {
     }
 
     case 'song': {
-      // 곡집·번호 + 제목. 둘 중 하나만 있어도 띄운다
-      const parts = [item.songLabel?.trim(), item.songTitle.trim()].filter(
-        (part): part is string => part !== undefined && part.length > 0,
-      );
-      return parts.length > 0 ? parts.join(' ') : undefined;
+      /*
+       * **곡집·번호는 적지 않는다** (2026-09-12 사용자 요청).
+       *
+       * 전에는 '많은물소리 265장 이 땅의 황무함을 보소서' 처럼 나갔다. 회중에게
+       * 곡집 이름과 번호는 뜻이 없다 — 손에 든 것이 없으면 찾아볼 데도 없고,
+       * 제목 앞에 붙은 글자가 길수록 정작 제목이 작아진다.
+       *
+       * 교독문·주기도문이 이미 같은 규칙이다 (아래 `reading`·`liturgy` 참고) —
+       * 찬양만 예외였다.
+       *
+       * 곡집·번호가 필요하면 **슬라이드 안의 저작권 줄**에 나온다
+       * (`lib/song-slides.ts` 의 `creditOf`, 템플릿의 '저작권 표기').
+       *
+       * 제목이 비어 있을 때만 곡집·번호라도 띄운다 — 빈 화면보다는 낫다.
+       */
+      const title = item.songTitle.trim();
+      if (title.length > 0) return title;
+      const label = item.songLabel?.trim();
+      return label !== undefined && label.length > 0 ? label : undefined;
     }
 
     case 'reading': {
