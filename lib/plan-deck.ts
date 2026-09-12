@@ -138,8 +138,18 @@ export async function buildPlanDeck(
 /**
  * 순서 표시 내용을 '순서 이름'과 '담당자'로 나눈다.
  *
- * 첫 줄이 순서 이름, **나머지 줄을 합친 것**이 담당자다. 담당자를 여러 줄로 적는
- * 경우(직분과 이름을 나눠 쓰는 등)를 한 줄로 합쳐야 오른쪽 자리에 들어간다.
+ * 첫 줄이 순서 이름, **나머지 줄이 담당자**다.
+ *
+ * ## 친 대로 줄이 나간다 (2026-09-12 사용자 요청)
+ *
+ * 전에는 나머지 줄을 **한 줄로 합쳤다**. 그래서 이름과 직분을 나눠 쳐도 화면에는
+ * 한 줄로 붙어 나갔고, 길면 자리가 넘쳤다 —
+ * '김애리 전도사 / MD연합여선교회 증경회장' 처럼.
+ *
+ * 이제 줄바꿈을 그대로 싣는다. 두 줄로 치면 두 줄로 나가고, 한 줄로 쳤는데 자리가
+ * 모자라면 **글자를 줄여** 맞춘다 (`public/output/output.js` 의 `fitPresenterWidth`).
+ * 어느 쪽이든 사람이 친 모습이 화면에 그대로 간다.
+ *
  * 빈 줄은 버린다 — 마지막에 Enter 를 한 번 더 쳐서 생긴 빈 담당자가 밑줄만
  * 덩그러니 남기는 것을 막는다.
  */
@@ -150,7 +160,7 @@ export function splitOrderText(content: string): { title: string; presenter?: st
     .filter((line) => line.length > 0);
 
   const [title = '', ...rest] = lines;
-  const presenter = rest.join(' ');
+  const presenter = rest.join('\n');
   return presenter.length > 0 ? { title, presenter } : { title };
 }
 

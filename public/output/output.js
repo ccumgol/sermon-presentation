@@ -519,8 +519,14 @@
       presenter.className = 'order-presenter line-secondary';
       // 담당자 크기는 템플릿의 보조 텍스트 크기를 기준으로 한 **배수**다.
       // em 으로 두면 부모(.order-row) 크기를 따라가 템플릿 설정과 어긋난다.
+      /*
+       * 사람이 정한 배수는 **변수로** 얹는다 (2026-09-12에 `font-size` 직접 지정에서 바꿨다).
+       * 자리에 맞추는 자동 축소(`--presenter-fit`)와 **곱해져야** 하기 때문이다 —
+       * `font-size` 를 통째로 덮어 버리면 자동 축소가 무시된다.
+       * 인라인 변수라 `.order-presenter.line-secondary` 규칙보다 우선한다.
+       */
       if (typeof payload.presenterScale === 'number' && payload.presenterScale > 0) {
-        presenter.style.fontSize = 'calc(var(--secondary-size) * ' + payload.presenterScale + ')';
+        presenter.style.setProperty('--presenter-scale', String(payload.presenterScale));
       }
       if (typeof payload.presenterStroke === 'number') {
         presenter.style.webkitTextStroke = strokeWithWidth('--secondary-stroke', payload.presenterStroke);
@@ -530,9 +536,40 @@
     }
 
     el.blocks.appendChild(row);
+    // 자리에 맞춘다 — **붙인 뒤에** 재야 실제 폭이 나온다
+    if (payload.presenter) fitPresenterWidth(row.lastChild);
     setOptional(el.heading, null);
     setOptional(el.reference, null);
     setOptional(el.credit, null);
+  }
+
+  /** 담당자를 줄일 수 있는 한계 — 이보다 작으면 회중이 못 읽는다 */
+  var PRESENTER_FIT_MIN = 0.55;
+
+  /**
+   * **담당자가 한 줄에 안 들어가면 글자를 줄인다** (2026-09-12 사용자 요청).
+   *
+   * 순서 이름은 줄바꿈을 막았고(`white-space: nowrap`) 담당자는 친 줄만 반영하므로
+   * (`white-space: pre`), 한 줄로 친 긴 담당자는 칸을 넘친다. 그때 접지 않고 줄인다 —
+   * '김애리 전도사 / MD연합여선교회 증경회장' 을 한 줄로 두고 싶다는 것이 요청이었다.
+   *
+   * **재고 줄이기를 되풀이하지 않는다.** 필요한 비율을 한 번에 셈해서 한 번만 얹는다 —
+   * 반복하면 슬라이드마다 레이아웃을 여러 번 강제로 계산하게 되고, 예배 중에 넘기는
+   * 속도에 영향이 간다.
+   *
+   * 여유 1% 를 둔다 — 반올림 때문에 한 글자가 잘려 나가는 것을 막는다.
+   */
+  function fitPresenterWidth(node) {
+    if (!node || !node.style) return;
+    node.style.removeProperty('--presenter-fit');
+
+    var available = node.clientWidth;
+    var needed = node.scrollWidth;
+    if (available <= 0 || needed <= available) return;
+
+    var ratio = Math.max(PRESENTER_FIT_MIN, (available / needed) * 0.99);
+    node.style.setProperty('--presenter-fit', String(ratio));
+    diag.presenterFit = ratio.toFixed(2);
   }
 
   function setOptional(node, value) {

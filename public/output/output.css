@@ -245,9 +245,17 @@ body.blanked .slide {
   box-sizing: border-box;
 }
 
+/*
+ * **순서 이름은 줄을 넘기지 않는다** (2026-09-12 사용자 요청).
+ *
+ * 전에는 `min-width: 0` 이라 담당자가 길면 '성경봉독' 이 '성경 / 봉독' 으로 접혔다.
+ * 순서 이름은 화면의 기준점이라 매번 다른 모양으로 접히면 눈이 먼저 그리로 간다.
+ * 자리가 모자라면 **담당자 쪽이 줄어든다** (아래 `.order-presenter`).
+ */
 .order-title {
   text-align: left;
-  min-width: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 /*
@@ -265,11 +273,23 @@ body.blanked .slide {
  * '적어 넣는 칸'처럼 보이게 하기 위함이다. 이름은 오른쪽에 붙인다.
  */
 .order-presenter {
-  flex: 0 0 auto;
+  /*
+   * **자리가 모자라면 이쪽이 양보한다** (2026-09-12). 순서 이름은 고정이다.
+   * `min-width` 는 밑줄의 최소 길이다 — 이름이 짧아도 '적어 넣는 칸' 으로 보이게 한다.
+   */
+  flex: 0 1 auto;
   min-width: var(--order-line-width, 38%);
   text-align: right;
   border-bottom: var(--order-line-thickness, 4px) solid currentColor;
   padding-bottom: var(--order-line-gap, 8px);
+
+  /*
+   * **친 줄바꿈만 반영한다** (`pre`). `pre-line` 이면 한 줄로 친 것도 자리가 모자랄 때
+   * 제멋대로 접히는데, 사용자가 원한 것은 그때 **글자를 줄이는 것**이다
+   * (`output.js` 의 `fitPresenterWidth`). 접을지 줄일지를 사람이 정한다.
+   */
+  white-space: pre;
+  overflow: hidden;
 }
 
 /*
@@ -281,7 +301,12 @@ body.blanked .slide {
  * 항목에서 지정한 값은 인라인 스타일이라 이 규칙도 덮는다.
  */
 .order-presenter.line-secondary {
-  font-size: calc(var(--secondary-size) * var(--presenter-scale, 1));
+  /*
+   * `--presenter-fit` 은 **자리에 맞추려고 줄인 배수**다 (`output.js` 가 잰다).
+   * 사람이 정한 배수(`--presenter-scale`)와 **곱한다** — 둘 중 하나가 다른 하나를
+   * 덮으면, 크기를 키워 놓은 템플릿에서 자동 축소가 통째로 무시된다.
+   */
+  font-size: calc(var(--secondary-size) * var(--presenter-scale, 1) * var(--presenter-fit, 1));
 }
 
 /*
