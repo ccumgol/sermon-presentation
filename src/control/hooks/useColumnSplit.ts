@@ -40,6 +40,14 @@ function readStored(name: string): number | undefined {
 
 export interface ColumnSplitOptions extends SplitBounds {
   edge: SplitEdge;
+  /**
+   * 어느 쪽으로 끄는가 — `x` 는 **열 너비**, `y` 는 **칸 높이**. 기본은 `x`.
+   *
+   * 셈(`lib/column-split.ts`)은 둘이 똑같다 — '한 칸을 키우면 이웃이 줄어든다' 뿐이라
+   * 가로세로를 가리지 않는다. 여기서 달라지는 것은 **무엇을 재고 무엇을 듣는가**다:
+   * 폭이냐 높이냐, `clientX` 냐 `clientY` 냐, ←→ 냐 ↑↓ 냐.
+   */
+  axis?: 'x' | 'y';
   /** 화면 낭독기와 도움말에 쓰는 이름 — '오른쪽 열' 처럼 */
   label: string;
 }
@@ -54,6 +62,8 @@ export interface ColumnSplit {
 export interface ResizerHandlers {
   label: string;
   width: number | undefined;
+  /** 가로 잡이인가 세로 잡이인가 — 잡이가 모양과 낭독 문구를 가른다 */
+  axis: 'x' | 'y';
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onDoubleClick: () => void;
@@ -61,7 +71,7 @@ export interface ResizerHandlers {
 
 export function useColumnSplit(name: string, options: ColumnSplitOptions): ColumnSplit {
   const [width, setWidth] = useState<number | undefined>(() => readStored(name));
-  const { edge, min, minNeighbor, label } = options;
+  const { edge, min, minNeighbor, label, axis = 'x' } = options;
 
   /** 끌기 도중에는 저장하지 않는다 — 놓을 때 한 번만 쓴다 */
   const store = useCallback(
@@ -91,12 +101,17 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
       const pane = edge === 'start' ? handle.previousElementSibling : handle.nextElementSibling;
       const container = handle.parentElement;
       if (!(pane instanceof HTMLElement) || !container) return undefined;
-      return { pane: pane.getBoundingClientRect().width, container: container.getBoundingClientRect().width };
+      const paneBox = pane.getBoundingClientRect();
+      const containerBox = container.getBoundingClientRect();
+      return axis === 'y'
+        ? { pane: paneBox.height, container: containerBox.height }
+        : { pane: paneBox.width, container: containerBox.width };
     },
-    [edge],
+    [axis, edge],
   );
 
-  const drag = useRef<{ startX: number; startWidth: number; container: number } | null>(null);
+  /** 끌기를 시작한 지점 — 세로 잡이면 `clientY` 가 들어온다 */
+  const drag = useRef<{ startPos: number; startWidth: number; container: number } | null>(null);
 
   /**
    * 지금 값. **이벤트 처리기는 이쪽을 본다.**
@@ -120,14 +135,14 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
       if (!measured) return;
 
       drag.current = {
-        startX: event.clientX,
+        startPos: axis === 'y' ? event.clientY : event.clientX,
         startWidth: widthRef.current ?? measured.pane,
         container: measured.container,
       };
       event.currentTarget.setPointerCapture(event.pointerId);
       event.preventDefault();
     },
-    [measure],
+    [axis, measure],
   );
 
   const onKeyDown = useCallback(
@@ -137,20 +152,36 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
         apply(undefined);
         store(undefined);
         event.preventDefault();
+        event.stopPropagation();
         return;
       }
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      /*
+       * 세로 잡이는 ↑↓ 로 움직인다. 이름을 '키우기/줄이기' 로 두지 않는 이유:
+       * **어느 쪽이 커지는지는 `edge` 가 정한다** (아래 칸을 조절하면 위로 끌 때 커진다).
+       * 여기서는 '잡이를 어느 방향으로 옮겼나' 만 말하고, 셈은 `widthAfterDrag` 에 맡긴다.
+       */
+      const plus = axis === 'y' ? 'ArrowDown' : 'ArrowRight';
+      const minus = axis === 'y' ? 'ArrowUp' : 'ArrowLeft';
+      if (event.key !== plus && event.key !== minus) return;
 
       const measured = measure(event.currentTarget);
       if (!measured) return;
-      const dx = event.key === 'ArrowRight' ? STEP : -STEP;
+      const dx = event.key === plus ? STEP : -STEP;
       const base = widthRef.current ?? measured.pane;
       const next = clampSplit(widthAfterDrag(base, dx, edge), measured.container, { min, minNeighbor });
       apply(next);
       store(next);
       event.preventDefault();
+      /*
+       * **더 위로 올리지 않는다** (2026-09-12 실측으로 발견).
+       *
+       * 예배 순서 탭은 ↑↓ 로 **줄을 옮긴다.** 잡이에 focus 를 둔 채 ↑ 를 누르면
+       * 높이도 바뀌고 **고른 항목까지 바뀌었다** — 무엇을 건드렸는지 알 수 없게 된다.
+       * 가로 잡이는 ←→ 라 부딪히지 않아 여태 드러나지 않았다.
+       */
+      event.stopPropagation();
     },
-    [apply, edge, measure, min, minNeighbor, store],
+    [apply, axis, edge, measure, min, minNeighbor, store],
   );
 
   /** 더블클릭으로 기본 너비로 되돌린다 — 잘못 끌었을 때 찾아 헤매지 않게 */
@@ -172,7 +203,8 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
     const onMove = (event: globalThis.PointerEvent): void => {
       const state = drag.current;
       if (!state) return;
-      const raw = widthAfterDrag(state.startWidth, event.clientX - state.startX, edge);
+      const now = axis === 'y' ? event.clientY : event.clientX;
+      const raw = widthAfterDrag(state.startWidth, now - state.startPos, edge);
       apply(clampSplit(raw, state.container, { min, minNeighbor }));
     };
     const onUp = (): void => {
@@ -190,7 +222,7 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [apply, edge, min, minNeighbor, store]);
+  }, [apply, axis, edge, min, minNeighbor, store]);
 
   return {
     /**
@@ -201,6 +233,6 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
      * 제멋대로 넓어진다.
      */
     style: width === undefined ? {} : ({ [`--split-${name}`]: `${width}px` } as CSSProperties),
-    resizer: { label, width, onPointerDown, onKeyDown, onDoubleClick },
+    resizer: { label, width, axis, onPointerDown, onKeyDown, onDoubleClick },
   };
 }

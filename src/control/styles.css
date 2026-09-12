@@ -1815,6 +1815,29 @@ button.link-inline {
   flex: 0 0 auto;
 }
 
+/*
+ * **사람이 잡이를 끌어 높이를 정한 경우** (사용자 요청 2026-09-12).
+ *
+ * ⚠️ `max-height` 만 올리면 아무 일도 일어나지 않는다 (2026-09-12 실측: 값은
+ * 481px 로 저장되는데 칸은 281px 그대로였다). 목록(`.plan-single`)이
+ * `flex: 1 1 auto` 로 남은 자리를 **먼저 가져가고**, 설정 칸은 `flex-shrink: 1`
+ * 이라 남은 만큼으로 **눌리기** 때문이다.
+ *
+ * 그래서 `flex: 0 0 auto` 로 **양보하지 않게** 한다 — 내용만큼 차지하되 정한 높이에서
+ * 멈춘다. 내용이 짧으면 그만큼만 쓰므로 빈 상자가 생기지 않는다.
+ */
+.plan-panel.settings-sized .plan-settings {
+  /*
+   * **양보하지 않는다.** `flex-shrink: 1` 이면 목록(`flex: 1 1 auto`)이 자리를 먼저
+   * 가져가 설정 칸이 도로 눌린다 (2026-09-12 실측: 481px 로 정했는데 281px 이었다).
+   *
+   * 목록이 0이 되지 않는 것은 **끌 수 있는 범위**가 막는다 — `minNeighbor: 380`
+   * (목록 카드의 머리·추가 바만 227px 라 그만큼은 남겨야 줄이 보인다).
+   */
+  flex: 0 0 auto;
+  max-height: var(--split-plan-settings);
+}
+
 .plan-detail-body {
   min-height: 0;
   overflow-y: auto;
@@ -2694,6 +2717,31 @@ button.link-inline {
   border-radius: 1px;
   background: var(--line-strong);
   opacity: 0.55;
+}
+
+/*
+ * **가로로 누운 잡이** — 위아래 칸 사이에서 높이를 바꾼다 (사용자 요청 2026-09-12).
+ *
+ * 예배 순서 탭에서 항목 설정 칸이 42vh 에 막혀 있어, 슬라이더가 많은 항목은
+ * 아래쪽 설정이 잘려 보이지 않았다. 이제 사람이 끌어 늘릴 수 있다.
+ *
+ * 세로 잡이의 규칙을 그대로 뒤집는다 — 폭↔높이, `::before` 의 좌우 여유↔위아래 여유,
+ * 손잡이 표시의 세로 막대↔가로 막대.
+ */
+.col-resizer.row-resizer {
+  width: auto;
+  height: 6px;
+  align-self: auto;
+  cursor: row-resize;
+}
+
+.col-resizer.row-resizer::before {
+  inset: -5px 0;
+}
+
+.col-resizer.row-resizer::after {
+  width: 28px;
+  height: 2px;
 }
 
 .col-resizer:hover,

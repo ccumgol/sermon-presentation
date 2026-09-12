@@ -20,6 +20,7 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 찬양 자료를 밖에서 정리해 올 때 | [docs/SONG-IMPORT-FORMAT.md](docs/SONG-IMPORT-FORMAT.md) — 반입 형식 규격 |
 | 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 조치. **2026-09-07 로 모든 항목이 닫혔다** — 새로 여는 것이 있으면 여기에 적는다 |
 | 설치·구조를 알아야 할 때 | [README.md](README.md) |
+| **무엇이 언제 달라졌는지** 알아야 할 때 | [docs/VERSION-HISTORY.md](docs/VERSION-HISTORY.md) — 판별 변경 요약. **커밋할 때 함께 고친다** |
 | 배포판(맥·윈도우)을 만들 때 | [docs/PACKAGING.md](docs/PACKAGING.md) — 만드는 법과 **겪은 함정** |
 | 설치 파일을 받은 사람이 물을 때 | [README '설치판으로 쓰기'](README.md) — 터미널 없이 쓰는 순서. 맥은 격리 표시 지우기 한 줄이 필요하다 |
 
@@ -180,6 +181,17 @@ PORT=7810 SERMON_DATA_DIR=$SCRATCH SERMON_BIBLE_DB=$PWD/data/bible.sqlite node s
 `main` 직통이다(사용자 결정 — 예배 직전 수정에 병합 단계가 끼면 느려진다).
 대신 **작게 자주** 커밋한다. 형식은 `feat:` `fix:` `docs:` `refactor:` `test:`.
 메시지에 **원인·조치·검증**을 담는다.
+
+**코드를 고쳤으면 판을 올린다** (2026-09-12 사용자 결정):
+
+| 무엇 | 어떻게 | 보기 |
+|---|---|---|
+| 간단한 고침 | 가운데 자리 | `1.0.0` → `1.1.0` |
+| 중요한 변경 | 앞자리, 나머지는 0 | `1.9.0` → `2.0.0` |
+
+`package.json` 의 `version` 과 [docs/VERSION-HISTORY.md](docs/VERSION-HISTORY.md) 를
+**함께** 고친다. 문서만 고친 커밋은 올리지 않는다 — 프로그램이 그대로다.
+판 번호는 설치 파일 이름과 설정 탭의 '서버 정보 → 판' 에 그대로 나온다.
 
 ```bash
 git diff --name-only origin/main..HEAD   # data/ 나 settings.local.json 이 섞였는지 확인

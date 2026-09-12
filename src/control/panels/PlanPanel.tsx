@@ -22,6 +22,7 @@ import {
 import { PlanItemEditor } from '../components/plan/PlanItemEditor.tsx';
 import { PlanActions } from '../components/plan/PlanActions.tsx';
 import { PlanAddBar } from '../components/plan/PlanAddBar.tsx';
+import { ColumnResizer } from '../components/ColumnResizer.tsx';
 import { PlanCueList } from '../components/plan/PlanCueList.tsx';
 import { PlanDefaultsCard } from '../components/plan/PlanDefaultsCard.tsx';
 import { PlanDirtyLine } from '../components/plan/PlanDirtyLine.tsx';
@@ -30,6 +31,7 @@ import { PlanLoadList } from '../components/plan/PlanLoadList.tsx';
 import { PlanNameBar } from '../components/plan/PlanNameBar.tsx';
 import type { ClientMsg, Deck, Template, Translation } from '../../../shared/types.ts';
 import { api } from '../api.ts';
+import { useColumnSplit } from '../hooks/useColumnSplit.ts';
 import { usePlanBackgrounds } from '../hooks/usePlanBackgrounds.ts';
 import { usePlanDraft } from '../hooks/usePlanDraft.ts';
 import { useFeedback } from '../hooks/useFeedback.ts';
@@ -60,6 +62,28 @@ export function PlanPanel({
    * 편집 중인 것 — 이 화면의 척추다 (usePlanDraft, 2026-09-07 R-4).
    * 읽기·저장과 항목 추가가 둘 다 이것을 붙잡으므로 먼저 떼어냈다.
    */
+  /*
+   * 항목 설정 칸의 높이 (사용자 요청 2026-09-12).
+   * `min` 은 설정 칸이 접히지 않을 만큼, `minNeighbor` 는 목록에 남겨 둘 최소 높이다 —
+   * 목록이 0이 되면 **무엇을 고치는 중인지 보이지 않는다.**
+   */
+  const settingsSplit = useColumnSplit('plan-settings', {
+    axis: 'y',
+    edge: 'end',
+    min: 140,
+    /*
+     * **목록에 줄 두세 개는 남긴다.** 180 으로 뒀더니 목록이 0이 됐다 —
+     * 목록 카드의 머리·추가 바만 227px 를 먹기 때문이다.
+     *
+     * 1440x900 에서 값별로 재 본 목록 높이 (줄 하나 ≈ 40px):
+     *   설정 300 → 183 · 340 → 143 · **380 → 103** · 420 → 64 · 440 → 44
+     * 440 은 한 줄이라 예배 중에 어디인지 알 수 없다. 380 을 상한으로 잡는다.
+     * (창이 크면 더 커진다 — 상한은 그때그때의 창 높이에서 이만큼을 뺀 값이다)
+     */
+    minNeighbor: 440,
+    label: '항목 설정',
+  });
+
   const draft = usePlanDraft();
   const {
     plan, items, dirty, cursor, setCursor, expandedId, setExpandedId, patchItems,
@@ -298,7 +322,14 @@ export function PlanPanel({
 
 
   return (
-    <div className="plan-panel">
+    <div
+      /*
+        높이를 정한 경우에만 표를 붙인다 — CSS 가 그때만 '양보하지 않기' 규칙을 쓴다.
+        값이 없으면 CSS 에 적힌 기본값(42vh)이 그대로 도는 것이 이 장치의 규칙이다.
+      */
+      className={settingsSplit.resizer.width === undefined ? 'plan-panel' : 'plan-panel settings-sized'}
+      style={settingsSplit.style}
+    >
       {error && (
         <div className="banner error">
           <button type="button" className="close" onClick={() => setError(null)}>닫기</button>
@@ -382,6 +413,19 @@ export function PlanPanel({
         선택한 항목의 설정. 오른쪽 열을 없앴으므로 목록 **아래**에 한 덩어리로 둔다.
         목록 안에 끼워 넣으면 줄을 옮길 때마다 목록이 출렁여 진행이 보이지 않는다.
       */}
+      {/*
+        **항목 설정 칸의 높이 잡이** (사용자 요청 2026-09-12).
+
+        설정 칸이 42vh 에 막혀 있어, 슬라이더가 많은 항목('순서 표시' 등)은 아래쪽
+        설정이 잘려 보이지 않았다. 위로 끌면 설정 칸이 커지고 목록이 줄어든다.
+
+        `edge: 'end'` — 잡이 **아래** 칸을 조절한다. 위로 끌면(dy 음수) 커진다.
+        접혀 있을 때는 두지 않는다 — 높이가 내용에 맞춰 붙는 상태라 끌 것이 없다.
+      */}
+      {plan && current && currentRow && detailOpen && (
+        <ColumnResizer {...settingsSplit.resizer} />
+      )}
+
       {plan && current && currentRow && (
         <PlanItemEditor
           current={current}

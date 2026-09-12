@@ -18,19 +18,35 @@
 
 import type { ResizerHandlers } from '../hooks/useColumnSplit.ts';
 
-export function ColumnResizer({ label, width, onPointerDown, onKeyDown, onDoubleClick }: ResizerHandlers): React.JSX.Element {
+export function ColumnResizer({
+  label,
+  width,
+  axis,
+  onPointerDown,
+  onKeyDown,
+  onDoubleClick,
+}: ResizerHandlers): React.JSX.Element {
+  // 세로 잡이는 **높이**를 바꾼다 — 낭독기와 도움말 문구도 그렇게 말해야 한다
+  const vertical = axis === 'y';
+  const what = vertical ? '높이' : '너비';
+
   return (
     <div
-      className="col-resizer"
+      className={vertical ? 'col-resizer row-resizer' : 'col-resizer'}
       role="separator"
-      aria-orientation="vertical"
-      aria-label={`${label} 너비 — 끌어서 조절, 더블클릭이나 Home 으로 기본값`}
+      /*
+       * `aria-orientation` 은 **잡이가 놓인 방향**이다 (무엇을 바꾸는지가 아니다).
+       * 열 사이의 잡이는 세로로 서 있고(vertical), 위아래 칸 사이의 잡이는
+       * 가로로 누워 있다(horizontal).
+       */
+      aria-orientation={vertical ? 'horizontal' : 'vertical'}
+      aria-label={`${label} ${what} — 끌어서 조절, 더블클릭이나 Home 으로 기본값`}
       aria-valuenow={width}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
       onDoubleClick={onDoubleClick}
-      title={`${label} 너비를 끌어서 조절합니다 (더블클릭 = 기본값)`}
+      title={`${label} ${what}를 끌어서 조절합니다 (더블클릭 = 기본값)`}
     />
   );
 }

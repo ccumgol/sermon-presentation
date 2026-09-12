@@ -22,6 +22,7 @@ OBS Studio의 **브라우저 소스**로 성경 본문과 찬양 가사를 송�
 | [docs/diagram-design-profile.md](docs/diagram-design-profile.md) | 위 그림에 쓴 색(이 앱의 UI 색). 새 PC 에서 그릴 때 홈 폴더로 한 번 복사 |
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | **탭별 사용법·기능·단축키** — 예배를 진행하는 사람이 보는 문서 |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | **문제 해결** — 증상 → 원인 → 조치 (실제로 겪은 것만) |
+| [docs/VERSION-HISTORY.md](docs/VERSION-HISTORY.md) | **판 이력** — 어느 판에서 무엇이 달라졌나 (설치판 쓰는 사람용) |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | 변경 이력 |
 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) | **보안 감사** — 확인된 위험과 권고 |
 | [PLAN.md](PLAN.md) | 전체 설계와 판단 근거 |
@@ -135,11 +136,15 @@ export BIBLE_DB_DIR=/path/to/BibleDB
 **내 것이 어느 판인지**는 설정 탭 → **서버 정보 → 판** 에서 봅니다:
 
 ```
-판    0.1.0 (2026. 9. 7. 오전 11:20:15 에 만들어짐)
+판    1.0.0 (2026. 9. 12. 오전 11:20:15 에 만들어짐)
 ```
 
-번호(`0.1.0`)는 빌드마다 바뀌지 않으므로 **'만들어진 시각'** 이 실제로 두 판을
-가릅니다. 자료는 데이터 폴더에 그대로 있으므로 **다시 설치해도 가사·순서표는
+**2026-09-12(1.0.0)부터는 고칠 때마다 번호가 올라갑니다** — 간단한 고침은 `1.1`,
+중요한 변경은 `2.0` 입니다. 무엇이 달라졌는지는
+[판 이력](docs/VERSION-HISTORY.md)에 있습니다.
+
+그 전(`0.1.0`)에는 여러 번 다시 만들어도 번호가 같아서, **'만들어진 시각'** 이
+실제로 두 판을 가릅니다. 자료는 데이터 폴더에 그대로 있으므로 **다시 설치해도 가사·순서표는
 그대로**입니다.
 
 사용법은 [docs/USER-GUIDE.md](docs/USER-GUIDE.md),
