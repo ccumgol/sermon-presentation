@@ -1,6 +1,6 @@
 {
   "name": "sermon-presentation",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "OBS 브라우저 소스로 성경 본문과 찬양 가사를 송출하는 로컬 애플리케이션",
   "type": "module",
@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "hymns:import": "node scripts/import-hymns.ts",
+    "data:pack": "node scripts/data-pack.ts",
     "lyrics:realign": "node scripts/realign-lyrics.ts",
     "chorus:merge": "node scripts/merge-chorus.ts",
     "measure:meter": "node scripts/measure-meter-ranking.ts",

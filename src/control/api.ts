@@ -285,6 +285,23 @@ export const api = {
   /** 데이터 폴더를 이 PC 의 파일 탐색기에서 연다 */
   openDataDir: () => send<{ path: string }>('POST', '/api/system/open-data-dir', {}),
 
+  /** 데이터 폴더의 `install/` 에 놓인 자료 꾸러미를 **살펴보기만** 한다 */
+  dataPack: () =>
+    get<{
+      dir: string;
+      found: boolean;
+      manifest?: { version: string; builtAt: string; entries: Array<{ name: string; bytes: number; files?: number }> };
+      plan: Array<{ name: string; action: 'install' | 'replace' | 'skip'; reason?: string }>;
+    }>('/api/data-pack'),
+
+  /** 실제로 넣는다 — 되돌릴 수 없으므로 화면이 먼저 무엇이 되는지 보여 준다 */
+  installDataPack: (overwriteMine = false) =>
+    send<{ installed: string[]; skipped: string[]; restartRequired: boolean }>(
+      'POST',
+      '/api/data-pack/install',
+      { overwriteMine },
+    ),
+
   /** 예배를 진행하려면 이 PC 에 무엇이 더 있어야 하는가 */
   envCheck: () =>
     get<{ platform: 'mac' | 'win' | 'other'; dataDir: string; items: EnvStatus[] }>('/api/system/env'),

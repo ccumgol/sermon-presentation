@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, ApiError, type ServerInfo } from '../api.ts';
+import { DataPackCard } from '../components/DataPackCard.tsx';
 import { EnvSetupCard } from '../components/EnvSetupCard.tsx';
 import { FontSetupCard } from '../components/FontSetupCard.tsx';
 import { TabletAccessCard } from '../components/TabletAccessCard.tsx';
@@ -235,6 +236,8 @@ export function SettingsPanel({ info }: Props): React.JSX.Element {
         아래로 읽어 내려가는 순서에서, 소스를 만든 직후가 폰트를 챙길 자리다.
         더 아래로 밀면 스크롤 밖이라 아무도 안 본다.
       */}
+      <DataPackCard />
+
       <FontSetupCard />
 
       <div className="card">

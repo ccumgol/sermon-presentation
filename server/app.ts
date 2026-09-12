@@ -32,6 +32,7 @@ import { registerLoginRoutes } from './routes/login.ts';
 import { registerTabletRoutes } from './routes/tablet.ts';
 import { registerBibleRoutes } from './routes/bible.ts';
 import { registerBackgroundRoutes } from './routes/backgrounds.ts';
+import { registerDataPackRoutes } from './routes/data-pack.ts';
 import { registerBackupRoutes } from './routes/backup.ts';
 import { registerPlanRoutes } from './routes/plans.ts';
 import { registerReadingRoutes } from './routes/readings.ts';
@@ -358,6 +359,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   registerLoginRoutes(app);
   registerSystemRoutes(app);
   registerTabletRoutes(app, options.getPort, () => lanOpen);
+  registerDataPackRoutes(app);
   await registerSongRoutes(app);
   await registerSongbookRoutes(app);
   await registerPlanRoutes(app);
