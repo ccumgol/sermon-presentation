@@ -1,3 +1,4 @@
+import { recolorKeepingAlpha } from '../../../lib/template-css.ts';
 import type { BoxStyle, TextStyle } from '../../../shared/types.ts';
 import { FontChainStatus } from './FontChainStatus.tsx';
 
@@ -54,9 +55,16 @@ interface ColorFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /**
+   * **색상자로 골랐을 때**만 부른다 (`#RRGGBB`). 없으면 `onChange` 를 그대로 쓴다.
+   *
+   * 투명도를 값에 담는 칸(네모 색)이 이것을 쓴다 — 그러지 않으면 색을 고르는 순간
+   * 투명도가 사라진다.
+   */
+  onPick?: (hex: string) => void;
 }
 
-export function ColorField({ label, value, onChange }: ColorFieldProps): React.JSX.Element {
+export function ColorField({ label, value, onChange, onPick }: ColorFieldProps): React.JSX.Element {
   // color input 은 #RRGGBB 만 받으므로 rgba() 값은 텍스트로 다룬다
   const isHex = /^#[0-9a-f]{6}$/i.test(value);
 
@@ -64,10 +72,17 @@ export function ColorField({ label, value, onChange }: ColorFieldProps): React.J
     <div className="field">
       <label>{label}</label>
       <div className="color-row">
+        {/*
+          **색상자는 `#RRGGBB` 만 준다.** 값이 투명도를 담고 있던 경우
+          (`rgba(0,0,0,0.55)`) 그대로 넣으면 **투명도가 조용히 사라진다** —
+          네모가 불투명해져 카메라 영상이 통째로 가려진다 (2026-09-12 실측).
+          그래서 부르는 쪽이 `onPick` 으로 '고른 색을 어떻게 합칠지' 를 정한다.
+          글자 칸은 사람이 쓴 값을 그대로 받는다 — 거기서는 뒤집지 않는다.
+        */}
         <input
           type="color"
           value={isHex ? value : '#ffffff'}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => (onPick ?? onChange)(e.target.value)}
           aria-label={label}
         />
         <input
@@ -129,7 +144,13 @@ export function BoxFields({
   return (
     <div className="box-fields">
       {/* rgba 를 쓰므로 색 고르기가 아니라 글자로도 받는다 (투명도가 값에 들어 있다) */}
-      <ColorField label={colorLabel} value={box.color} onChange={(color) => onChange({ ...box, color })} />
+      <ColorField
+        label={colorLabel}
+        value={box.color}
+        onChange={(color) => onChange({ ...box, color })}
+        // 색상자로 고를 때는 **지금 투명도를 그대로 유지한다** (없으면 1 = 불투명)
+        onPick={(hex) => onChange({ ...box, color: recolorKeepingAlpha(hex, box.color) })}
+      />
       <div className="row">
         <NumberField
           label="좌우 여백"

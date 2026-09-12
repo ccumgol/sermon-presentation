@@ -456,8 +456,11 @@ export function TemplatePanel({ active, connected, send }: Props): React.JSX.Ele
               onChange={(box) => patchDraft((c) => ({ ...c, layout: { ...c.layout, box } }))}
             />
             <p className="hintline muted">
-              투명도는 색에 담습니다 — <code>rgba(0,0,0,0.55)</code> 는 검정 55%,{' '}
-              <code>rgba(10,20,60,0.6)</code> 는 짙은 파랑 60%입니다.
+              <strong>투명도는 색 값에 담습니다.</strong> 색 칸(색상자 오른쪽 글자
+              칸)에 <code>rgba(0,0,0,0.55)</code> 처럼 씁니다 — 검정 55%,{' '}
+              <code>rgba(10,20,60,0.6)</code> 은 짙은 파랑 60%입니다.
+              마지막 숫자가 진하기입니다(0 = 안 보임, 1 = 꽉 참).
+              한 번 써 두면 <strong>색상자로 색만 바꿔도 그 투명도는 유지됩니다.</strong>
               네모는 <strong>글자 폭을 따라가고</strong> 안전 영역 끝에서 멈춥니다 —
               짧은 찬양 줄은 글자만큼, 긴 성경 본문은 대개 끝까지 넓어집니다.
             </p>

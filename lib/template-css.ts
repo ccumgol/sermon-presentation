@@ -71,6 +71,36 @@ export function isHexColor(color: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(color.trim());
 }
 
+/**
+ * 색에 담긴 **투명도**를 꺼낸다. 없으면 1(불투명).
+ *
+ * 왜 필요한가: 네모 색은 투명도를 값 안에 담는다(`rgba(0,0,0,0.55)`). 그런데 색을
+ * **색상자로 고르면 브라우저가 `#RRGGBB` 를 준다** — 그대로 넣으면 투명도가 조용히
+ * 사라져 카메라 영상이 통째로 가려진다(2026-09-12 실측). 고르기 전의 투명도를
+ * 다시 입히려면 그 값을 읽을 수 있어야 한다.
+ */
+export function alphaOf(color: string): number {
+  const match = /^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/i.exec(color.trim());
+  if (!match) return 1;
+  const alpha = Number.parseFloat(match[1]!);
+  if (!Number.isFinite(alpha)) return 1;
+  return Math.min(Math.max(alpha, 0), 1);
+}
+
+/**
+ * **색만 바꾸고 투명도는 그대로 둔다** — 색상자로 색을 고를 때 쓴다.
+ *
+ * 브라우저 색상자는 `#RRGGBB` 만 준다. 그대로 넣으면 투명도가 사라져 네모가
+ * 불투명해지고 카메라 영상이 통째로 가려진다 (기능의 목적과 정반대다).
+ *
+ * 불투명(1)할 때는 **hex 그대로 둔다** — 그래야 색상자가 계속 그 색을 보여 준다
+ * (`rgba(...)` 로 바꿔 버리면 색상자가 값을 못 읽어 흰색으로 보인다).
+ */
+export function recolorKeepingAlpha(hex: string, previous: string): string {
+  const alpha = alphaOf(previous);
+  return alpha >= 1 ? hex : withAlpha(hex, alpha);
+}
+
 /** #RRGGBB + 알파 → rgba(). 이미 rgba/hsl 형태면 그대로 둔다. */
 export function withAlpha(color: string, alpha: number): string {
   if (!isHexColor(color)) return color;

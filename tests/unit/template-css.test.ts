@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_TEMPLATES, SHARED_PRESET_IDS, DEFAULT_TEMPLATE_ID, getBuiltinTemplate } from '../../lib/template-presets.ts';
-import { MAX_TITLE_RHYTHM, anchorToAlignment, clampRhythm, diffCssVars, isAllowedStyleKey, isHexColor, overrideVarsFor, templateToCssVars, withAlpha } from '../../lib/template-css.ts';
+import { MAX_TITLE_RHYTHM, alphaOf, anchorToAlignment, recolorKeepingAlpha, clampRhythm, diffCssVars, isAllowedStyleKey, isHexColor, overrideVarsFor, templateToCssVars, withAlpha } from '../../lib/template-css.ts';
 import type { Anchor, Template } from '../../shared/types.ts';
 
 function base(): Template {
@@ -624,5 +624,63 @@ describe('그림 배경의 폴더', () => {
     expect(backdrop({ mode: 'transparent' })).toBe('');
     expect(backdrop({ mode: 'color', color: '#000000', opacity: 1 })).toBe('');
     expect(backdrop({ mode: 'image', src: '' })).toBe('');
+  });
+});
+
+/**
+ * **색상자로 색을 고를 때 투명도를 잃지 않는다** (2026-09-12 사용자 질문에서 드러났다).
+ *
+ * 네모 색은 투명도를 값 안에 담는다(`rgba(0,0,0,0.55)`). 그런데 브라우저의 색상자는
+ * `#RRGGBB` 만 준다 — 그대로 넣으면 **투명도가 조용히 사라져** 네모가 불투명해지고
+ * 카메라 영상이 통째로 가려진다. 기능의 목적과 정반대다.
+ *
+ * 실제로 사용자의 템플릿에 `#e11919`(빨강·불투명)가 들어가 있었다.
+ * 그래서 색상자로 고를 때는 **고르기 전의 투명도를 다시 입힌다** — 그 조합이 이것이다.
+ */
+describe('alphaOf — 색에 담긴 투명도를 꺼낸다', () => {
+  it('rgba 에서 꺼낸다', () => {
+    expect(alphaOf('rgba(0,0,0,0.55)')).toBe(0.55);
+    expect(alphaOf('rgba(10, 20, 60, 0.6)')).toBe(0.6);
+    expect(alphaOf('  rgba(0,0,0,0)  ')).toBe(0);
+  });
+
+  it('투명도가 없는 색은 1 (불투명)', () => {
+    expect(alphaOf('#000000')).toBe(1);
+    expect(alphaOf('rgb(0,0,0)')).toBe(1);
+    expect(alphaOf('black')).toBe(1);
+    expect(alphaOf('')).toBe(1);
+  });
+
+  it('이상한 값에도 던지지 않는다 — 예배 중에 멈추면 안 된다', () => {
+    expect(alphaOf('rgba(0,0,0,없음)')).toBe(1);
+    expect(alphaOf('rgba(')).toBe(1);
+  });
+
+  /** 범위를 벗어난 값은 자른다 — CSS 가 무시해 버리면 색이 통째로 안 먹는다 */
+  it('0~1 을 벗어나면 자른다', () => {
+    expect(alphaOf('rgba(0,0,0,5)')).toBe(1);
+  });
+
+});
+
+/**
+ * **색상자로 고를 때 화면이 실제로 하는 일.**
+ *
+ * 사용자의 템플릿에 `#e11919`(빨강·불투명)가 들어가 있었다 — 투명도를 쳐 넣었다가
+ * 색상자를 한 번 누르면서 사라진 것이다.
+ */
+describe('recolorKeepingAlpha — 색만 바꾸고 투명도는 지킨다', () => {
+  it('색상자로 파랑을 골라도 55% 가 남는다', () => {
+    expect(recolorKeepingAlpha('#0a143c', 'rgba(0,0,0,0.55)')).toBe('rgba(10, 20, 60, 0.55)');
+  });
+
+  /** 불투명이면 hex 그대로 — 그래야 색상자가 계속 그 색을 보여 준다 */
+  it('원래가 불투명했으면 hex 그대로 둔다', () => {
+    expect(recolorKeepingAlpha('#0a143c', '#e11919')).toBe('#0a143c');
+    expect(recolorKeepingAlpha('#0a143c', 'rgb(0,0,0)')).toBe('#0a143c');
+  });
+
+  it('0% 도 지킨다 — 껐다 켜는 중일 수 있다', () => {
+    expect(recolorKeepingAlpha('#0a143c', 'rgba(0,0,0,0)')).toBe('rgba(10, 20, 60, 0)');
   });
 });
