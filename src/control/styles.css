@@ -143,6 +143,28 @@
   box-sizing: border-box;
 }
 
+/*
+ * 글자 크기 배율 (사용자 요청 2026-09-16 — 슬라이드 본문이 작아 안 보이는 사람이 있다).
+ *
+ * **뿌리에 건다.** `.app` 은 `height: 100%` 이라 거기 걸면 배율만큼 뷰포트를 넘쳐
+ * 창 전체에 스크롤바가 생긴다. 뿌리에 걸면 브라우저가 기준 상자(ICB)를 함께 줄여
+ * `100%` 도 `vh` 도 그대로 맞는다 (격리 서버에서 100·130·150 으로 실측했다).
+ *
+ * `transform: scale` 이 아니라 `zoom` 인 이유: zoom 은 **레이아웃을 다시 계산한다.**
+ * 글자가 커진 만큼 줄이 다시 나뉘고 스크롤 범위도 맞는다. scale 은 그려진 것만
+ * 늘려서 줄바꿈이 그대로고 스크롤이 어긋난다.
+ *
+ * 값은 `useUiScale` 이 `--ui-scale` 로 얹는다. 100% 면 변수를 **지우므로** 아래
+ * 기본값 `1` 이 살아난다 — 한 번도 만지지 않은 사람에게는 이 기능이 없던 때와 같다.
+ *
+ * ⚠️ 배율 안쪽에서 **뷰포트 좌표(`clientX`)와 요소 크기를 섞어 쓰면 안 된다.**
+ * `useColumnSplit` 이 그랬다 — 머리말 참고.
+ */
+html {
+  --ui-scale: 1;
+  zoom: var(--ui-scale);
+}
+
 html,
 body,
 #root {
@@ -234,8 +256,15 @@ select:focus {
 .tabs {
   display: flex;
   gap: 4px;
+  /* 탭 이름은 끝까지 보여야 한다 — 좁아지면 아래 `.status` 가 먼저 줄어든다 */
+  flex: 0 0 auto;
 }
 .tab {
+  /*
+   * 글자 크기를 키우면(`--ui-scale`) 좁은 화면에서 '예배 순서' 가 두 줄로 접혔다
+   * (1280×800 · 150% 실측). 탭은 늘 한 줄이어야 어느 탭인지 한눈에 든다.
+   */
+  white-space: nowrap;
   min-height: 36px;
   padding: 6px 14px;
   background: transparent;
@@ -263,6 +292,12 @@ select:focus {
   font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
+  /*
+   * 자리가 모자라면 **여기가 먼저 줄어든다.** 연결 표시는 점 색으로도 읽히지만
+   * 탭 이름은 글자가 없으면 못 읽는다 — 줄일 순서를 정해 두는 것이다.
+   */
+  min-width: 0;
+  overflow: hidden;
 }
 .dot {
   display: inline-block;
@@ -319,6 +354,8 @@ select:focus {
   min-height: 30px;
   padding: 0 10px;
   font-size: 0.82rem;
+  /* 탭과 같은 이유 — 글자를 키워도 '강사 모니터' 가 두 줄로 접히지 않게 */
+  white-space: nowrap;
 }
 
 /* 테마 토글 — 고정했을 때는 점을 하나 붙여 'OS 따라감' 과 구별한다 */
@@ -337,6 +374,28 @@ select:focus {
   bottom: 1px;
   font-size: 10px;
   color: var(--accent);
+}
+
+/* 글자 크기 단추 — 밝기 토글과 같은 높이로 나란히 선다 */
+.scale-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  min-height: 32px;
+  padding: 0 8px;
+  line-height: 1;
+}
+
+.scale-toggle .glyph {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* 지금 배율을 늘 보여 준다 — 눌러 보지 않고도 어디쯤인지 알 수 있게 */
+.scale-toggle .pct {
+  font-size: 10px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
 }
 
 .side {

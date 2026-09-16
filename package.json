@@ -1,6 +1,6 @@
 {
   "name": "sermon-presentation",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "description": "OBS 브라우저 소스로 성경 본문과 찬양 가사를 송출하는 로컬 애플리케이션",
   "type": "module",

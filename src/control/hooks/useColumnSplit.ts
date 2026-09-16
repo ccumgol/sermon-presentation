@@ -97,21 +97,38 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
    * 한 칸만 움직인다.
    */
   const measure = useCallback(
-    (handle: HTMLElement): { pane: number; container: number } | undefined => {
+    (handle: HTMLElement): { pane: number; container: number; zoom: number } | undefined => {
       const pane = edge === 'start' ? handle.previousElementSibling : handle.nextElementSibling;
       const container = handle.parentElement;
-      if (!(pane instanceof HTMLElement) || !container) return undefined;
-      const paneBox = pane.getBoundingClientRect();
-      const containerBox = container.getBoundingClientRect();
+      if (!(pane instanceof HTMLElement) || !(container instanceof HTMLElement)) return undefined;
+
+      /*
+       * **`offsetWidth` 를 쓴다 — `getBoundingClientRect` 가 아니다** (2026-09-16).
+       *
+       * 글자 크기 배율(`useUiScale` 의 `zoom`)이 걸리면 둘이 갈린다:
+       * `offsetWidth` 는 **이 요소가 사는 좌표계의 CSS px**, `getBoundingClientRect` 는
+       * 배율이 곱해진 **화면 px** 이다. 우리가 저장하고 되돌려 놓는 값은 CSS px 이므로
+       * 여기서 화면 px 을 읽으면 배율 130% 일 때 열이 끌 때마다 1.3배씩 벌어진다.
+       *
+       * 배율 자체는 두 값의 비로 잰다 — 변수 이름을 알 필요가 없고,
+       * 나중에 배율을 다른 방식으로 걸어도 저절로 따라온다.
+       */
+      const box = container.getBoundingClientRect();
+      const cssSize = axis === 'y' ? container.offsetHeight : container.offsetWidth;
+      const screenSize = axis === 'y' ? box.height : box.width;
+      const zoom = cssSize > 0 && screenSize > 0 ? screenSize / cssSize : 1;
+
       return axis === 'y'
-        ? { pane: paneBox.height, container: containerBox.height }
-        : { pane: paneBox.width, container: containerBox.width };
+        ? { pane: pane.offsetHeight, container: container.offsetHeight, zoom }
+        : { pane: pane.offsetWidth, container: container.offsetWidth, zoom };
     },
     [axis, edge],
   );
 
   /** 끌기를 시작한 지점 — 세로 잡이면 `clientY` 가 들어온다 */
-  const drag = useRef<{ startPos: number; startWidth: number; container: number } | null>(null);
+  const drag = useRef<{ startPos: number; startWidth: number; container: number; zoom: number } | null>(
+    null,
+  );
 
   /**
    * 지금 값. **이벤트 처리기는 이쪽을 본다.**
@@ -138,6 +155,7 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
         startPos: axis === 'y' ? event.clientY : event.clientX,
         startWidth: widthRef.current ?? measured.pane,
         container: measured.container,
+        zoom: measured.zoom,
       };
       event.currentTarget.setPointerCapture(event.pointerId);
       event.preventDefault();
@@ -204,7 +222,13 @@ export function useColumnSplit(name: string, options: ColumnSplitOptions): Colum
       const state = drag.current;
       if (!state) return;
       const now = axis === 'y' ? event.clientY : event.clientX;
-      const raw = widthAfterDrag(state.startWidth, now - state.startPos, edge);
+      /*
+       * 포인터 좌표는 **화면 px** 이고 우리가 다루는 폭은 **CSS px** 이다.
+       * 배율이 걸리면 마우스를 100px 움직였을 때 열은 100/1.3 만큼만 움직여야
+       * 잡이가 손끝을 따라온다 (안 나누면 열이 앞서 달아난다).
+       */
+      const moved = (now - state.startPos) / state.zoom;
+      const raw = widthAfterDrag(state.startWidth, moved, edge);
       apply(clampSplit(raw, state.container, { min, minNeighbor }));
     };
     const onUp = (): void => {

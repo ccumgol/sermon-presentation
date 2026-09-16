@@ -2006,6 +2006,41 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
   결과: [docs/BLOG-SERIES-PLAN.md](BLOG-SERIES-PLAN.md) — 12편 구성 + 데이터 안내 3단 전략.
   다음 단계: 사용자 검토 후 1편 초고. 별도로 `bible:adopt`(외부 자료 반입기) 착수 여부 결정.
 
+- [시작 2026-09-16 / Agent C] 관리자 페이지 글자 크기 옵션 (사용자 요청)
+  요청: "각 슬라이드의 내용 글씨가 작아 잘 안 보이는 사람이 있다 — 옵션으로 조절하게"
+  계획: `useUiScale` 훅(`useTheme` 과 같은 꼴) → `localStorage` → `:root` 에 `zoom` 배율.
+        상단 바에 밝기 토글 옆 '가' 단추 하나로 100 → 115 → 130 → 150 순환.
+  왜 `zoom` 인가: `styles.css` 의 글자 크기가 **전부 px 로 박혀 있다**(150곳 넘음).
+        rem 으로 바꾸면 diff 가 너무 크고 위험하다. `zoom` 은 레이아웃까지 다시 계산하므로
+        `transform: scale` 과 달리 줄바꿈·스크롤이 정상이다.
+  미리 확인한 것 (코드 읽기):
+    - `useMeasure` 의 측정 iframe · `fontProbe` 의 측정 span 은 **document.body 에 직접** 붙는다
+      → `.app` 밖이라 배율의 영향을 받지 않는다. 자동 분할 셈은 안전하다.
+    - `LivePreview` 는 `ResizeObserver` 의 `contentRect`(요소 자기 좌표계) 대 1920 비율이라
+      배율 안에서 일관된다. 손댈 것 없다.
+    - ⚠️ `useColumnSplit` 만 위험하다 — `getBoundingClientRect`(배율 곱해진 뷰포트 px)와
+      `event.clientX` 를 섞어 쓰고, 그 값을 다시 **배율 안쪽 CSS px** 로 저장한다.
+      → `offsetWidth/offsetHeight`(CSS px)로 재고 포인터 이동량만 배율로 나눈다.
+    - ⚠️ `.app { height: 100% }` 이라 `.app` 에 zoom 을 걸면 뷰포트를 넘친다.
+      **`:root` 에 건다** (ICB 가 함께 조정된다) — 브라우저에서 실측해 확인할 것.
+  완료 (판 1.0.6). `useUiScale` · `html { zoom: var(--ui-scale) }` · 상단 바 '가' 단추.
+  격리 서버 7811 실측 (1440×900 · 1280×800, 네 배율 모두):
+    - 넘침 0 — `scrollWidth-clientWidth` · `scrollHeight-clientHeight` 가 전부 0.
+      **`:root` 에 걸어서** 그렇다 (`.app` 은 `height:100%` 이라 거기 걸면 넘친다).
+    - 열 너비 잡이: 배율 150% 에서 화면상 151px 끌었을 때 열이 **481px**(380 + 151/1.5).
+      배율로 안 나누면 531 이 됐을 것이다 — `getBoundingClientRect`(화면 px)와
+      `offsetWidth`(CSS px)를 섞어 쓰고 있었다.
+    - 곁들여: 150%·1280px 에서 탭 이름과 '강사 모니터' 가 두 줄로 접혀 `nowrap` 고정.
+      자리가 모자라면 `.status` 가 먼저 줄어들게 순서를 정했다.
+  검사: `tests/unit/use-ui-scale.test.tsx` 7개. **변이 검사 4종 중 3종을 잡았다**
+    (쓰레기 값 통과 · 100%에서도 변수 얹기 · % 를 배율로 안 나누기).
+    `UI_SCALES[at+1] ?? DEFAULT` 는 **동등 변이**라 안 잡히는 것이 맞고,
+    `(at+2)` 로 바꾸면 잡힌다(확인).
+  ⚠️ 발견: **jsdom 에 `window.localStorage` 가 없다** (`sessionStorage` 는 있다).
+    Node 의 실험적 전역이 가리는데 `--localstorage-file` 없이는 값이 없다.
+    검사에서 가짜 저장소를 끼운다 — 검사 머리말에 적어 두었다.
+  전체: tsc ✅ · vitest 2,105 ✅ (118 파일) · vite build ✅
+
 ### 작성 예시 (복사해서 쓰세요)
 ```
 - [시작 2026-08-15 14:30 / Agent B] D-5 찬미예수 2000 가져오기

@@ -16,6 +16,7 @@ import { SongPanel } from './panels/SongPanel.tsx';
 import { TemplatePanel } from './panels/TemplatePanel.tsx';
 import { SettingsPanel } from './panels/SettingsPanel.tsx';
 import { useTheme } from './hooks/useTheme.ts';
+import { UI_SCALES, useUiScale } from './hooks/useUiScale.ts';
 
 /** 탭 순서 = 화면에 나오는 순서. 예배 순서가 첫 번째다 — 실제로 가장 많이 쓴다. */
 type Tab = 'plan' | 'bible' | 'song' | 'review' | 'template' | 'settings';
@@ -135,6 +136,7 @@ export function App(): React.JSX.Element {
   const outputCount = connections.output;
   const live = Boolean(state?.slide) && !(state?.blank ?? false);
   const theme = useTheme();
+  const uiScale = useUiScale();
 
   /**
    * 오른쪽 열(미리보기 + 송출 제어) 너비. **모든 탭이 함께 쓴다** —
@@ -232,6 +234,22 @@ export function App(): React.JSX.Element {
         >
           {theme.resolved === 'dark' ? '🌙' : '☀️'}
           {theme.choice !== 'system' && <span className="pin" aria-hidden="true">•</span>}
+        </button>
+
+        {/*
+          글자 크기. 밝기 토글과 나란히 둔다 — 둘 다 '이 PC 의 취향' 이고
+          예배 중에 볼 일이 없는 자리다. 단추 하나로 순환하므로 메뉴를 열 필요가 없다.
+        */}
+        <button
+          type="button"
+          className="scale-toggle"
+          onClick={uiScale.cycle}
+          title={`글자 크기 — 지금 ${uiScale.scale}%. 눌러서 키웁니다 (${UI_SCALES.join(' → ')}%)`}
+        >
+          <span className="glyph" aria-hidden="true">
+            가
+          </span>
+          <span className="pct">{uiScale.scale}%</span>
         </button>
 
         <div className="status">
