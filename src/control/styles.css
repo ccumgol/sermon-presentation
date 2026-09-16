@@ -379,10 +379,20 @@ select:focus {
 /* 글자 크기 단추 — 밝기 토글과 같은 높이로 나란히 선다 */
 .scale-toggle {
   display: flex;
-  align-items: baseline;
-  gap: 3px;
+  /*
+   * **`baseline` 이 아니라 `center` 다** (2026-09-16 사용자 지적).
+   *
+   * `baseline` 은 두 글자의 밑줄만 맞추고, 그렇게 묶인 줄을 상자의 **위쪽**에 붙인다
+   * (가운데가 아니다). 그래서 '가 115%' 가 단추 안에서 떠 보였다.
+   * 여기서 맞춰야 하는 것은 두 글자끼리가 아니라 **글자와 단추 상자**다.
+   */
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  /* 배율이 세 자리(100%)와 두 자리(115%)를 오가도 단추가 들썩이지 않게 */
+  min-width: 76px;
   min-height: 32px;
-  padding: 0 8px;
+  padding: 0 12px;
   line-height: 1;
 }
 
