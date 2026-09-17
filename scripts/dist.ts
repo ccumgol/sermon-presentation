@@ -115,9 +115,18 @@ function main(): void {
   }
 
   const argv = ['electron-builder', ...targets, '--publish', 'never'];
-  console.log(`· ${variant} 설치 파일을 만듭니다 — npx ${argv.join(' ')}\n`);
 
-  execFileSync('npx', argv, {
+  /*
+   * **윈도우에서는 `npx.cmd` 다** (2026-09-17 CI 에서 겪었다 — 맥은 멀쩡했다).
+   *
+   * `execFileSync` 는 셸을 거치지 않고 파일을 그대로 찾는다. 윈도우에 `npx` 라는
+   * 이름의 파일은 없고 `npx.cmd` 만 있어서 `spawnSync npx ENOENT` 로 죽는다.
+   * `shell: true` 로 넘기는 길도 있지만, 그러면 인자가 셸 해석을 한 번 더 거친다.
+   */
+  const runner = platform === 'win32' ? 'npx.cmd' : 'npx';
+  console.log(`· ${variant} 설치 파일을 만듭니다 — ${runner} ${argv.join(' ')}\n`);
+
+  execFileSync(runner, argv, {
     stdio: 'inherit',
     env: { ...process.env, SERMON_VARIANT: variant },
   });

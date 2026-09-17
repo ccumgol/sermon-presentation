@@ -65,6 +65,11 @@ SermonPresentation_core-1.0.8-x64-setup.exe
 > **`electron-builder` 를 직접 부르지 마세요.** `SERMON_VARIANT` 가 비면 파일 이름이
 > `SermonPresentation_-1.0.8.dmg` 가 됩니다.
 
+> ⚠️ **윈도우에서는 `npx` 가 아니라 `npx.cmd` 입니다** (2026-09-17 CI 에서 겪었습니다).
+> `execFileSync` 는 셸을 거치지 않고 파일을 그대로 찾는데, 윈도우에 `npx` 라는 이름의
+> 파일은 없습니다 — `spawnSync npx ENOENT` 로 죽습니다. 맥에서는 멀쩡해서
+> **CI 에 올리기 전까지 드러나지 않았습니다.**
+
 ### `_full` 을 받은 사람은
 
 설정 탭 → **자료 꾸러미** 카드에 설치판 안의 자료가 이미 잡혀 있습니다.
