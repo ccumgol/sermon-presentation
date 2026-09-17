@@ -114,19 +114,26 @@ function main(): void {
     console.log('· 자료를 담지 않습니다 (_core)');
   }
 
-  const argv = ['electron-builder', ...targets, '--publish', 'never'];
-
   /*
-   * **윈도우에서는 `npx.cmd` 다** (2026-09-17 CI 에서 겪었다 — 맥은 멀쩡했다).
+   * **`npx` 를 거치지 않고 node 로 직접 부른다** (2026-09-17 CI 에서 두 번 겪었다).
    *
-   * `execFileSync` 는 셸을 거치지 않고 파일을 그대로 찾는다. 윈도우에 `npx` 라는
-   * 이름의 파일은 없고 `npx.cmd` 만 있어서 `spawnSync npx ENOENT` 로 죽는다.
-   * `shell: true` 로 넘기는 길도 있지만, 그러면 인자가 셸 해석을 한 번 더 거친다.
+   * 맥에서는 `npx` 한 줄로 멀쩡했는데 윈도우에서만 두 단계로 막혔다:
+   *
+   *   1. `spawnSync npx ENOENT` — 윈도우에 `npx` 라는 이름의 파일은 없다. `npx.cmd` 뿐.
+   *   2. `spawnSync npx.cmd EINVAL` — Node 는 보안 문제(CVE-2024-27980) 때문에
+   *      `.cmd`·`.bat` 을 `shell: true` 없이 실행하는 것을 막는다.
+   *
+   * `shell: true` 를 붙이면 되지만, 그러면 인자가 셸 해석을 한 번 더 거친다 —
+   * 경로에 공백이나 `&` 가 있으면 조용히 깨진다. **셸도 `.cmd` 도 거치지 않는 길**이
+   * 안전하다: electron-builder 의 진짜 진입점(JS)을 찾아 지금 이 node 로 돌린다.
    */
-  const runner = platform === 'win32' ? 'npx.cmd' : 'npx';
-  console.log(`· ${variant} 설치 파일을 만듭니다 — ${runner} ${argv.join(' ')}\n`);
+  const builder = path.join(paths.appRoot, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js');
+  if (!existsSync(builder)) fail(`electron-builder 를 찾을 수 없습니다: ${builder}\n  npm ci 를 먼저 돌리세요.`);
 
-  execFileSync(runner, argv, {
+  const argv = [builder, ...targets, '--publish', 'never'];
+  console.log(`· ${variant} 설치 파일을 만듭니다 — node ${argv.join(' ')}\n`);
+
+  execFileSync(process.execPath, argv, {
     stdio: 'inherit',
     env: { ...process.env, SERMON_VARIANT: variant },
   });

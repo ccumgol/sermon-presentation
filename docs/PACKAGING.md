@@ -65,10 +65,21 @@ SermonPresentation_core-1.0.8-x64-setup.exe
 > **`electron-builder` 를 직접 부르지 마세요.** `SERMON_VARIANT` 가 비면 파일 이름이
 > `SermonPresentation_-1.0.8.dmg` 가 됩니다.
 
-> ⚠️ **윈도우에서는 `npx` 가 아니라 `npx.cmd` 입니다** (2026-09-17 CI 에서 겪었습니다).
-> `execFileSync` 는 셸을 거치지 않고 파일을 그대로 찾는데, 윈도우에 `npx` 라는 이름의
-> 파일은 없습니다 — `spawnSync npx ENOENT` 로 죽습니다. 맥에서는 멀쩡해서
-> **CI 에 올리기 전까지 드러나지 않았습니다.**
+### ⚠️ 겪은 함정 — 윈도우에서 `npx` 를 부르면 안 됩니다 (2026-09-17)
+
+맥에서는 `npx electron-builder` 한 줄로 멀쩡했는데 **윈도우 CI 에서만 두 단계로** 막혔습니다.
+
+| 시도 | 결과 | 왜 |
+|---|---|---|
+| `execFileSync('npx', …)` | `spawnSync npx ENOENT` | 윈도우에 `npx` 라는 이름의 파일은 없습니다 — `npx.cmd` 뿐 |
+| `execFileSync('npx.cmd', …)` | `spawnSync npx.cmd EINVAL` | Node 가 보안 문제(CVE-2024-27980)로 `.cmd`·`.bat` 을 `shell: true` 없이 막습니다 |
+| **`execFileSync(node, [cli.js, …])`** | ✅ | 셸도 `.cmd` 도 거치지 않습니다 |
+
+`shell: true` 를 붙이면 되지만 **인자가 셸 해석을 한 번 더 거칩니다** — 경로에 공백이나
+`&` 가 있으면 조용히 깨집니다. 그래서 `node_modules/electron-builder/out/cli/cli.js` 를
+지금 도는 node 로 직접 돌립니다.
+
+> **맥에서는 끝까지 드러나지 않는 부류입니다.** 포장 스크립트를 고쳤으면 CI 를 한 번 돌려 보세요.
 
 ### `_full` 을 받은 사람은
 
