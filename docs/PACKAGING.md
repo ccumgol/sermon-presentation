@@ -13,6 +13,7 @@
 npm run dist:mac        # 맥 — _core (프로그램만) · .dmg 두 개
 npm run dist:mac:full   # 맥 — _full (자료까지)
 npm run dist:win        # 윈도우에서 — _core .exe
+npm run dist:win:full   # 윈도우에서 — _full .exe
 ```
 
 **윈도우 설치 파일은 윈도우(또는 Wine)에서만 만들어집니다.** 맥에서 만들려면
@@ -36,18 +37,46 @@ SermonPresentation_full-1.0.8-arm64.dmg
 SermonPresentation_core-1.0.8-x64-setup.exe
 ```
 
-### ⚠️ 윈도우 `_full` 은 만들 수 없습니다
+### 어디서 무엇을 만들 수 있나
 
-막다른 길이 **양쪽 다** 막혀 있습니다.
+| 만들 것 | 맥에서 | 윈도우에서 | CI 에서 |
+|---|:---:|:---:|:---:|
+| 맥 `_core` | ✅ | ✖ | ✅ |
+| 맥 `_full` | ✅ | ✖ | ✖ |
+| 윈도우 `_core` | ✖ | ✅ | ✅ |
+| 윈도우 `_full` | ✖ | ✅ | ✖ |
 
-- **맥에서**: NSIS 설치 파일은 윈도우나 Wine 이 있어야 만들어집니다. 이 맥에는 없습니다.
-- **CI 에서**: 만들려면 자료를 GitHub 에 올려야 하는데 **그것이 곧 저작권 문제**입니다.
+두 가지 제약이 표를 만듭니다.
 
-`scripts/dist.ts` 가 이 조합을 **거부하고 멈춥니다** — 조용히 자료 없는 `_full` 을
-만들어 내보내면 받는 사람이 속습니다.
+- **설치 파일은 그 OS 에서 만듭니다.** NSIS 는 윈도우(또는 Wine)가, DMG 는 맥이 필요합니다.
+- **`_full` 은 CI 에서 못 만듭니다.** 만들려면 자료를 GitHub 에 올려야 하는데
+  **그것이 곧 저작권 문제**입니다.
 
-**윈도우에 자료를 넣는 길**: `_core` 로 설치한 뒤 `npm run data:pack` 으로 만든
-꾸러미를 옮기고, 설정 탭 → **자료 꾸러미**에서 넣습니다.
+`scripts/dist.ts` 가 만들 수 없는 조합을 **거부하고 멈춥니다** — 조용히 자료 없는
+`_full` 을 만들어 내보내면 받는 사람이 속습니다.
+
+### 윈도우 `_full` 을 만들려면 — 윈도우 PC 에서
+
+**`data/` 폴더 전체를 옮길 필요가 없습니다.** `stageFull()` 이 보는 것은
+자료 꾸러미 폴더 하나(`release/sermon-data-<판>/manifest.json`)뿐입니다.
+
+1. 자료가 있는 PC 에서 꾸러미를 만듭니다 — `npm run data:pack`
+   → `release/sermon-data-0.1.0/` (158MB)
+2. 윈도우 PC 에서 저장소를 받고 `npm ci`
+3. **1 에서 만든 꾸러미 폴더를 그 PC 의 `release/` 안에 통째로 복사**합니다
+4. `npm run dist:win:full`
+
+결과는 `release/SermonPresentation_full-<판>-x64-setup.exe` (약 200MB)입니다.
+
+> 3 에서 꾸러미를 USB·클라우드로 옮깁니다. **GitHub 에 올리지 마세요** —
+> `.gitignore` 의 `release/` 가 그것을 막고 있습니다.
+
+> ⚠️ 이 경로는 **아직 윈도우에서 돌려 본 적이 없습니다** (2026-09-17 기준).
+> CI 가 윈도우 `_core` 까지는 통과했고 `_full` 이 더하는 것은 `build-data/` 에
+> 158MB 를 얹는 것뿐이지만, 200MB 짜리 NSIS 설치 파일은 만들어 본 적이 없습니다.
+
+**윈도우 PC 가 없다면**: `_core` 로 설치한 뒤 꾸러미를 옮기고,
+설정 탭 → **자료 꾸러미**에서 넣습니다. 결과는 같습니다 — 설치 단계가 한 번 더 있을 뿐입니다.
 
 ### 어떻게 갈리나
 

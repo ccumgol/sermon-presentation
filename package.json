@@ -1,6 +1,6 @@
 {
   "name": "sermon-presentation",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "description": "OBS 브라우저 소스로 성경 본문과 찬양 가사를 송출하는 로컬 애플리케이션",
   "type": "module",
@@ -42,6 +42,7 @@
     "dist": "npm run app:build && npm run build:server && node scripts/dist.ts",
     "dist:mac": "npm run app:build && npm run build:server && node scripts/dist.ts --mac",
     "dist:win": "npm run app:build && npm run build:server && node scripts/dist.ts --win",
+    "dist:win:full": "npm run app:build && npm run build:server && node scripts/dist.ts --win --full",
     "icons": "node scripts/build-icons.ts",
     "dist:core": "npm run app:build && npm run build:server && node scripts/dist.ts",
     "dist:full": "npm run app:build && npm run build:server && node scripts/dist.ts --full",

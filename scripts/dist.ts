@@ -5,7 +5,8 @@
  * ```bash
  * npm run dist:core          # 이 PC 가 만들 수 있는 것 전부 (맥에서는 맥용)
  * npm run dist:full          # 자료를 담아서
- * npm run dist:core -- --win # 대상을 콕 집을 때
+ * npm run dist:mac:full      # 맥에서 · 자료까지
+ * npm run dist:win:full      # **윈도우 PC 에서** · 자료까지
  * ```
  *
  * ## 왜 스크립트가 끼는가
@@ -17,12 +18,17 @@
  *   1. `SERMON_VARIANT` 를 넣는다 → `artifactName` 의 `${env.SERMON_VARIANT}`
  *   2. `build-data/` 를 채우거나 비운다 → `extraResources` 가 그대로 담는다
  *
- * ## ⚠️ 윈도우 `_full` 은 맥에서 만들 수 없다
+ * ## ⚠️ 윈도우 `_full` 은 **맥에서** 만들 수 없다 (윈도우에서는 된다)
  *
  * NSIS 설치 파일은 윈도우나 Wine 이 있어야 만들어진다. 그리고 CI 도 답이 아니다 —
- * **자료가 git 에 없고, 올리는 순간 그것이 저작권 문제다.** 윈도우에 자료를 넣는
- * 길은 `_core` + 자료 꾸러미(설정 탭에서 설치)다. 이 스크립트는 그 경우
- * **왜 안 되는지 말하고 멈춘다** — 조용히 빈 `_full` 을 만들지 않는다.
+ * **자료가 git 에 없고, 올리는 순간 그것이 저작권 문제다.**
+ *
+ * 막힌 것은 **맥에서 윈도우 것을 만드는 일**이지 윈도우 자체가 아니다. 윈도우 PC 가
+ * 있으면 `npm run dist:win:full` 로 만들 수 있고, 그때 **`data/` 전체를 옮길 필요도
+ * 없다** — `stageFull()` 이 보는 것은 자료 꾸러미 폴더 하나뿐이다.
+ *
+ * 윈도우 PC 가 없으면 `_core` + 자료 꾸러미(설정 탭에서 설치)로 간다. 이 스크립트는
+ * 만들 수 없는 조합에서 **두 갈래를 다 일러 주고 멈춘다** — 조용히 빈 `_full` 을 만들지 않는다.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -100,11 +106,15 @@ function main(): void {
 
   if (variant === 'full' && wantsWin && platform !== 'win32') {
     fail(
-      '윈도우 _full 설치 파일은 이 PC 에서 만들 수 없습니다.\n' +
+      '윈도우 _full 설치 파일은 이 PC(맥)에서는 만들 수 없습니다.\n' +
         '  NSIS 는 윈도우나 Wine 이 있어야 하고, CI 로도 못 합니다 —\n' +
         '  자료가 git 에 없고 올리면 그것이 곧 저작권 문제입니다.\n\n' +
-        '  대신: 윈도우는 _core 로 설치한 뒤, 설정 탭 → 자료 꾸러미로 넣으세요.\n' +
-        '        꾸러미는  npm run data:pack  으로 만듭니다.',
+        '  ① 윈도우 PC 가 있다면 거기서 만들 수 있습니다:\n' +
+        `     저장소를 받아 npm ci 한 뒤, 자료 꾸러미 폴더(${path.basename(packDir)})를\n` +
+        '     그 PC 의 release/ 에 복사하고  npm run dist:win:full\n' +
+        '     (data/ 전체를 옮길 필요는 없습니다 — 꾸러미 하나면 됩니다.)\n\n' +
+        '  ② 윈도우 PC 가 없다면: _core 로 설치한 뒤 설정 탭 → 자료 꾸러미로 넣으세요.\n' +
+        '     꾸러미는  npm run data:pack  으로 만듭니다.',
     );
   }
 
