@@ -2067,7 +2067,24 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
       (`which wine` → 없음). CI 도 안 된다 — 자료가 git 에 없고, 올리면 그게 곧
       저작권 문제다. 윈도우는 `_core` + 자료 꾸러미(94MB zip)로 간다.
     - 맥 `_full` 은 로컬에서 만든다 (자료가 이 PC 에 있다).
-  다음 단계: 설명서 탭 → 검사 → 판 1.0.8 → 포장 설정 → 맥 빌드 → 윈도우 CI
+  완료 ① 판 1.0.8 — `src/control/help/` 네 부 22장 + `HelpPanel`. 검사 14개(변이 4/4 검출).
+  완료 ② 포장 두 벌. 설정 파일은 하나로 두고 `scripts/dist.ts` 가 갈리는 둘만 준비한다:
+    `SERMON_VARIANT` 환경 변수(→ `artifactName`)와 `build-data/` 채우기/비우기(→ `extraResources`).
+    `_core` 의 `build-data/` 에는 안내문뿐이라 `manifest.json` 이 없고, 서버가
+    '담겨 온 자료 없음' 으로 지나간다 — 그래서 코드에 갈래가 없다.
+  실측 검증:
+    - 맥 4개 빌드 확인: `_core` 124·131MB / `_full` 214·220MB
+    - `_full` DMG 를 마운트해 `Resources/app/data-pack/` 에 bible 107MB·songs 8.5MB·
+      sheets 2,061장·manifest 가 실제로 든 것을 확인. `_core` 에는 README.txt 하나뿐.
+    - 서버가 설치판 안의 꾸러미를 찾는가 (격리 서버 7812, `SERMON_APP_ROOT` 를 흉내):
+      `_full` → found=true + 설치 계획 4줄 / `_core` → found=false
+    - **사람이 `install/` 에 넣은 것이 설치판 안의 것보다 먼저**인 것도 확인.
+      설치판 안의 자료는 만들 때 박힌 채 늙기 때문이다.
+    - `build-data/` 가 빌드 뒤 비워지는 것 확인 (다음 `_core` 에 자료가 섞이지 않게)
+  ⚠️ 윈도우 `_full` 은 **거부하고 멈춘다** (`scripts/dist.ts`) — 조용히 자료 없는
+    `_full` 을 내보내면 받는 사람이 속는다. 실행해 확인했다.
+  `.gitignore`: `release/` 는 이미 있었고 `build-data/*` 를 더했다(안내문만 예외).
+  다음 단계: 커밋 → 윈도우 `_core` 는 CI 로
 
 ### 작성 예시 (복사해서 쓰세요)
 ```

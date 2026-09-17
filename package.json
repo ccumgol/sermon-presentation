@@ -39,10 +39,13 @@
     "sheets:detect": "node scripts/detect-staff.ts",
     "build:server": "tsc -p tsconfig.build.json",
     "electron": "npm run app:build && npm run build:server && electron .",
-    "dist": "npm run app:build && npm run build:server && electron-builder --publish never",
-    "dist:mac": "npm run app:build && npm run build:server && electron-builder --mac --publish never",
-    "dist:win": "npm run app:build && npm run build:server && electron-builder --win --publish never",
-    "icons": "node scripts/build-icons.ts"
+    "dist": "npm run app:build && npm run build:server && node scripts/dist.ts",
+    "dist:mac": "npm run app:build && npm run build:server && node scripts/dist.ts --mac",
+    "dist:win": "npm run app:build && npm run build:server && node scripts/dist.ts --win",
+    "icons": "node scripts/build-icons.ts",
+    "dist:core": "npm run app:build && npm run build:server && node scripts/dist.ts",
+    "dist:full": "npm run app:build && npm run build:server && node scripts/dist.ts --full",
+    "dist:mac:full": "npm run app:build && npm run build:server && node scripts/dist.ts --mac --full"
   },
   "dependencies": {
     "@fastify/static": "^10.1.3",

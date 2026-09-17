@@ -10,13 +10,67 @@
 ## 한 줄 요약
 
 ```bash
-npm run dist:mac    # 맥에서 — .dmg 두 개 (Apple Silicon · Intel)
-npm run dist:win    # 윈도우에서 — .exe 설치 파일
+npm run dist:mac        # 맥 — _core (프로그램만) · .dmg 두 개
+npm run dist:mac:full   # 맥 — _full (자료까지)
+npm run dist:win        # 윈도우에서 — _core .exe
 ```
 
 **윈도우 설치 파일은 윈도우(또는 Wine)에서만 만들어집니다.** 맥에서 만들려면
 GitHub Actions 를 쓰세요 — 저장소의 Actions 탭에서 **설치 파일 빌드**를 실행하면
 맥·윈도우 것이 함께 나옵니다 (`.github/workflows/build.yml`).
+
+---
+
+## `_core` 와 `_full` — 두 벌 (2026-09-17 사용자 요청)
+
+| | 무엇이 들었나 | 크기(1.0.8) | 어디서 만드나 |
+|---|---|---:|---|
+| **`_core`** | 프로그램만 | 맥 130MB · 윈도우 114MB | 어디서나 · CI 로도 |
+| **`_full`** | 프로그램 **＋ 성경·가사·악보** | 맥 약 290MB | **자료가 있는 PC 에서만** |
+
+이름은 제품 이름 바로 뒤에 붙습니다 — 파일만 보고 갈릴 수 있게.
+
+```
+SermonPresentation_core-1.0.8-arm64.dmg
+SermonPresentation_full-1.0.8-arm64.dmg
+SermonPresentation_core-1.0.8-x64-setup.exe
+```
+
+### ⚠️ 윈도우 `_full` 은 만들 수 없습니다
+
+막다른 길이 **양쪽 다** 막혀 있습니다.
+
+- **맥에서**: NSIS 설치 파일은 윈도우나 Wine 이 있어야 만들어집니다. 이 맥에는 없습니다.
+- **CI 에서**: 만들려면 자료를 GitHub 에 올려야 하는데 **그것이 곧 저작권 문제**입니다.
+
+`scripts/dist.ts` 가 이 조합을 **거부하고 멈춥니다** — 조용히 자료 없는 `_full` 을
+만들어 내보내면 받는 사람이 속습니다.
+
+**윈도우에 자료를 넣는 길**: `_core` 로 설치한 뒤 `npm run data:pack` 으로 만든
+꾸러미를 옮기고, 설정 탭 → **자료 꾸러미**에서 넣습니다.
+
+### 어떻게 갈리나
+
+설정 파일은 **하나**입니다. 갈리는 것은 두 가지뿐이라 `scripts/dist.ts` 가 준비합니다.
+
+| 무엇 | 어떻게 |
+|---|---|
+| 파일 이름 | `SERMON_VARIANT` 환경 변수 → `artifactName` 의 `${env.SERMON_VARIANT}` |
+| 자료 | `build-data/` 를 채우거나(`_full`) 비운다(`_core`). `extraResources` 가 그대로 담는다 |
+
+`_core` 의 `build-data/` 에는 안내문 하나뿐이라 `manifest.json` 이 없고, 서버는
+그것을 **'담겨 온 자료 없음'** 으로 지나갑니다
+(`server/routes/data-pack.ts` 의 `bundledPackDir`). 그래서 코드에도 갈래가 없습니다.
+
+> **`electron-builder` 를 직접 부르지 마세요.** `SERMON_VARIANT` 가 비면 파일 이름이
+> `SermonPresentation_-1.0.8.dmg` 가 됩니다.
+
+### `_full` 을 받은 사람은
+
+설정 탭 → **자료 꾸러미** 카드에 설치판 안의 자료가 이미 잡혀 있습니다.
+무엇이 들어올지 표로 보고 **설치**를 한 번 누르면 끝입니다.
+사람이 `install/` 에 직접 넣은 것이 있으면 **그쪽이 먼저**입니다 — 설치판 안의
+자료는 만들 때 박힌 채 늙기 때문입니다.
 
 ---
 

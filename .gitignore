@@ -34,5 +34,14 @@ coverage/
 .obsidian/
 
 # 포장 산출물 (Phase 6)
+#
+# `release/` 에는 설치 파일(_core · _full)과 자료 꾸러미가 들어간다.
+# **_full 설치 파일에는 성경·가사·악보가 통째로 들어 있다** — 올리면 그것이 곧
+# 저작권 문제다. 이 두 줄이 그것을 막는 마지막 방어선이니 지우지 말 것.
 dist-server/
 release/
+
+# 설치 파일을 만들 때 자료 꾸러미가 담기는 자리 (build-data/README.txt 참고).
+# 안내문만 저장소에 두고 자료는 올리지 않는다.
+build-data/*
+!build-data/README.txt

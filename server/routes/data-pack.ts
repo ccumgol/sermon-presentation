@@ -62,6 +62,20 @@ export function installDir(): string {
   return path.join(paths.dataDir, 'install');
 }
 
+/**
+ * **설치판 안에 담겨 온 꾸러미** (`_full` 설치 파일, 2026-09-17 사용자 요청).
+ *
+ * 설치 파일을 두 가지로 만든다 — `_core` 는 프로그램만, `_full` 은 자료까지.
+ * `_full` 로 깐 사람은 **아무것도 옮기지 않고** 설정 탭에서 한 번 누르면 된다.
+ *
+ * 자리는 `resources/app/data-pack/` 이다(`electron-builder.yml` 의 `extraResources`).
+ * `_core` 에도 같은 폴더가 있지만 안내문 하나뿐이라 `manifest.json` 이 없고,
+ * 그래서 `inspectPack()` 이 **'없음'으로 지나간다** — 갈래를 나눌 필요가 없다.
+ */
+export function bundledPackDir(): string {
+  return path.join(paths.appRoot, 'data-pack');
+}
+
 interface PackStatus {
   dir: string;
   found: boolean;
@@ -90,6 +104,12 @@ export function inspectPack(): PackStatus {
       }
     }
   }
+
+  /*
+   * 설치판에 담겨 온 것은 **맨 뒤**에 본다. 사람이 `install/` 에 직접 넣었다면
+   * 그쪽이 더 새 자료일 것이다 — 설치판 안의 것은 만들 때 박힌 채 늙는다.
+   */
+  candidates.push(bundledPackDir());
 
   for (const dir of candidates) {
     const file = path.join(dir, 'manifest.json');

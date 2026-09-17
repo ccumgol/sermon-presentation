@@ -44,6 +44,17 @@ directories:
 asar: false
 afterPack: electron/after-pack.cjs
 
+# ## 설치 파일 이름 — `_core` 와 `_full` (2026-09-17 사용자 요청)
+#
+# 두 벌을 만든다. 이름만 보고 어느 쪽인지 알아야 하므로 제품 이름 바로 뒤에 붙인다.
+#
+#   SermonPresentation_core-1.0.8-arm64.dmg    ← 프로그램만
+#   SermonPresentation_full-1.0.8-arm64.dmg    ← 자료까지 (약 290MB)
+#
+# `${env.SERMON_VARIANT}` 는 `scripts/dist.ts` 가 넣는다. **직접 electron-builder 를
+# 부르지 말 것** — 그 변수가 비면 이름이 `SermonPresentation_-1.0.8` 이 된다.
+artifactName: ${productName}_${env.SERMON_VARIANT}-${version}-${arch}.${ext}
+
 # `resources/app/` 아래로 그대로 복사된다. electron/main.js 의 APP_ROOT 와 짝이다 —
 # 한쪽만 바꾸면 앱이 자기 파일을 찾지 못한다.
 extraResources:
@@ -53,6 +64,11 @@ extraResources:
     to: app/public
   - from: package.json
     to: app/package.json
+  # 자료 꾸러미가 담기는 자리. `_core` 에는 안내문 하나뿐이라 `manifest.json` 이
+  # 없고, 서버는 그것을 '담겨 온 자료 없음' 으로 지나간다
+  # (`server/routes/data-pack.ts` 의 `bundledPackDir`). 그래서 설정을 갈라 둘 필요가 없다.
+  - from: build-data
+    to: app/data-pack
 
 files:
   - electron/**/*
@@ -129,6 +145,9 @@ win:
       arch: [x64]
 
 nsis:
+  # 위의 `artifactName` 을 그대로 쓴다 — 기본값(`... Setup 1.0.8.exe`)에는 변종이
+  # 들어가지 않아 두 파일이 같은 이름이 된다.
+  artifactName: ${productName}_${env.SERMON_VARIANT}-${version}-${arch}-setup.${ext}
   # 설치 중에 OBS·Chrome 도 함께 깔 수 있게 한다 (2026-09-10, 사용자 요청).
   # 물어보는 화면과 winget 호출이 그 안에 있고, **실패해도 설치는 끝난다.**
   # ⚠️ 그 스크립트는 실행해 본 적이 없다 — 만든 사람에게 윈도우가 없다.
