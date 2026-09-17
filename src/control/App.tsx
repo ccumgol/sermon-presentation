@@ -15,11 +15,12 @@ import { ReviewPanel } from './panels/ReviewPanel.tsx';
 import { SongPanel } from './panels/SongPanel.tsx';
 import { TemplatePanel } from './panels/TemplatePanel.tsx';
 import { SettingsPanel } from './panels/SettingsPanel.tsx';
+import { HelpPanel } from './panels/HelpPanel.tsx';
 import { useTheme } from './hooks/useTheme.ts';
 import { UI_SCALES, useUiScale } from './hooks/useUiScale.ts';
 
 /** 탭 순서 = 화면에 나오는 순서. 예배 순서가 첫 번째다 — 실제로 가장 많이 쓴다. */
-type Tab = 'plan' | 'bible' | 'song' | 'review' | 'template' | 'settings';
+type Tab = 'plan' | 'bible' | 'song' | 'review' | 'template' | 'settings' | 'help';
 
 /** 입력 중에는 단축키가 동작하지 않아야 한다 */
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -177,6 +178,17 @@ export function App(): React.JSX.Element {
             onClick={() => setTab('settings')}
           >
             설정
+          </button>
+          {/*
+            사용설명서는 **맨 끝**이다 — 예배 중에 누를 일이 없고, 찾을 때는
+            늘 같은 자리(끝)에 있는 편이 빠르다. 물음표를 붙여 눈에 띄게 한다.
+          */}
+          <button
+            type="button"
+            className={`tab${tab === 'help' ? ' active' : ''}`}
+            onClick={() => setTab('help')}
+          >
+            사용설명서
           </button>
         </nav>
 
@@ -357,6 +369,8 @@ export function App(): React.JSX.Element {
           {tab === 'template' && <TemplatePanel active={template} connected={connected} send={send} />}
 
           {tab === 'settings' && <SettingsPanel info={info} />}
+
+          {tab === 'help' && <HelpPanel />}
         </main>
 
         {/*

@@ -2990,3 +2990,230 @@ button.link-inline {
   white-space: nowrap;
   min-width: 0;
 }
+
+/* ── 사용설명서 탭 (2026-09-17 사용자 요청) ─────────────────────── */
+
+/*
+ * 왼쪽 차례 · 잡이 · 오른쪽 본문. 찬양·검토 탭과 같은 짜임이라
+ * 폭 끌기(`useColumnSplit`)도 그대로 쓴다.
+ */
+.help {
+  display: grid;
+  grid-template-columns: var(--split-help, minmax(200px, 300px)) auto minmax(320px, 1fr);
+  gap: 5px;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 목록만 스크롤하고 페이지는 넘치지 않게 — 찬양·검토 탭과 같은 이유 */
+.main:has(.help) {
+  overflow: hidden;
+}
+
+.help-toc {
+  overflow-y: auto;
+  padding-right: 4px;
+  min-height: 0;
+}
+
+.help-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.help-hits {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.help-toc h3 {
+  margin: 14px 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  text-transform: none;
+}
+
+.help-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+/* 제목과 한 줄 설명을 함께 — 무엇을 찾는지 제목만으로는 가리기 어렵다 */
+.help-link {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 8px;
+  line-height: 1.35;
+}
+
+.help-link:hover {
+  background: var(--row-hover);
+}
+
+.help-link.active {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+.help-link .t {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.help-link .s {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.help-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.help-article {
+  /* 글줄이 너무 길면 눈이 다음 줄을 놓친다 — 실측으로 정한 값이 아니라 통상값이다 */
+  max-width: 760px;
+}
+
+.help-article h2 {
+  margin: 0 0 2px;
+}
+
+.help-summary {
+  margin: 0 0 14px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.help-p {
+  margin: 0 0 10px;
+  line-height: 1.7;
+}
+
+.help-sub {
+  margin: 20px 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.help-steps,
+.help-list {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  line-height: 1.7;
+}
+
+.help-steps li,
+.help-list li {
+  margin-bottom: 5px;
+}
+
+/* 표만 옆으로 밀리게 둔다 — 글까지 밀리면 읽을 수 없다 */
+.help-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 14px;
+}
+
+.help-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.help-table th,
+.help-table td {
+  border: 1px solid var(--line);
+  padding: 7px 9px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.help-table th {
+  background: var(--panel-2);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/*
+ * 알림. `warn` 은 '모르면 예배 중에 당한다' 는 뜻으로만 쓰므로 색을 따로 준다 —
+ * 모두 같은 색이면 눈이 걸러 내지 못한다.
+ */
+.help-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  line-height: 1.65;
+  font-size: 13px;
+}
+
+.help-note.warn {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+}
+
+.help-note .mark {
+  line-height: 1.5;
+}
+
+.help-keys {
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.help-keys td {
+  padding: 4px 10px 4px 0;
+  vertical-align: middle;
+}
+
+.help-keys .k {
+  white-space: nowrap;
+}
+
+.help-keys kbd,
+.help-article code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86em;
+  background: var(--panel-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.help-keys kbd + kbd {
+  margin-left: 4px;
+}
+
+.help-article code {
+  border-color: var(--line);
+}
+
+/* 다음 장으로 이어지게 — 처음 쓰는 사람은 차례를 안 보고 이것만 누른다 */
+.help-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.help-nav .spacer {
+  flex: 1 1 auto;
+}
