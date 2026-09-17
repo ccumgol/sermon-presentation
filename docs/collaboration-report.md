@@ -2084,7 +2084,16 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
   ⚠️ 윈도우 `_full` 은 **거부하고 멈춘다** (`scripts/dist.ts`) — 조용히 자료 없는
     `_full` 을 내보내면 받는 사람이 속는다. 실행해 확인했다.
   `.gitignore`: `release/` 는 이미 있었고 `build-data/*` 를 더했다(안내문만 예외).
-  다음 단계: 커밋 → 윈도우 `_core` 는 CI 로
+  완료 ③ 윈도우 `_core` — CI 35184600722 성공, 109MB 내려받아 `release/` 에 두었다.
+  ⚠️ **맥에서는 끝까지 안 드러나는 함정을 두 번 밟았다** (CI 두 번 실패):
+    1. `execFileSync('npx', …)` → `ENOENT`. 윈도우에 `npx` 라는 이름의 파일은 없다.
+    2. `execFileSync('npx.cmd', …)` → `EINVAL`. Node 가 CVE-2024-27980 때문에
+       `.cmd`·`.bat` 을 `shell: true` 없이 막는다.
+    → 셸도 `.cmd` 도 거치지 않는 길로 갔다: `electron-builder/out/cli/cli.js` 를
+      지금 도는 node 로 직접 돌린다. `shell: true` 는 인자가 셸 해석을 한 번 더
+      거쳐 경로에 공백·`&` 가 있으면 조용히 깨진다. `docs/PACKAGING.md` 에 표로 적었다.
+  산출물(1.0.8): `_core` 맥 124·131MB · 윈도우 109MB / `_full` 맥 214·220MB.
+  다음 단계: (없음) — 사용자 확인 대기
 
 ### 작성 예시 (복사해서 쓰세요)
 ```
