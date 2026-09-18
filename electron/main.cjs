@@ -28,6 +28,7 @@
 
 const { appendFileSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, shell, dialog, Menu } = require('electron');
 
 const { argsWithAttempt, decideRestart, readAttempt } = require('./restart-policy.cjs');
@@ -224,7 +225,22 @@ function createWindow(url) {
 }
 
 async function start() {
-  const { startServer } = await import(path.join(APP_ROOT, 'dist-server', 'server', 'electron-entry.js'));
+  /*
+   * ⚠️ **`import()` 에 경로를 그대로 넘기면 윈도우에서 앱이 뜨지 않는다**
+   * (2026-09-18 사용자 보고 — 윈도우 설치판 첫 실행에서 드러났다).
+   *
+   * ESM 로더는 받은 문자열을 **URL 로** 읽는다. 맥의 `/Users/...` 는 우연히 통하지만
+   * 윈도우의 `C:\Users\...` 는 `C:` 가 프로토콜로 읽혀 이렇게 죽는다:
+   *
+   *   ERR_UNSUPPORTED_ESM_URL_SCHEME — Received protocol 'c:'
+   *
+   * `pathToFileURL()` 이 `file:///C:/Users/...` 로 바꿔 준다. 공백·한글이 든 경로도
+   * 여기서 함께 인코딩되므로, 사용자 이름이 한글인 PC 도 이 한 줄로 같이 풀린다.
+   *
+   * **맥에서는 끝까지 드러나지 않는 부류다** — 고쳤으면 윈도우에서 실제로 띄워 볼 것.
+   */
+  const entry = path.join(APP_ROOT, 'dist-server', 'server', 'electron-entry.js');
+  const { startServer } = await import(pathToFileURL(entry).href);
   const { url, close } = await startServer();
   stopServer = close;
   serverUrl = url;
@@ -242,10 +258,19 @@ app.whenReady().then(
    * 서버가 못 뜨면 **빈 창을 띄우지 않는다.** 무슨 일인지 적어 보여 주고 끝낸다 —
    * 예배 준비 중에 검은 창만 보면 손쓸 방법이 없다.
    */
+  /*
+   * 두 가지를 **갈라서** 적는다 (2026-09-18).
+   *
+   * 전에는 오류 문구 바로 아래에 데이터 폴더 경로만 붙여 두었더니, 받은 사람이
+   * **데이터 폴더가 원인**이라고 읽었다. 실제 원인은 위의 한 줄이었다.
+   * 경로는 '원인' 이 아니라 '알려 드리는 값' 이라는 것이 보여야 한다.
+   */
   dialog.showErrorBox(
     '시작하지 못했습니다',
     `${error && error.message ? error.message : String(error)}\n\n` +
-      `데이터 폴더: ${process.env.SERMON_DATA_DIR}`,
+      `— 아래는 원인이 아니라 참고 값입니다 —\n` +
+      `데이터 폴더: ${process.env.SERMON_DATA_DIR}\n` +
+      `프로그램 폴더: ${APP_ROOT}`,
   );
   app.quit();
 });
