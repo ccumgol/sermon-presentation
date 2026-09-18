@@ -69,4 +69,7 @@ jobs:
             release/*.dmg
             release/*.exe
           if-no-files-found: error
-          retention-days: 30
+          # 7일. 30일로 두었더니 옛 설치 파일이 쌓여 **저장 용량 한도에 걸렸고**,
+          # 빌드는 멀쩡한데 올리기만 실패했다 (2026-09-18, 17개 3.4GB).
+          # 여기서 만든 것은 받아서 쓰면 그만이고, 필요하면 다시 돌리면 된다.
+          retention-days: 7
