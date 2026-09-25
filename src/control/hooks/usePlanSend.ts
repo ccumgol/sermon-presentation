@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { buildPlanDeck, describeItem, itemsInGroup } from '../../../lib/plan-deck.ts';
+import { buildPlanDeck, describeItem, itemsInGroup, resumeIndex } from '../../../lib/plan-deck.ts';
 import { itemTitle } from '../../../lib/item-title.ts';
 import { templateIdFor as pickTemplateId, type TemplateChoice } from '../../../lib/plan-item-template.ts';
 import {
@@ -311,6 +311,21 @@ export function usePlanSend(options: PlanSendOptions) {
   /** 순서표 전체를 하나의 덱으로 올린다 (순서대로 진행할 때) */
   async function loadForService(): Promise<void> {
     if (!plan || items.length === 0) return;
+
+    /*
+     * **보던 자리를 지킬 것인가** (2026-09-25 사용자 요청).
+     *
+     * 올린 뒤 항목을 고치면 화면이 따라오지 않아 다시 올려야 하는데, 그때마다
+     * 첫 장으로 갔다 — 예배 중반에 오타 하나 고치면 맨 처음으로 튀었다.
+     *
+     * 지킬 수 있는 경우는 **지금 이 순서표가 올라가 있을 때뿐**이다. 두 가지를 본다:
+     *   · 예배 전 안내가 도는 중이 아니다 — 그건 예배 앞의 시간이고, 거기서
+     *     '올리기' 를 누르는 것은 **예배를 시작한다**는 뜻이라 첫 장이 맞다.
+     *   · 올라가 있는 묶음이 이 순서표다 (`reference`). 다른 순서표나 성경 조회에서
+     *     넘어온 것이면 짚을 자리가 없다.
+     */
+    const resumeFrom = auto === null && deck?.reference === plan.name ? deck : null;
+
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -323,25 +338,50 @@ export function usePlanSend(options: PlanSendOptions) {
         setError('올릴 수 있는 항목이 없습니다');
         return;
       }
-      // 항목이 템플릿을 지정하지 않았으면 예배 기본 설정을 경계에 실어 보낸다.
-      // 이게 없으면 순서표를 올려 진행할 때만 기본 설정이 빠진다.
+      /*
+       * 항목이 템플릿을 지정하지 않았으면 예배 기본 설정을 경계에 실어 보낸다.
+       * 이게 없으면 순서표를 올려 진행할 때만 기본 설정이 빠진다.
+       *
+       * **항목 id 로 찾는다** (2026-09-25 에 고쳤다). 전에는 `groups[i]` 와
+       * `비-divider 항목[i]` 를 자리 번호로 짝지었는데, 못 푼 항목은 경계에서
+       * 빠지므로 **앞에 실패가 하나만 있어도 그 뒤가 전부 밀려** 엉뚱한 항목의
+       * 템플릿이 실렸다.
+       */
+      const byId = new Map(items.map((item) => [item.id, item]));
       const withDefaults = {
         ...result.deck,
-        groups: result.deck.groups?.map((group, index) => {
+        groups: result.deck.groups?.map((group) => {
           if (group.templateId !== undefined) return group;
-          const item = items.filter((i) => i.type !== 'divider')[index];
+          const item = group.itemId === undefined ? undefined : byId.get(group.itemId);
           const id = item ? templateIdFor(item) : undefined;
           return id === undefined ? group : { ...group, templateId: id };
         }),
       };
+      const index = resumeIndex(withDefaults, resumeFrom);
+      send({ t: 'deck:load', payload: { ...withDefaults, index } });
+      setLiveItemId(null);
+
+      /*
+       * 알릴 것을 **한 번에 모아** 쓴다. 배너는 하나뿐이라 두 번 부르면 나중 것이
+       * 앞 것을 지운다 — 건너뛴 항목을 그렇게 잃으면 예배 중에 순서가 조용히 사라진다.
+       *
+       * 건너뛴 것이 먼저다. 그쪽이 손쓸 일이고, 이어붙인 자리는 화면을 보면 안다.
+       */
+      const lines: string[] = [];
       if (result.failed.length > 0) {
-        setNotice(
+        lines.push(
           `${result.failed.length}개 항목을 건너뛰었습니다: ` +
             result.failed.map((f) => `${describeItem(f.item)} (${f.error})`).join(', '),
         );
       }
-      send({ t: 'deck:load', payload: withDefaults });
-      setLiveItemId(null);
+      if (index > 0) {
+        // 경계는 오름차순이라 조건에 맞는 **마지막** 것이 지금 항목이다
+        const here = withDefaults.groups?.filter((group) => group.startIndex <= index).at(-1);
+        lines.push(
+          `보던 자리에서 이어갑니다${here ? ` — ${here.label}` : ''} (처음부터 하려면 PgUp).`,
+        );
+      }
+      if (lines.length > 0) setNotice(lines.join('\n'));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '순서표를 올리지 못했습니다');
     } finally {

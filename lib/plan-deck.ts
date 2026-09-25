@@ -120,6 +120,9 @@ export async function buildPlanDeck(
     groups.push({
       label: describeItem(item),
       startIndex: slides.length,
+      // 어느 항목이 만든 경계인지 남긴다 — 자리 번호로 짝지으면 위에서 건너뛴
+      // 항목만큼 어긋난다 (`DeckGroup.itemId` 머리말)
+      itemId: item.id,
       ...(typeof templateId === 'number' ? { templateId } : {}),
     });
 
@@ -133,6 +136,70 @@ export async function buildPlanDeck(
     deck: { reference: planName, slides, labels, index: 0, groups },
     failed,
   };
+}
+
+/**
+ * 다시 올릴 때 **보던 자리**로 돌아갈 슬라이드 번호 (2026-09-25 사용자 요청).
+ *
+ * ## 왜 필요한가
+ *
+ * 순서표를 올린 뒤에 항목을 고치면 화면이 따라오지 않는다(의도된 제약 — 덱을 통째로
+ * 다시 만들면 진행 위치를 잃는다). 되살리는 길은 다시 올리기뿐인데, 그때 늘 첫 장으로
+ * 갔다. **예배 중반에 오타 하나 고치면 순서표 맨 처음으로 튀었다.**
+ *
+ * ## 어떻게 찾는가
+ *
+ * 자리 번호가 아니라 **항목 id** 로 짝짓는다. 못 푼 항목은 경계에서 빠지므로 번호는
+ * 어긋나지만 id 는 어긋나지 않는다.
+ *
+ * | 경우 | 어디로 |
+ * |---|---|
+ * | 보던 항목이 그대로 있다 | 그 항목의 **같은 장**. 장이 줄었으면 그 항목의 마지막 장 |
+ * | 보던 항목이 사라졌다 | **그 앞의 살아남은 항목**의 첫 장 — 지나온 데로 돌아가는 것이 덜 놀랍다 |
+ * | 짚을 데가 없다 | 첫 장 |
+ *
+ * 사라진 항목에서 **뒤로** 가지 않는 이유: 앞으로 밀면 아직 안 나간 것이 회중 화면에
+ * 튀어나온다. 뒤로 물러나면 이미 지나온 것이라 사고가 아니다.
+ */
+export function resumeIndex(
+  next: Deck,
+  previous: { groups?: readonly DeckGroup[]; index: number } | null,
+): number {
+  const nextGroups = next.groups;
+  if (!previous || !previous.groups || !nextGroups || nextGroups.length === 0) return 0;
+
+  const last = next.slides.length - 1;
+  if (last < 0) return 0;
+
+  /** 그 경계가 거느린 마지막 슬라이드 (다음 경계 바로 앞, 없으면 덱 끝) */
+  const endOf = (at: number): number => {
+    const start = nextGroups[at + 1]?.startIndex;
+    return start === undefined ? last : start - 1;
+  };
+
+  // 보던 자리가 어느 항목의 몇 번째였나
+  let wasAt = -1;
+  previous.groups.forEach((group, index) => {
+    if (group.startIndex <= previous.index) wasAt = index;
+  });
+  if (wasAt < 0) return 0;
+
+  const offset = previous.index - (previous.groups[wasAt]?.startIndex ?? 0);
+
+  // 그 항목부터 **앞으로 거슬러** 살아남은 것을 찾는다
+  for (let at = wasAt; at >= 0; at -= 1) {
+    const id = previous.groups[at]?.itemId;
+    if (id === undefined) continue;
+    const found = nextGroups.findIndex((group) => group.itemId === id);
+    if (found < 0) continue;
+
+    const start = nextGroups[found]!.startIndex;
+    // 보던 그 항목이면 같은 장을 노리고, 앞으로 물러난 것이면 그 항목의 첫 장이다
+    const wanted = at === wasAt ? start + offset : start;
+    return Math.min(Math.max(wanted, 0), Math.min(endOf(found), last));
+  }
+
+  return 0;
 }
 
 /**

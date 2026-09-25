@@ -60,10 +60,12 @@ describe('buildPlanDeck', () => {
     const items = [bible('a', '요 3:16'), song('b', 1, '찬송'), bible('c', '롬 8:28')];
     const { deck } = await buildPlanDeck('순서', items, resolverWith({ a: 2, b: 3, c: 1 }));
 
+    // 통째로 비교한다 — 경계에 뭔가 새로 실리면 여기서 걸려야 한다.
+    // `itemId` 는 자리 번호 대신 항목을 짚는 열쇠다 (다시 올릴 때 · 템플릿 고를 때)
     expect(deck.groups).toEqual([
-      { label: '요 3:16', startIndex: 0 },
-      { label: '찬송', startIndex: 2 },
-      { label: '롬 8:28', startIndex: 5 },
+      { label: '요 3:16', startIndex: 0, itemId: 'a' },
+      { label: '찬송', startIndex: 2, itemId: 'b' },
+      { label: '롬 8:28', startIndex: 5, itemId: 'c' },
     ]);
   });
 
@@ -78,10 +80,15 @@ describe('buildPlanDeck', () => {
     expect(failed[0]!.error).toBe('내용 없음');
   });
 
-  it('건너뛴 항목이 경계 인덱스를 밀지 않는다', async () => {
+  it('건너뛴 항목이 경계 인덱스를 밀지 않고, 살아남은 항목의 id 가 실린다', async () => {
     const items = [bible('bad', 'x'), bible('a', '요 3:16')];
     const { deck } = await buildPlanDeck('순서', items, resolverWith({ a: 2 }));
-    expect(deck.groups).toEqual([{ label: '요 3:16', startIndex: 0 }]);
+    /*
+     * **`itemId` 가 'a' 여야 한다.** 여기가 자리 번호로 짝지으면 안 되는 이유다 —
+     * 경계는 하나뿐인데 비-divider 항목은 둘이라, 번호로 짝지으면 이 경계가
+     * 실패한 'bad' 와 엮인다. 실제로 그래서 엉뚱한 항목의 템플릿이 실렸다.
+     */
+    expect(deck.groups).toEqual([{ label: '요 3:16', startIndex: 0, itemId: 'a' }]);
   });
 
   it('리졸버가 던진 예외도 실패로 모은다 (전체가 죽지 않는다)', async () => {
