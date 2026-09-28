@@ -566,7 +566,9 @@ Origin 검사는 화면이 바뀌는 피해지만, `replace` 는 **되돌릴 수
        ⚠️ **data/sheets(52MB)와 DB 의 sheets 테이블은 건드리지 않는다** —
        사용자 데이터다. 코드만 걷고 지울지는 사용자에게 묻는다
     B) 예배 순서에서 그 곡의 가사로 바로 가는 길 + 영어 가사가 수상한지 표시
-  다음 단계: A 부터. 먼저 전용 파일과 참조를 실측해 목록을 굳힌다.
+  다음 단계: **A 완료** (3960ade · 1.1.0 · 전용 파일 15개 + 참조 39곳, 4,161줄 삭제).
+      data/sheets(52MB)와 DB 의 sheets 표는 그대로 뒀다 — 지울지 사용자에게 묻는다.
+      이제 B: 예배 순서에서 그 곡의 가사로 바로 가는 길.
 - [완료 2026-09-12 / Agent C] 설치 파일 1.0.5 — 자료 꾸러미 기능 포함 (CI 34714526405)
     · SermonPresentation-1.0.5-arm64.dmg 124M · SermonPresentation-1.0.5.dmg 131M
     · SermonPresentation Setup 1.0.5.exe 109M

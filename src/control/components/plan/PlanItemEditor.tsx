@@ -45,6 +45,8 @@ export interface PlanItemEditorProps {
   liturgyDraft: { id: string; text: string } | null;
   setLiturgyDraft: React.Dispatch<React.SetStateAction<{ id: string; text: string } | null>>;
   songInfo: { id: number; available: string[] } | null;
+  /** 찬양 항목의 '가사 고치기' — 찬양 탭에서 그 곡을 연다 (없으면 단추를 안 보인다) */
+  onEditSong?: ((songId: number) => void) | undefined;
   liveItemId: string | null;
   liveItemIndex: number;
   liveViaPlanDeck: boolean;
@@ -62,7 +64,7 @@ export interface PlanItemEditorProps {
 export function PlanItemEditor({
   current, currentRow, items, translations, connected,
   detailOpen, setDetailOpen, bgFiles, bgLibrary,
-  liturgyDraft, setLiturgyDraft, songInfo, liveItemId, liveItemIndex, liveViaPlanDeck,
+  liturgyDraft, setLiturgyDraft, songInfo, onEditSong, liveItemId, liveItemIndex, liveViaPlanDeck,
   patchItems, itemTemplateFor, baseFontSizeFor, sendItem, refreshLive, refreshQuotePreview,
   restoreBefore, before,
 }: PlanItemEditorProps): React.JSX.Element {
@@ -270,6 +272,27 @@ export function PlanItemEditor({
                 <option value="section">섹션 전체</option>
               </select>
 
+              {/*
+                **이 곡의 가사로 바로 간다** (2026-09-28 사용자 결정).
+
+                한/영 가사를 일괄로 다시 나누지 않기로 했다 — 예배 순서를 준비하면서
+                그 주에 부를 곡만 사람이 보고 고친다. 그러려면 순서를 짜다가 한 번에
+                그 곡으로 갈 수 있어야 한다. 찬양 탭에서 곡을 다시 찾게 하면 그 흐름이
+                끊긴다.
+
+                **짜 둔 순서는 그대로 있다** — 편집 중인 것은 초안(sessionStorage)에
+                담겨 있어 탭을 오가도 살아남는다 (`usePlanDraft`).
+              */}
+              {onEditSong && (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => onEditSong(current.songId)}
+                  title="찬양 탭에서 이 곡의 가사를 엽니다 — 짜 둔 순서는 그대로 있습니다"
+                >
+                  가사 고치기
+                </button>
+              )}
             </div>
           )}
 

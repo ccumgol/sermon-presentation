@@ -48,6 +48,7 @@ const TRANSLATIONS = [
 ] as unknown as Translation[];
 
 const spies = {
+  onEditSong: vi.fn(),
   patchItems: vi.fn(), setDetailOpen: vi.fn(), setLiturgyDraft: vi.fn(),
   sendItem: vi.fn(), refreshLive: vi.fn(), refreshQuotePreview: vi.fn(),
   restoreBefore: vi.fn(),
@@ -65,6 +66,7 @@ function setup(
     liveItemId: string | null;
     liveItemIndex: number;
     songInfo: { id: number; available: string[] } | null;
+    onEditSong: ((songId: number) => void) | undefined;
     extraItems: CueItem[];
   }> = {},
 ) {
@@ -93,6 +95,7 @@ function setup(
       liturgyDraft={null}
       setLiturgyDraft={spies.setLiturgyDraft}
       songInfo={o.songInfo ?? null}
+      onEditSong={'onEditSong' in o ? o.onEditSong : spies.onEditSong}
       liveItemId={o.liveItemId ?? null}
       liveItemIndex={o.liveItemIndex ?? -1}
       liveViaPlanDeck={false}
@@ -239,6 +242,30 @@ describe('찬양', () => {
     const en = [...document.querySelectorAll('.candidates button')].find((b) => b.textContent?.startsWith('English'))!;
     fireEvent.click(en);
     expect(edited().langs).toEqual(['ko', 'en']);
+  });
+
+  /**
+   * **예배를 준비하면서 한 곡씩 가사를 고치는 길** (2026-09-28 사용자 결정).
+   *
+   * 한/영 가사를 일괄로 다시 나누지 않기로 했다. 대신 순서를 짜다가 그 곡으로
+   * 바로 갈 수 있어야 한다 — 찬양 탭에서 곡을 다시 찾게 하면 흐름이 끊긴다.
+   */
+  it('★ 찬양 항목에서 그 곡의 가사로 바로 간다', () => {
+    setup(song());
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent === '가사 고치기')!;
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(spies.onEditSong).toHaveBeenCalledWith(7);
+  });
+
+  it('갈 곳이 없으면(콜백 없음) 단추를 보이지 않는다 — 눌러도 아무 일이 없으면 고장으로 보인다', () => {
+    setup(song(), { onEditSong: undefined });
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === '가사 고치기')).toBe(false);
+  });
+
+  it('찬양이 아닌 항목에는 없다', () => {
+    setup({ id: 'b1', type: 'bible', ref: '요 3:16', primary: 'nkrv', secondary: [] } as unknown as CueItem);
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === '가사 고치기')).toBe(false);
   });
 
   it('찬양에는 역본 칸이 없다', () => {

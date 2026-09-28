@@ -38,6 +38,14 @@ export function App(): React.JSX.Element {
   // 기본 탭은 예배 순서. 성경·찬양은 한 종류를 깊게 다룰 때 쓰고,
   // 예배 진행은 찬양·성경·광고가 섞여 순서대로 흐른다.
   const [tab, setTab] = useState<Tab>('plan');
+  /**
+   * 예배 순서에서 '가사 고치기' 를 누르면 그 곡을 찬양 탭에서 연다
+   * (2026-09-28 사용자 결정 — 준비하면서 한 곡씩 고치는 흐름).
+   *
+   * **매번 새 객체로 담는다.** 같은 곡을 두 번 눌러도 찬양 탭이 다시 열어야 하는데,
+   * 숫자만 두면 값이 같아 effect 가 돌지 않는다.
+   */
+  const [songToEdit, setSongToEdit] = useState<{ id: number } | null>(null);
   const [info, setInfo] = useState<ServerInfo | null>(null);
   const [translations, setTranslations] = useState<Translation[]>([]);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -344,6 +352,7 @@ export function App(): React.JSX.Element {
 
           {tab === 'song' && (
             <SongPanel
+              openSongId={songToEdit?.id ?? null}
               deck={deck}
               currentIndex={deck?.index ?? 0}
               connected={connected}
@@ -361,6 +370,10 @@ export function App(): React.JSX.Element {
               translations={translations}
               defaultTranslation={info?.defaultTranslation ?? 'nkrv'}
               send={send}
+              onEditSong={(songId) => {
+                setSongToEdit({ id: songId });
+                setTab('song');
+              }}
             />
           )}
 

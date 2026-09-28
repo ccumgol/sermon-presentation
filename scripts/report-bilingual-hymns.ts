@@ -47,6 +47,8 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
+
+import { looksBroken } from '../lib/bilingual-check.ts';
 import path from 'node:path';
 
 import { DatabaseSync } from 'node:sqlite';
@@ -84,9 +86,14 @@ function argValue(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-/** 둘째 줄 이후인데 소문자로 시작 = 문장 중간에서 끊겼다 */
+/**
+ * 끊김 판정은 **`lib/bilingual-check.ts` 하나만 쓴다** (2026-09-28).
+ *
+ * 전에는 이 파일에만 있었다. 화면에도 같은 표시를 붙이면서 규칙이 두 곳이 되면
+ * 리포트와 화면이 다른 말을 하게 되므로 `lib/` 로 옮겼다.
+ */
 function isBroken(line: Line): boolean {
-  return line.index > 0 && /^[a-z]/.test(line.text.trim());
+  return looksBroken(line.text, line.index);
 }
 
 function collect(db: DatabaseSync, book: string): Song[] {

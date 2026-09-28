@@ -1,11 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { LANG_LABELS, MAX_LANGS, langChoices } from '../../../lib/lang-select.ts';
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
+import { checkBilingual, describeBilingual } from '../../../lib/bilingual-check.ts';
 import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
 import { SongMetaRows } from '../components/SongMetaRows.tsx';
 
-import type { ClientMsg, Deck, Template } from '../../../shared/types.ts';
+import type { ClientMsg, Deck, LangCode, Template } from '../../../shared/types.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
 import { isSectionStart, verseNumberPrefix } from '../../../lib/song-slides.ts';
 import { shortEntryLabel } from '../../../lib/plan-item-view.ts';
@@ -35,10 +36,17 @@ interface Props {
   /** 활성 템플릿 — 표시 행 폭(maxCharsPerLine)을 가져온다 */
   template: Template | null;
   send: (msg: ClientMsg) => boolean;
+  /**
+   * 열자마자 이 곡을 연다 — **예배 순서에서 '가사 고치기' 로 건너온 경우**다.
+   *
+   * 예배를 준비하면서 한 곡씩 보고 고치는 흐름을 위한 것이다(2026-09-28 사용자 결정).
+   * 값이 바뀔 때만 연다 — 같은 곡을 계속 다시 열면 사람이 고르던 다른 곡이 밀려난다.
+   */
+  openSongId?: number | null;
 }
 
 /** 수록 정보를 짧게 — '새305 · 통405' */
-export function SongPanel({ deck, currentIndex, connected, template, send }: Props): React.JSX.Element {
+export function SongPanel({ deck, currentIndex, connected, template, send, openSongId }: Props): React.JSX.Element {
 
 
   /** 왼쪽 '곡집·검색' 열 너비. 곡을 훑을 때와 가사를 고칠 때 원하는 폭이 다르다 */
@@ -98,6 +106,26 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     creating, setCreating, newTitle, setNewTitle,
     openSong, createSong, removeSong, toggleFavorite, saveLyrics,
   } = editor;
+
+  /**
+   * 예배 순서에서 '가사 고치기' 로 건너왔으면 그 곡을 연다.
+   *
+   * **값이 바뀔 때만** 연다 — 매번 열면 사람이 이 탭에서 고른 다른 곡이 밀려난다.
+   * 편집까지 함께 펼친다: 건너온 뜻이 '이 곡 가사를 손보겠다' 이므로 한 번 더
+   * 누르게 할 이유가 없다.
+   */
+  useEffect(() => {
+    if (openSongId != null) void openSong(openSongId, true);
+  }, [openSongId, openSong]);
+
+  /**
+   * 열어 둔 곡의 영어 가사가 줄에 맞는지 — 곡이 바뀔 때만 다시 센다.
+   * 영어가 없는 곡에는 아무것도 보이지 않는다 (대부분의 찬양이 그렇다).
+   */
+  const bilingual = useMemo(
+    () => (song && song.langs.includes('en' as LangCode) ? checkBilingual(song.sections) : null),
+    [song],
+  );
 
   /**
    * 이 탭의 프리셋·폰트를 얹어 보낸다.
@@ -500,6 +528,38 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
 
             {song.hasAmen && (
               <p className="hintline muted">이 곡은 아멘으로 끝납니다 (별도 절로 만들지 않고 속성으로 표시).</p>
+            )}
+
+            {/*
+              **영어 가사가 줄에 맞는지** (2026-09-28 사용자 결정).
+
+              한/영을 일괄로 다시 나누지 않기로 했다 — 한 번에 맞추기 어려운 작업이라,
+              **예배 순서를 준비하면서 그 주에 부를 곡만** 사람이 보고 고친다.
+              그러려면 '이 곡이 손볼 곡인가' 가 곡을 연 자리에서 바로 보여야 한다.
+
+              판정은 `lib/bilingual-check.ts` 하나만 쓴다 — `npm run report:bilingual`
+              과 같은 규칙이라 리포트와 화면이 다른 말을 하지 않는다.
+              **완벽한 판정이 아니다**(`'Tis`·고유명사 등). '여기를 보라' 는 표시이고,
+              고칠지는 사람이 내용을 보고 정한다.
+            */}
+            {bilingual && bilingual.grade !== 'ok' && bilingual.grade !== 'none' && (
+              <p className={`hintline ${bilingual.grade === 'broken' ? 'warn' : 'muted'}`}>
+                <b>영어 가사를 봐 주세요</b> — {describeBilingual(bilingual)}
+                {bilingual.brokenAt.length > 0 && (
+                  <>
+                    {' · '}
+                    {bilingual.brokenAt.map((at) => `${at.label} ${at.indexes.map((i) => i + 1).join('·')}번째 줄`).join(', ')}
+                  </>
+                )}
+                {!editing && (
+                  <>
+                    {' '}
+                    <button type="button" className="ghost" onClick={() => setEditing(true)}>
+                      가사 편집 열기
+                    </button>
+                  </>
+                )}
+              </p>
             )}
 
             <div className="row" style={{ marginTop: 12 }}>

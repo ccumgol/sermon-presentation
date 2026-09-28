@@ -49,6 +49,13 @@ interface Props {
   translations: Translation[];
   defaultTranslation: string;
   send: (msg: ClientMsg) => boolean;
+  /**
+   * 찬양 항목의 '가사 고치기' — 찬양 탭에서 그 곡을 연다.
+   *
+   * 예배를 준비하면서 한 곡씩 가사를 고치는 흐름을 위한 것이다(2026-09-28 사용자 결정).
+   * 짜 둔 순서는 초안에 담겨 있어 탭을 오가도 살아남는다.
+   */
+  onEditSong?: ((songId: number) => void) | undefined;
 }
 
 
@@ -56,7 +63,7 @@ interface Props {
 
 
 export function PlanPanel({
-  deck, currentIndex, connected, template, translations, defaultTranslation, send,
+  deck, currentIndex, connected, template, translations, defaultTranslation, send, onEditSong,
 }: Props): React.JSX.Element {
   /**
    * 편집 중인 것 — 이 화면의 척추다 (usePlanDraft, 2026-09-07 R-4).
@@ -439,6 +446,7 @@ export function PlanPanel({
           liturgyDraft={liturgyDraft}
           setLiturgyDraft={setLiturgyDraft}
           songInfo={songInfo}
+          onEditSong={onEditSong}
           liveItemId={liveItemId}
           liveItemIndex={liveItemIndex}
           liveViaPlanDeck={liveViaPlanDeck}
