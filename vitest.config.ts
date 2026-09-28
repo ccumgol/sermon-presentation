@@ -105,7 +105,7 @@ export default defineConfig({
          *
          * 찬양 탭은 훅으로 갈랐다(2026-09-08): useSongSearch 100 · useSongEditor 95.
          * `SongPanel` 자체는 0% 인데, 위험한 규칙(빈 가사 덮어쓰기 방지·삭제 확인·
-         * 악보 보기 초기화)이 전부 훅으로 내려가 검사가 붙었다.
+         * 표시 설정 초기화)이 전부 훅으로 내려가 검사가 붙었다.
          *
          * 남은 것은 **아직 검사가 없는 화면들**이다 — BiblePanel · SongPanel(JSX) ·
          * TemplatePanel · SongbookManager 등.

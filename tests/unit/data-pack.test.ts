@@ -22,10 +22,9 @@ describe('사람이 손본 것이 든 파일', () => {
     expect(holdsUserData('app.sqlite')).toBe(true);
   });
 
-  /** 성경·악보는 원본에서 만들어 낸 것이라 같은 자료면 같은 결과다 */
-  it('성경과 악보는 아니다', () => {
+  /** 성경은 원본에서 만들어 낸 것이라 같은 자료면 같은 결과다 */
+  it('성경은 아니다', () => {
     expect(holdsUserData('bible.sqlite')).toBe(false);
-    expect(holdsUserData('sheets')).toBe(false);
   });
 
   /** 꾸러미에 담기는 것은 모두 이 판정을 지난다 — 새 항목이 늘어도 빠지지 않게 */

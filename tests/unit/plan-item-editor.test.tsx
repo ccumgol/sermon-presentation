@@ -64,7 +64,7 @@ function setup(
     before: { slide: unknown; label: string } | null;
     liveItemId: string | null;
     liveItemIndex: number;
-    songInfo: { id: number; available: string[]; hasSheet: boolean } | null;
+    songInfo: { id: number; available: string[] } | null;
     extraItems: CueItem[];
   }> = {},
 ) {
@@ -239,29 +239,6 @@ describe('찬양', () => {
     const en = [...document.querySelectorAll('.candidates button')].find((b) => b.textContent?.startsWith('English'))!;
     fireEvent.click(en);
     expect(edited().langs).toEqual(['ko', 'en']);
-  });
-
-  /** 기본은 가사다 — 단 경계 자동 검출이 아직 불완전하다 */
-  it('프로젝터는 가사가 기본이다', () => {
-    setup(song(), { songInfo: { id: 7, available: ['ko'], hasSheet: true } });
-    const buttons = [...document.querySelectorAll('.toggle-row .toggle')] as HTMLButtonElement[];
-    expect(buttons.find((b) => b.textContent === '가사')!.className).toContain('active');
-  });
-
-  it('악보로 바꾸면 담기고 송출도 따라온다', () => {
-    setup(song(), { songInfo: { id: 7, available: ['ko'], hasSheet: true } });
-    const sheet = [...document.querySelectorAll('.toggle-row .toggle')].find((b) => b.textContent === '악보')!;
-    fireEvent.click(sheet);
-
-    expect(edited().sheet).toBe(true);
-    expect(spies.refreshLive).toHaveBeenCalled();
-  });
-
-  /** 악보가 없는 곡이면 눌러도 아무 일이 없다 — 그렇다고 말해 준다 */
-  it('악보가 없는 곡이면 잠긴다', () => {
-    setup(song(), { songInfo: { id: 7, available: ['ko'], hasSheet: false } });
-    const sheet = [...document.querySelectorAll('.toggle-row .toggle')].find((b) => b.textContent === '악보')!;
-    expect((sheet as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('찬양에는 역본 칸이 없다', () => {

@@ -613,14 +613,10 @@
   }
 
   /**
-   * 그림 한 장 — 예배 전 안내·악보처럼 글자 없이 그림만 나가는 화면.
+   * 그림 한 장 — 예배 전 안내처럼 글자 없이 그림만 나가는 화면.
    *
-   * 배경이 아니라 **내용**이므로 기본이 `contain` 이다. 안내문이나 악보는 잘리면
-   * 읽을 수 없다 (배경은 화면을 채워야 하므로 `cover` 가 기본이다 — 반대다).
-   *
-   * `crop` 은 원본의 세로 일부만 보여 준다. 악보 한 장에서 지금 부르는 단만 잘라
-   * 내기 위한 것이라 **파일을 슬라이드마다 만들지 않아도 된다.** 자르기는 감싼 상자의
-   * 비율을 원본 조각의 비율로 맞추고 그림을 그만큼 키워 위로 밀어 올려서 한다.
+   * 배경이 아니라 **내용**이므로 기본이 `contain` 이다. 안내문은 잘리면 읽을 수 없다
+   * (배경은 화면을 채워야 하므로 `cover` 가 기본이다 — 반대다).
    */
   function renderImage(payload) {
     clearChildren(el.blocks);
@@ -634,40 +630,6 @@
     img.alt = payload.alt || '';
     img.src = payload.src;
     img.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
-
-    var crop = payload.crop;
-    var span = crop ? crop.bottom - crop.top : 0;
-    if (crop && typeof crop.top === 'number' && typeof crop.bottom === 'number' && span > 0 && span <= 100) {
-      /*
-       * **자르기 — 창을 하나 두고 그 안에서 그림을 밀어 올린다.**
-       *
-       * 창은 보이는 띠와 **같은 가로세로 비**여야 한다. 예전에는 창 없이 그림에만
-       * 높이·여백을 줬는데, 상자가 화면 비(16:9)라 5:1 짜리 악보 한 단이 세로로
-       * 늘어나 뭉개졌다 (2026-09-04 프로젝터에서 실측).
-       *
-       * 비를 알려면 원본 크기가 필요한데 그림이 다 받아져야 안다. 그래서 `load` 에서
-       * 정한다 — 이미 받아져 있으면(캐시) 바로 정한다.
-       */
-      box.classList.add('cropped');
-      var win = document.createElement('div');
-      win.className = 'crop-window';
-
-      // 창 높이를 100 으로 보면 그림은 (100/span)배이고 top/span 만큼 위로 간다
-      img.style.height = (100 / span) * 100 + '%';
-      img.style.top = '-' + (crop.top / span) * 100 + '%';
-
-      var sizeWindow = function () {
-        if (!img.naturalWidth || !img.naturalHeight) return;
-        win.style.aspectRatio = img.naturalWidth + ' / ' + (img.naturalHeight * span) / 100;
-      };
-      img.addEventListener('load', sizeWindow);
-      if (img.complete) sizeWindow();
-
-      win.appendChild(img);
-      box.appendChild(win);
-      el.blocks.appendChild(box);
-      return;
-    }
 
     box.appendChild(img);
     el.blocks.appendChild(box);
@@ -814,7 +776,7 @@
     syncBackdrop(payload);
     /*
      * **그림 슬라이드는 화면을 꽉 쓴다.** 템플릿의 안쪽 여백(80/50px)은 글자가
-     * 가장자리에 붙지 않게 하는 장치다. 안내 그림이나 악보에 그 여백을 주면
+     * 가장자리에 붙지 않게 하는 장치다. 안내 그림에 그 여백을 주면
      * 정작 봐야 할 것이 작아진다.
      */
     el.body.classList.toggle('full-bleed', !!payload && payload.kind === 'image');
@@ -931,26 +893,6 @@
   // 공통으로 사용하는 진입점.
   window.SermonOutput = {
     render: render,
-    /**
-     * 마지막 슬라이드를 **거르기부터 다시** 그린다.
-     *
-     * 프로젝터에서 악보 보기를 끄고 켤 때 쓴다 — 다음 슬라이드까지 기다리면 예배 중에
-     * 몇 초씩 엉뚱한 화면이 남는다. 받은 것이 없으면 아무 일도 하지 않는다.
-     */
-    redraw: function () {
-      if (!incoming) return;
-      lastSlide = filtered(incoming);
-      render(lastSlide);
-    },
-    /**
-     * 거르기 **전**의 슬라이드 — 받은 그대로.
-     *
-     * 프로젝터가 '이 화면에 악보를 낼 수 있는가' 를 물을 때 쓴다. 거른 뒤를 주면
-     * 악보를 끈 상태에서는 늘 가사 슬라이드라, 악보가 있는지 알 수 없다.
-     */
-    currentSlide: function () {
-      return incoming;
-    },
     applyStylePatch: applyStylePatch,
     applyAnchor: applyAnchor,
     measure: measure,
@@ -1042,30 +984,6 @@
     reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX);
   }
 
-  /**
-   * 서버가 보낸 마지막 슬라이드 (거르기 **전**).
-   *
-   * `lastSlide` 는 실제로 그린 것이라 이미 걸러진 뒤다. 설정이 바뀌어 다시 그릴 때는
-   * 원본이 있어야 한다 — 걸러진 것을 다시 거르면 되돌아갈 수 없다.
-   */
-  var incoming = null;
-
-  /**
-   * 그리기 전에 한 번 거친다.
-   *
-   * 프로젝터는 같은 슬라이드에서 가사 대신 악보를 그린다(`projector.js` 가 이 문을
-   * 쓴다). 서버가 화면마다 다른 것을 보내지 않는 이유: 덱이 갈라지면 진행 위치가
-   * 갈라진다. 한 슬라이드가 둘을 함께 들고 다니고 **보는 쪽이 고른다.**
-   */
-  function filtered(slide) {
-    if (typeof window.SermonSlideFilter !== 'function') return slide;
-    try {
-      return window.SermonSlideFilter(slide) || slide;
-    } catch (err) {
-      return slide; // 거르다 실패해도 화면은 나가야 한다
-    }
-  }
-
   function applyState(live) {
     // 순서가 뒤바뀐 오래된 메시지는 버린다
     if (typeof live.revision === 'number') {
@@ -1084,19 +1002,8 @@
       clearSlide();
       diag.lastRender = 'empty';
     } else {
-      /*
-       * **그리기 전에 한 번 거친다.**
-       *
-       * 프로젝터는 같은 슬라이드에서 가사 대신 악보를 그린다(`projector.js` 가 이
-       * 문을 쓴다). 서버가 화면마다 다른 것을 보내지 않는 이유: 덱이 갈라지면 진행
-       * 위치가 갈라진다. 한 슬라이드가 둘을 함께 들고 다니고 **보는 쪽이 고른다** —
-       * 그래야 끄고 켜는 것도 그 창에서 바로 된다.
-       */
-      // 거르기 전의 것을 따로 둔다 — 설정이 바뀌면 이것으로 다시 그린다
-      incoming = live.slide;
-      var shown = filtered(live.slide);
-      lastSlide = shown;
-      render(shown);
+      lastSlide = live.slide;
+      render(live.slide);
     }
 
     window.SermonOutput.setBlank(Boolean(live.blank));

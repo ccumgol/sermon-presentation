@@ -4,7 +4,6 @@ import { LANG_LABELS, MAX_LANGS, langChoices } from '../../../lib/lang-select.ts
 import { OutputStyleBar, type OutputStyle } from '../components/OutputStyleBar.tsx';
 import { LyricsTwoPane } from '../components/LyricsTwoPane.tsx';
 import { SongMetaRows } from '../components/SongMetaRows.tsx';
-import { ProjectorSheetToggle } from '../components/ProjectorSheetToggle.tsx';
 
 import type { ClientMsg, Deck, Template } from '../../../shared/types.ts';
 import { formatLyrics } from '../../../lib/lyrics-parser.ts';
@@ -19,17 +18,6 @@ import { FAVORITE_SLOTS, useSongSearch } from '../hooks/useSongSearch.ts';
 import { isComposing } from '../ime.ts';
 import { SongbookBar } from '../components/SongbookBar.tsx';
 import { SongbookManager } from './SongbookManager.tsx';
-
-/**
- * 악보 모양 고르기 — 이름·설명을 한 곳에 둔다.
- *
- * '자동' 이 맨 앞이다: 대부분의 곡은 짐작이 맞고(실측 74%), 고칠 곡만 손댄다.
- */
-const SHEET_LAYOUT_CHOICES: ReadonlyArray<readonly ['auto' | 'shared' | 'sequential', string, string]> = [
-  ['auto', '자동', '가사 줄 수와 단 수를 견줘 스스로 정합니다'],
-  ['shared', '겹쳐', '한 단 아래 1절·2절 가사가 겹쳐 적힌 악보'],
-  ['sequential', '이어', '1절이 끝나야 2절이 시작하는 악보'],
-];
 
 const LINE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: '1', label: '1줄씩' },
@@ -105,10 +93,10 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
     maxChars,
   });
   const {
-    song, setSong, sheet, useSheet, setUseSheet, langs, toggleLang, lines, setLines,
+    song, setSong, langs, toggleLang, lines, setLines,
     editing, setEditing, draftLyrics, setDraftLyrics, draftDeck,
     creating, setCreating, newTitle, setNewTitle,
-    openSong, createSong, removeSong, toggleFavorite, saveLyrics, chooseSheetLayout,
+    openSong, createSong, removeSong, toggleFavorite, saveLyrics,
   } = editor;
 
   /**
@@ -145,7 +133,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
       setBusy(true);
       setError(null);
       try {
-        const deckResult = await api.songDeck(song.id, langs, lines, sectionId, maxChars, useSheet);
+        const deckResult = await api.songDeck(song.id, langs, lines, sectionId, maxChars);
         if (deckResult.deck.slides.length === 0) {
           setError('표시할 가사가 없습니다');
           return;
@@ -162,7 +150,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         setBusy(false);
       }
     },
-    [song, langs, lines, maxChars, useSheet, sendWithStyle, reloadQuickPicks],
+    [song, langs, lines, maxChars, sendWithStyle, reloadQuickPicks],
   );
 
   /**
@@ -201,8 +189,7 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
         const opened = await editor.openForSend(id);
         if (!opened) return;
 
-        // 번호로 바로 띄우는 길 — 곡을 새로 여는 것이므로 늘 가사다
-        const deckResult = await api.songDeck(id, opened.langs, lines, undefined, maxChars, false);
+        const deckResult = await api.songDeck(id, opened.langs, lines, undefined, maxChars);
         if (deckResult.deck.slides.length === 0) {
           setError(`'${opened.song.title}' 에 표시할 가사가 없습니다`);
           return;
@@ -473,83 +460,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
             />
 
             {/*
-              **악보 상태.** 프로젝터에 악보가 나가는지, 배분이 흔들리는 곡인지
-              조작자가 알아야 한다 — 예배 중에 '악보가 왜 안 나오지?' 를 화면에서
-              알 수 없으면 곤란하다.
-            */}
-            <p className="hintline muted song-links">
-              <span>악보</span>
-              {sheet ? (
-                <>
-                  <span className="link-chip static">
-                    <span className="link-inline">
-                      {shortEntryLabel(song.entries.filter((e) => e.songbookId === sheet.songbookId)) ||
-                        `${sheet.songbookId} ${sheet.number}`}
-                      {' · '}
-                      {sheet.systemCount}단
-                    </span>
-                  </span>
-                  {/*
-                    짐작이 틀리는 곡이 26% 다 (lib/sheet-match.ts 실측). 사람이 보고
-                    고칠 수 있어야 한다 — '자동' 을 따로 둔 이유는 잘못 고른 것을
-                    되돌리기 위해서다.
-                  */}
-                  <span className="toggle-row sheet-layout">
-                    {SHEET_LAYOUT_CHOICES.map(([key, label, hint]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        className={`toggle${(sheet.chosen ? sheet.layout : 'auto') === key ? ' active' : ''}`}
-                        title={hint}
-                        onClick={() => void chooseSheetLayout(key === 'auto' ? null : key)}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </span>
-                  <span className="dim">
-                    {sheet.layout === 'shared' ? '절이 겹쳐 적힘' : '절이 이어 적힘'}
-                    {sheet.chosen ? '' : ' (짐작)'}
-                  </span>
-                </>
-              ) : (
-                <span className="dim">없습니다 — 프로젝터에도 가사가 나갑니다</span>
-              )}
-            </p>
-
-            {/*
-              프로젝터에 무엇을 낼지. **기본은 가사**다 — 단 경계 검출이 아직
-              불완전해서, 틀린 자리가 벽에 걸리는 것보다 가사가 낫다.
-              OBS 화면과 강사 모니터는 이 값과 무관하게 언제나 가사다.
-            */}
-            <p className="hintline muted song-links">
-              <span>프로젝터</span>
-              <ProjectorSheetToggle
-                value={useSheet}
-                hasSheet={sheet !== undefined}
-                onChange={setUseSheet}
-              />
-              <span className="dim">
-                {useSheet ? '지금 부르는 줄의 악보 단이 나갑니다' : 'OBS 화면과 같은 가사가 나갑니다'}
-              </span>
-            </p>
-
-            {sheet?.uncertain && (
-              <p className="hintline warn">
-                <b>악보 줄맞춤이 흔들릴 수 있습니다.</b> 가사 줄 수와 악보 단 수가 어긋나
-                ({song.sections.length}개 섹션 · 악보 {sheet.systemCount}단), 슬라이드에 딸린 단이
-                실제와 다를 수 있습니다. 아래 슬라이드 목록의 <b>단 번호</b>를 악보와 견줘 보세요.
-              </p>
-            )}
-
-            {sheet?.needsReview && (
-              <p className="hintline warn">
-                이 악보는 <b>단을 자동으로 찾다가 이상한 곳</b>이 있었습니다 (오선이 5줄이 아닌 단).
-                잘린 자리가 어긋났을 수 있습니다.
-              </p>
-            )}
-
-            {/*
               이 탭은 순서를 벗어나 급히 띄우는 자리다 — 예배 중 곡이 갑자기 바뀔 때 쓴다.
               그때 화면 모양을 정할 길이 없었다(지금 활성 템플릿이 무엇이든 그대로 나갔다).
             */}
@@ -723,24 +633,6 @@ export function SongPanel({ deck, currentIndex, connected, template, send }: Pro
                 <span className="label">
                   {!preview && index === currentIndex ? '▶ ' : ''}
                   {labels[index] || index + 1}
-                  {/*
-                    이 줄이 악보의 몇 번째 단인지. **배분이 맞는지 눈으로 확인하는 유일한
-                    자리다** — 퍼센트만으로는 셀 수 없어 숫자로 적는다.
-                    편집 미리보기에는 붙지 않는다 (아직 서버가 만든 덱이 아니다).
-                  */}
-                  {slide.kind === 'song' && slide.sheet && (
-                    <span
-                      className={`sheet-tag${slide.sheet.uncertain ? ' uncertain' : ''}`}
-                      title={
-                        slide.sheet.uncertain
-                          ? `악보 ${slide.sheet.system}/${slide.sheet.systemCount}단 — 줄맞춤이 흔들릴 수 있습니다`
-                          : `악보 ${slide.sheet.system}/${slide.sheet.systemCount}단`
-                      }
-                    >
-                      ♪{slide.sheet.system}
-                      {slide.sheet.uncertain ? '?' : ''}
-                    </span>
-                  )}
                 </span>
                 <span className="text">
                   {slide.kind === 'song'

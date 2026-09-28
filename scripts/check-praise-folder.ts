@@ -10,8 +10,7 @@
  *     찬미예수 2000/              ← 폴더 이름 = 곡집 이름
  *       1 나를 사랑하는 자들이.txt  ← 「번호 제목」 = 곡
  *       ...
- *     찬미예수 2000 악보/          ← 이름에 '악보' 가 붙으면 악보 폴더
- *       0001.bmp  또는 (1889).bmp  ← 번호로 가사와 잇는다
+ *     찬미예수 2000 악보/          ← 이름에 '악보' 가 붙은 폴더는 **건너뛴다**
  *
  * 사용:
  *   npm run praise:check
@@ -26,7 +25,6 @@ import { paths } from '../server/paths.ts';
 
 /** 가사로 인정할 확장자 — txt 와 md 를 함께 받는다 */
 const LYRIC_EXTENSIONS = new Set(['.txt', '.md']);
-const SCORE_EXTENSIONS = new Set(['.bmp', '.png', '.jpg', '.jpeg', '.gif', '.pdf']);
 
 /** 이보다 짧은 파일은 가사가 아니라 수집 실패로 본다 */
 const MIN_LYRIC_BYTES = 30;
@@ -55,7 +53,6 @@ interface BookReport {
   singleBlock: number;
   longLines: number;
   totalLines: number;
-  scores: { files: number; matched: number; unmatched: number[] } | null;
 }
 
 /** macOS 는 파일명을 NFD 로 저장한다 — 비교·표시 전에 NFC 로 맞춘다 */
@@ -93,12 +90,6 @@ function readSongs(dir: string): SongFile[] {
     .sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity) || a.file.localeCompare(b.file));
 }
 
-/** 악보 파일명에서 번호를 뽑는다 — `0801.bmp` 와 `(1889).bmp` 둘 다 쓰인다 */
-function scoreNumber(stem: string): number | null {
-  const match = /^\(?(\d+)\)?$/.exec(nfc(stem).trim());
-  return match ? Number(match[1]) : null;
-}
-
 function classifySections(text: string): string[] {
   const styles: string[] = [];
   const lines = text.split(/\r?\n/).map((line) => line.trim());
@@ -111,7 +102,7 @@ function classifySections(text: string): string[] {
   return styles.length > 0 ? styles : ['구분 없음'];
 }
 
-function checkBook(dir: string, scoreDir: string | null): BookReport {
+function checkBook(dir: string): BookReport {
   const songs = readSongs(dir);
 
   const byNumber = new Map<number, string[]>();
@@ -148,21 +139,6 @@ function checkBook(dir: string, scoreDir: string | null): BookReport {
     }
   }
 
-  let scores: BookReport['scores'] = null;
-  if (scoreDir !== null && existsSync(scoreDir)) {
-    const found = new Set<number>();
-    for (const name of readdirSync(scoreDir)) {
-      if (!SCORE_EXTENSIONS.has(path.extname(name).toLowerCase())) continue;
-      const number = scoreNumber(path.basename(name, path.extname(name)));
-      if (number !== null) found.add(number);
-    }
-    scores = {
-      files: found.size,
-      matched: [...found].filter((n) => byNumber.has(n)).length,
-      unmatched: [...found].filter((n) => !byNumber.has(n)).sort((a, b) => a - b),
-    };
-  }
-
   return {
     book: nfc(path.basename(dir)),
     songs: songs.length,
@@ -175,7 +151,6 @@ function checkBook(dir: string, scoreDir: string | null): BookReport {
     singleBlock,
     longLines,
     totalLines,
-    scores,
   };
 }
 
@@ -194,12 +169,6 @@ function renderReport(reports: Array<{ report: BookReport; dir: string }>): stri
   for (const { report, dir } of reports) {
     out.push(`## ${report.book}`, '');
     out.push(`- 곡 ${report.songs}개, 총 ${report.totalLines}행`);
-    if (report.scores) {
-      out.push(
-        `- 악보 ${report.scores.files}개 · 번호로 매칭 ${report.scores.matched}개` +
-          (report.scores.unmatched.length > 0 ? ` · 짝 없음 ${report.scores.unmatched.length}개` : ''),
-      );
-    }
     out.push(
       `- 24자 초과 행 ${report.longLines}개 (${((report.longLines / Math.max(1, report.totalLines)) * 100).toFixed(1)}%)`,
     );
@@ -274,17 +243,14 @@ function main(): void {
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== '.venv')
     .map((entry) => nfc(entry.name));
 
-  // '… 악보' 폴더는 같은 이름의 가사 폴더에 딸린 것으로 본다
+  // '… 악보' 같은 그림 폴더는 가사가 아니다 — 여기서 걸러야 가사 폴더로 잘못 읽지 않는다.
+  // (악보 기능 자체는 2026-09-28 에 없앴지만, 원본 폴더에는 그대로 있다)
   const lyricDirs = entries.filter((name) => !/악보|score|sheet/i.test(name));
   const reports: Array<{ report: BookReport; dir: string }> = [];
 
   for (const name of lyricDirs) {
     const dir = path.join(root, name);
-    const scoreName = entries.find((other) => other !== name && other.startsWith(name) && /악보|score|sheet/i.test(other));
-    reports.push({
-      report: checkBook(dir, scoreName ? path.join(root, scoreName) : null),
-      dir,
-    });
+    reports.push({ report: checkBook(dir), dir });
   }
 
   if (reports.length === 0) {

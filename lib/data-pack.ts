@@ -4,7 +4,7 @@
  * ## 왜 번들(JSON)로는 안 되나
  *
  * 이미 있는 '자료 가져오기' 는 가사·곡집·교독문·템플릿을 **파일 하나**에 담는다.
- * 그런데 성경 DB(102MB)와 악보 그림(52MB)은 그 안에 들어갈 수 없어서, 여태
+ * 그런데 성경 DB(102MB)는 그 안에 들어갈 수 없어서, 여태
  * **폴더를 손으로 복사**하라고 안내해 왔다 (README '설치판으로 쓰기').
  * 이 꾸러미가 그 손작업을 대신한다.
  *
@@ -15,7 +15,6 @@
  * | `bible.sqlite` | 성경. 다시 만들려면 원본 폴더가 있어야 한다 |
  * | `songs.sqlite` | 가사·곡집 |
  * | `app.sqlite` | 설정·템플릿·순서표·교독문 |
- * | `sheets/` | 악보 그림 |
  * | ❌ `backups/` | **그 PC 의 백업**이다. 받는 쪽에 옮길 것이 아니고 205MB 다 |
  * | ❌ `reports/` | 점검 산출물. 받는 쪽에 뜻이 없다 |
  * | ❌ `fonts/` | 글꼴은 PC 에 설치하는 것이라 폴더째 옮겨도 쓰이지 않는다 |
@@ -34,9 +33,6 @@ export const DATA_PACK_FORMAT = 'sermon-data-pack';
 
 /** 꾸러미에 담기는 DB — 이름이 곧 데이터 폴더에서의 이름이다 */
 export const PACK_DATABASES = ['bible.sqlite', 'songs.sqlite', 'app.sqlite'] as const;
-
-/** 꾸러미에 담기는 폴더 */
-export const PACK_FOLDERS = ['sheets'] as const;
 
 export interface DataPackEntry {
   name: string;
@@ -93,7 +89,7 @@ export function formatBytes(bytes: number): string {
  * `songs.sqlite`(가사)와 `app.sqlite`(순서표·설정)가 그렇다 — 그 PC 에서만 있는
  * 것이고 git 에 없다. 한 번 덮으면 되돌릴 방법이 백업뿐이다.
  *
- * 성경과 악보는 원본에서 만들어 낸 것이라 같은 자료면 같은 결과다.
+ * 성경은 원본에서 만들어 낸 것이라 같은 자료면 같은 결과다.
  *
  * ⚠️ **'이미 파일이 있다' 와 '내용이 있다' 는 다르다.** 앱은 처음 뜰 때 빈 DB 를
  * 만든다 — 파일만 보고 건너뛰면 **새 PC 에서 가사가 안 들어간다**

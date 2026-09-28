@@ -118,9 +118,8 @@ export function usePlanPreview(options: {
       }
 
       if (item.type === 'song') {
-        // 악보는 항목이 켠 것만 — 기본은 가사다 (2026-09-04 사용자 결정)
         const songDeck = await api.songDeck(
-          item.songId, item.langs, item.lines ?? '2', undefined, maxChars, item.sheet === true,
+          item.songId, item.langs, item.lines ?? '2', undefined, maxChars,
         );
         const slides =
           item.display === undefined && item.style === undefined

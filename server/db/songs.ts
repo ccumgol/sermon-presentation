@@ -27,7 +27,6 @@ import type {
 } from '../../shared/types.ts';
 import { ensureDataDirs, paths } from '../paths.ts';
 import * as songbooks from './songbooks.ts';
-import * as sheets from './sheets.ts';
 
 const SONG_SCHEMA = `
 PRAGMA journal_mode = WAL;
@@ -100,8 +99,6 @@ export function initSongsDb(): void {
   db = new DatabaseSync(paths.songsDb);
   db.exec(SONG_SCHEMA);
   db.exec(songbooks.SCHEMA);
-  db.exec(sheets.SCHEMA);
-  sheets.addLayoutColumn(db);
   addUsageColumns(db);
   addLinesSourceColumn(db);
   // 기존 hymnal/hymn_number 컬럼이 있으면 곡집 구조로 옮긴다 (한 번만 동작)
@@ -253,34 +250,6 @@ export function findByEntry(songbookId: string, number: number): Song[] {
     const song = getSong(row.song_id);
     return song ? [song] : [];
   });
-}
-
-/**
- * `(곡집, 번호) → 제목` 을 한 번에 읽는다. 악보 검토 목록이 쓴다.
- *
- * `findByEntry` 를 줄마다 부르면 곡 하나마다 가사·수록까지 통째로 읽어 온다.
- * 155줄이면 그만큼 읽는 셈인데, 목록에 필요한 것은 제목 한 줄뿐이다.
- *
- * 같은 번호를 두 곡이 가질 수 있어(실측 35건) **제목을 모아 준다** — 조용히
- * 하나만 고르면 엉뚱한 곡 제목이 붙는다.
- */
-export function titlesByEntry(songbookId?: string): Map<string, string[]> {
-  const sql = `SELECT e.songbook_id, e.number, s.title
-                 FROM song_entries e JOIN songs s ON s.id = e.song_id
-                WHERE e.number IS NOT NULL${songbookId ? ' AND e.songbook_id = ?' : ''}
-                ORDER BY e.songbook_id, e.number, s.id`;
-  const rows = (
-    songbookId ? conn().prepare(sql).all(songbookId) : conn().prepare(sql).all()
-  ) as unknown as Array<{ songbook_id: string; number: number; title: string }>;
-
-  const map = new Map<string, string[]>();
-  for (const row of rows) {
-    const key = `${row.songbook_id}:${row.number}`;
-    const found = map.get(key);
-    if (found) found.push(row.title);
-    else map.set(key, [row.title]);
-  }
-  return map;
 }
 
 export function getSong(id: number): Song | undefined {

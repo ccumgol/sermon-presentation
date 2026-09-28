@@ -11,8 +11,6 @@
  * |---|---|
  * | 빈 가사로 덮지 않는다 | 두 칸 중 한국어를 비우고 저장하면 그 곡 가사가 통째로 사라진다. `songs.sqlite` 는 git 에 없어 되돌릴 방법이 백업뿐이다 |
  * | 지우기 전에 제목을 보여 주고 묻는다 | 되돌릴 수 없다 |
- * | 곡을 바꾸면 악보 보기가 꺼진다 | 앞 곡에서 켠 것이 남으면 검토가 안 된 다음 곡 악보가 예고 없이 벽에 걸린다 |
- * | 악보 모양을 바꿔도 **다시 송출하지 않는다** | 지금 뜬 덱을 다시 보내면 첫 슬라이드로 튄다 — 3절 부르다 1절로 가는 것보다 다음 송출부터가 안전하다 |
  * | 표시 언어 규칙은 `lib/lang-select.ts` 하나만 쓴다 | 전에 이 탭만 자기 규칙을 갖고 있어 상한이 2 로 박혀 3언어를 못 골랐다 |
  */
 
@@ -20,7 +18,6 @@ import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } fr
 
 import { LANG_LABELS, orderLangs, toggleLang as nextLangs } from '../../../lib/lang-select.ts';
 import { formatLyrics, parseLyrics } from '../../../lib/lyrics-parser.ts';
-import type { SheetSummary } from '../../../lib/sheet-attach.ts';
 import { buildSongDeck } from '../../../lib/song-slides.ts';
 import type { LangCode, Song } from '../../../shared/types.ts';
 import { api, ApiError } from '../api.ts';
@@ -40,11 +37,6 @@ export interface SongEditor {
   song: Song | null;
   /** 수록·대응곡을 고치는 줄(`SongMetaRows`)이 곡을 갱신한다 */
   setSong: Dispatch<SetStateAction<Song | null>>;
-  /** 이 곡의 악보 상태 — 곡을 여는 순간 받는다 */
-  sheet: SheetSummary | undefined;
-  /** 이 탭에서 띄울 때 프로젝터에 악보를 낼지. **기본은 가사** */
-  useSheet: boolean;
-  setUseSheet: (on: boolean) => void;
 
   langs: LangCode[];
   toggleLang: (lang: LangCode) => void;
@@ -74,7 +66,6 @@ export interface SongEditor {
   removeSong: () => Promise<void>;
   toggleFavorite: () => Promise<void>;
   saveLyrics: () => Promise<void>;
-  chooseSheetLayout: (layout: 'shared' | 'sequential' | null) => Promise<void>;
 }
 
 export function useSongEditor(deps: SongEditorDeps): SongEditor {
@@ -82,8 +73,6 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
   const { setError, setNotice, setBusy } = feedback;
 
   const [song, setSong] = useState<Song | null>(null);
-  const [sheet, setSheet] = useState<SheetSummary | undefined>(undefined);
-  const [useSheet, setUseSheet] = useState(false);
   const [langs, setLangs] = useState<LangCode[]>(['ko']);
   const [lines, setLines] = useState('2');
   const [editing, setEditing] = useState(false);
@@ -134,11 +123,8 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
   }, [editing, song, draftLyrics, lines, maxChars]);
 
   /** 곡을 받아 화면 상태를 그 곡에 맞춘다 (여는 두 길이 함께 쓴다) */
-  const adopt = useCallback((loaded: Song, found: SheetSummary | undefined, nextLangs2: LangCode[]) => {
+  const adopt = useCallback((loaded: Song, nextLangs2: LangCode[]) => {
     setSong(loaded);
-    setSheet(found);
-    // 앞 곡에서 켜 둔 악보 보기가 남으면 안 된다
-    setUseSheet(false);
     setLangs(nextLangs2);
     setDraftLyrics(formatLyrics(loaded.sections));
   }, []);
@@ -154,8 +140,8 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
       setNotice(null);
       setEditing(false);
       try {
-        const { song: loaded, availableLangs, sheet: found } = await api.song(id);
-        adopt(loaded, found, availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
+        const { song: loaded, availableLangs } = await api.song(id);
+        adopt(loaded, availableLangs.length > 0 ? availableLangs.slice(0, 1) : ['ko']);
         if (startEditing) setEditing(true);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : '곡을 불러오지 못했습니다');
@@ -170,10 +156,10 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
    */
   const openForSend = useCallback(
     async (id: number): Promise<{ song: Song; langs: LangCode[] } | null> => {
-      const { song: loaded, availableLangs, sheet: found } = await api.song(id);
+      const { song: loaded, availableLangs } = await api.song(id);
       const kept = langs.filter((lang) => loaded.langs.includes(lang));
       const useLangs = kept.length > 0 ? kept : availableLangs.slice(0, 1);
-      adopt(loaded, found, useLangs);
+      adopt(loaded, useLangs);
       return { song: loaded, langs: useLangs };
     },
     [adopt, langs],
@@ -268,34 +254,6 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
   }, [song, draftLyrics, setBusy, setError, setNotice]);
 
   /**
-   * 악보 모양(겹쳐/이어)을 사람이 고른다. `null` 이면 자동 짐작으로 되돌린다.
-   *
-   * **송출을 다시 하지 않는다.** 지금 화면에 떠 있는 덱을 다시 보내면 첫 슬라이드로
-   * 되돌아간다 — 예배 중에 3절을 부르다 1절로 튀는 것보다, 다음에 띄울 때 반영되는
-   * 편이 안전하다. 그래서 안내 문구로 알린다.
-   */
-  const chooseSheetLayout = useCallback(
-    async (layout: 'shared' | 'sequential' | null) => {
-      if (!sheet || !song) return;
-      setError(null);
-      setNotice(null);
-      try {
-        await api.setSheetLayout(sheet.songbookId, sheet.number, layout);
-        const { sheet: found } = await api.song(song.id);
-        setSheet(found);
-        setNotice(
-          layout === null
-            ? '악보 모양을 자동으로 되돌렸습니다 — 다음 송출부터 반영됩니다'
-            : '악보 모양을 바꿨습니다 — 다음 송출부터 반영됩니다',
-        );
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : '악보 모양을 바꾸지 못했습니다');
-      }
-    },
-    [sheet, song, setError, setNotice],
-  );
-
-  /**
    * 표시 언어 토글 — 규칙은 `lib/lang-select.ts` 에 있다.
    *
    * 전에는 이 파일이 같은 규칙을 자기 안에 또 갖고 있었다. 예배 순서 탭에 같은
@@ -307,10 +265,10 @@ export function useSongEditor(deps: SongEditorDeps): SongEditor {
   }, []);
 
   return {
-    song, setSong, sheet, useSheet, setUseSheet,
+    song, setSong,
     langs, toggleLang, lines, setLines,
     editing, setEditing, draftLyrics, setDraftLyrics, draftDeck,
     creating, setCreating, newTitle, setNewTitle,
-    openSong, openForSend, createSong, removeSong, toggleFavorite, saveLyrics, chooseSheetLayout,
+    openSong, openForSend, createSong, removeSong, toggleFavorite, saveLyrics,
   };
 }

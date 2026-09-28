@@ -9,9 +9,6 @@ import { MAX_LANGS } from '../../lib/lang-select.ts';
 import type { FastifyInstance } from 'fastify';
 
 import { parseLyrics } from '../../lib/lyrics-parser.ts';
-import { attachSheets, isUncertain, sheetSrc, type SheetSummary } from '../../lib/sheet-attach.ts';
-import { guessLayout } from '../../lib/sheet-match.ts';
-import * as sheets from '../db/sheets.ts';
 import {
   availableLangs,
   buildSongDeck,
@@ -118,43 +115,10 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  /**
-   * 이 곡의 악보 상태 — 조작 화면이 **곡을 열자마자** 알아야 한다.
-   *
-   * 덱을 만들 때까지 기다리면 '악보가 왜 안 나오지?' 를 송출하고 나서야 알게 된다.
-   * 판정은 `attachSheets` 와 **같은 함수**를 쓴다 — 두 곳에 적으면 화면은 '괜찮다'
-   * 는데 실제로는 어긋나는 일이 생긴다.
-   *
-   * 여러 곡집에 실린 곡은 **악보가 있는 첫 수록**을 쓴다 (덱 라우트와 같은 규칙).
-   */
-  function sheetSummaryFor(song: Song): SheetSummary | undefined {
-    const sectionLines = [...song.sections]
-      .sort((a, b) => a.position - b.position)
-      .map((section) => new Set(section.lines.map((line) => line.lineIndex)).size);
-
-    for (const entry of song.entries) {
-      if (entry.number === undefined) continue;
-      const sheet = sheets.getSheet(store.conn(), entry.songbookId, entry.number);
-      if (!sheet || sheet.systems.length === 0) continue;
-      // 사람이 정해 둔 것이 있으면 그것이 이긴다. 없으면 짐작한다
-      const layout = sheet.layout ?? guessLayout(sectionLines, sheet.systems.length);
-      return {
-        songbookId: sheet.songbookId,
-        number: sheet.number,
-        systemCount: sheet.systems.length,
-        layout,
-        chosen: sheet.layout !== undefined,
-        uncertain: isUncertain(sectionLines, sheet.systems.length, layout),
-        needsReview: sheet.needsReview,
-      };
-    }
-    return undefined;
-  }
-
   app.get<{ Params: { id: string } }>('/api/songs/:id', async (request, reply) => {
     const song = store.getSong(Number(request.params.id));
     if (!song) return reply.code(404).send(fail('곡을 찾을 수 없습니다'));
-    return ok({ song, availableLangs: availableLangs(song), sheet: sheetSummaryFor(song) });
+    return ok({ song, availableLangs: availableLangs(song) });
   });
 
   /**
@@ -207,13 +171,6 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       credit?: string;
       /** 표시 한 행의 최대 글자 수 — 템플릿의 값을 그대로 넘긴다 */
       maxChars?: string;
-      /**
-       * `1` 이면 프로젝터에 **악보**를 낸다. 없으면 가사다.
-       *
-       * **기본이 가사인 이유**(2026-09-04 사용자 결정): 악보 자동 검출이 아직
-       * 불완전하다. 틀린 자리가 벽에 걸리는 것보다 가사가 낫다 — 가사는 늘 맞다.
-       */
-      sheet?: string;
     };
   }>('/api/songs/:id/deck', async (request, reply) => {
     const song = store.getSong(Number(request.params.id));
@@ -229,7 +186,7 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
     const sequence =
       sectionId !== null && song.sections.some((s) => s.id === sectionId) ? [sectionId] : undefined;
 
-    const { slides, labels, slideSections, sectionLines } = buildSongDeck(song, {
+    const { slides, labels } = buildSongDeck(song, {
       langs,
       linesPerSlide,
       includeCredit,
@@ -237,56 +194,15 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
       ...(sequence ? { sequence } : {}),
     });
 
-    /*
-     * 악보를 **요청했을 때만** 슬라이드에 싣는다.
-     *
-     * ## 왜 붙일지 말지를 서버가 정하는가
-     *
-     * 프로젝터는 `deck` 을 받지 않는다 — `state.slide` **한 장**만 본다.
-     * 그래서 '이 곡은 악보로 낸다' 는 결정이 슬라이드에 실려 있어야 하고,
-     * 실어 보내지 않으면 프로젝터는 가사를 그린다. 조작 화면이 주인이 된다.
-     *
-     * ## 왜 기본이 가사인가 (2026-09-04 사용자 결정)
-     *
-     * 단 경계 자동 검출이 아직 불완전하다. 틀린 자리가 벽에 걸리는 것보다
-     * 가사가 낫다 — **가사는 늘 맞다.**
-     *
-     * 붙일 때는 슬라이드마다 어느 단인지까지 함께 싣는다. 화면마다 따로 계산하면
-     * 프로젝터와 조작 화면이 다른 단을 가리킬 수 있다.
-     *
-     * 곡이 여러 곡집에 실렸으면 **악보가 있는 첫 수록**을 쓴다. 같은 곡의 악보는
-     * 어느 곡집 것이든 같은 가락이라 아무거나 쓰면 되고, 없는 것을 찾아 헤매느니
-     * 있는 것을 바로 쓰는 편이 낫다.
-     */
-    let withSheets = slides;
-    for (const entry of request.query.sheet === '1' ? song.entries : []) {
-      if (entry.number === undefined) continue;
-      const sheet = sheets.getSheet(store.conn(), entry.songbookId, entry.number);
-      if (!sheet || sheet.systems.length === 0) continue;
-      withSheets = attachSheets(slides, {
-        slideSections,
-        sectionLines,
-        // 사람이 정해 둔 모양이 있으면 짐작하지 않는다 (요약 라우트와 같은 규칙)
-        ...(sheet.layout ? { layout: sheet.layout } : {}),
-        sheet: {
-          songbookId: sheet.songbookId,
-          number: sheet.number,
-          height: sheet.height,
-          systems: sheet.systems,
-        },
-      });
-      break;
-    }
-
     const deck: Deck = {
       reference: deckReference(song),
-      slides: withSheets,
+      slides,
       labels,
       index: 0,
     };
 
     // 덱을 만들어 준 시점을 '사용'으로 본다 — 최근 목록의 근거가 된다
-    if (withSheets.length > 0) store.markUsed(song.id);
+    if (slides.length > 0) store.markUsed(song.id);
 
     // 요청한 언어 중 이 곡에 없는 것을 조용히 넘기지 않고 알린다
     const missingLangs = langs.filter((lang) => !song.langs.includes(lang));
@@ -365,83 +281,6 @@ export async function registerSongRoutes(app: FastifyInstance): Promise<void> {
         linesSource: 'manual',
       });
       return ok(store.getSong(id));
-    },
-  );
-
-  /**
-   * 악보 모양을 사람이 정한다 — `shared`(절이 겹쳐 적힘) · `sequential`(이어 적힘).
-   *
-   * `layout` 을 주지 않으면 **자동 짐작으로 되돌린다.** 잘못 골랐을 때 원래대로 갈 수
-   * 있어야 하고, 짐작 규칙이 나아지면 그 곡도 자동이 맞힐 수 있다.
-   *
-   * 곡이 아니라 **악보**에 붙는다 (곡집·번호). 같은 악보를 여러 곡이 가리킬 수 있고,
-   * 모양은 악보가 어떻게 인쇄됐는지의 성질이지 곡의 성질이 아니다.
-   */
-  app.put<{ Params: { songbookId: string; number: string }; Body: { layout?: unknown } }>(
-    '/api/sheets/:songbookId/:number/layout',
-    async (request, reply) => {
-      // `null` 도 '되돌린다' 로 본다 — JSON.stringify 가 undefined 키를 지워 버려서
-      // 화면이 '자동으로' 를 보낼 방법이 null 뿐인 경우가 있다 (lineGapPx 에서 겪은 것)
-      const raw = request.body?.layout ?? undefined;
-      if (raw !== undefined && raw !== 'shared' && raw !== 'sequential') {
-        return reply.code(400).send(fail("layout 은 'shared' · 'sequential' · null 중 하나여야 합니다"));
-      }
-      const number = Number(request.params.number);
-      if (!Number.isInteger(number)) return reply.code(400).send(fail('번호가 올바르지 않습니다'));
-
-      const changed = sheets.setSheetLayout(store.conn(), request.params.songbookId, number, raw);
-      if (!changed) return reply.code(404).send(fail('악보를 찾을 수 없습니다'));
-      return ok({ songbookId: request.params.songbookId, number, layout: raw ?? null });
-    },
-  );
-
-  /**
-   * 사람이 봐야 하는 악보 목록 — 오선이 5줄로 잡히지 않은 장들.
-   *
-   * **곡 제목을 함께 준다.** 번호만 있으면 '이게 무슨 곡이지' 를 다른 탭에서
-   * 찾아봐야 해서, 155장을 훑는 동안 손이 계속 끊긴다.
-   *
-   * 이미 본 장도 함께 준다 — 빼면 방금 누른 것이 사라져 잘못 눌렀는지 알 수 없다.
-   */
-  app.get<{ Querystring: { book?: string } }>('/api/sheets/review', async (request) => {
-    const db = store.conn();
-    const rows = sheets.listSheetsToReview(db, request.query.book);
-    const titles = store.titlesByEntry(request.query.book);
-
-    return ok({
-      counts: sheets.countSheets(db),
-      items: rows.map((sheet) => ({
-        songbookId: sheet.songbookId,
-        number: sheet.number,
-        src: sheetSrc(sheet.songbookId, sheet.number),
-        width: sheet.width,
-        height: sheet.height,
-        systems: sheet.systems,
-        titles: titles.get(`${sheet.songbookId}:${sheet.number}`) ?? [],
-        ...(sheet.reviewState ? { reviewState: sheet.reviewState } : {}),
-      })),
-    });
-  });
-
-  /**
-   * 한 장에 대한 사람의 판정. `state` 가 없으면 **안 본 것으로 되돌린다.**
-   *
-   * 155장을 훑는 중에 한 번 잘못 누르면 그 장을 다시 만날 방법이 없어지므로,
-   * 물릴 길을 반드시 둔다.
-   */
-  app.put<{ Params: { songbookId: string; number: string }; Body: { state?: unknown } }>(
-    '/api/sheets/:songbookId/:number/review',
-    async (request, reply) => {
-      const raw = request.body?.state ?? undefined;
-      if (raw !== undefined && raw !== 'ok' && raw !== 'bad') {
-        return reply.code(400).send(fail("state 는 'ok' · 'bad' · null 중 하나여야 합니다"));
-      }
-      const number = Number(request.params.number);
-      if (!Number.isInteger(number)) return reply.code(400).send(fail('번호가 올바르지 않습니다'));
-
-      const changed = sheets.setSheetReview(store.conn(), request.params.songbookId, number, raw);
-      if (!changed) return reply.code(404).send(fail('악보를 찾을 수 없습니다'));
-      return ok({ songbookId: request.params.songbookId, number, state: raw ?? null });
     },
   );
 

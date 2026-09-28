@@ -1,6 +1,6 @@
 {
   "name": "sermon-presentation",
-  "version": "1.0.11",
+  "version": "1.1.0",
   "private": true,
   "description": "OBS 브라우저 소스로 성경 본문과 찬양 가사를 송출하는 로컬 애플리케이션",
   "type": "module",
@@ -35,8 +35,6 @@
     "hymn:realign": "node scripts/realign-hymn-english.ts",
     "misc:import": "node scripts/import-misc-lyrics.ts",
     "song:retitle": "node scripts/retitle-with-alt.ts",
-    "sheets:convert": "node scripts/convert-sheets.ts",
-    "sheets:detect": "node scripts/detect-staff.ts",
     "build:server": "tsc -p tsconfig.build.json",
     "electron": "npm run app:build && npm run build:server && electron .",
     "dist": "npm run app:build && npm run build:server && node scripts/dist.ts",

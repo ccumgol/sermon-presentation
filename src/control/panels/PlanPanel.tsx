@@ -128,7 +128,7 @@ export function PlanPanel({
    * (찬양 탭과 같은 규칙). 항목을 고를 때 한 번만 읽는다.
    */
   /** 고른 찬양 항목의 곡 정보 — 언어 버튼을 흐리게 하고, 악보가 있는지 알린다 */
-  const [songInfo, setSongInfo] = useState<{ id: number; available: string[]; hasSheet: boolean } | null>(null);
+  const [songInfo, setSongInfo] = useState<{ id: number; available: string[] } | null>(null);
 
 
   // 항목을 슬라이드로 푸는 것은 usePlanPreview 로 옮겼다 (2026-09-07 R-4).
@@ -216,7 +216,6 @@ export function PlanPanel({
           setSongInfo({
             id: currentSongId,
             available: loaded.availableLangs,
-            hasSheet: loaded.sheet !== undefined,
           });
         }
       })

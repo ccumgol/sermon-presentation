@@ -2718,37 +2718,6 @@ button.link-inline {
 .link-chip.static { cursor: default; }
 .link-chip.static .link-inline { color: var(--fg); }
 
-/*
- * 슬라이드 목록의 악보 단 표시 (`♪3`).
- *
- * 라벨 옆에 작게 붙는다 — 가사를 읽는 데 방해가 되면 안 되지만, 배분이 어긋난 것을
- * 알아채려면 눈에 들어와야 한다. 흔들리는 곡은 물음표와 함께 경고색으로.
- */
-.sheet-tag {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--panel-2);
-  color: var(--dim);
-  font: 11px/1.6 ui-monospace, monospace;
-  vertical-align: middle;
-}
-.sheet-tag.uncertain {
-  background: color-mix(in srgb, var(--warn) 18%, transparent);
-  color: var(--warn);
-}
-
-/* 악보 모양 고르기 — 안내 줄(hintline) 안에 들어가므로 버튼을 한 치수 줄인다.
-   줄 높이가 튀면 그 아래 '절이 겹쳐 적힘' 설명과 눈높이가 어긋난다. */
-.sheet-layout { vertical-align: middle; }
-.sheet-layout .toggle {
-  min-height: 22px;
-  padding: 1px 8px;
-  font-size: 0.78rem;
-}
-
-
 /* ── 열 잡이 ─────────────────────────────────────────────────────
    두 열 사이를 끌어 너비를 정한다 (사용자 요청 2026-09-04).
 
@@ -2833,76 +2802,6 @@ button.link-inline {
 /* .body 의 잡이는 오른쪽 열 테두리와 맞닿는다 — 선이 겹쳐 두 줄로 보이지 않게 */
 .app > .body > .col-resizer {
   margin-right: -1px;
-}
-
-/* ── 악보 단 경계 검토 (D-6 ⑥) ───────────────────────────────────
-   자동으로 잡은 단이 맞는지 **눈으로** 본다. 숫자만으로는 판단할 수 없어
-   그림 위에 잘리는 자리를 겹쳐 그린다. */
-
-.review-modes {
-  flex: 0 0 auto;
-}
-
-.sheet-detail {
-  overflow-y: auto;
-}
-
-.sheet-canvas {
-  position: relative;
-  margin-top: 12px;
-  /* 악보는 흰 종이다 — 다크 모드에서 바탕이 어두우면 가장자리가 어디인지 모른다 */
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.sheet-canvas img {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-/*
- * 잘리는 자리. **채우지 않고 테두리만** 그린다 — 반투명으로 덮으면 그 안의
- * 오선과 가사가 흐려져, 정작 봐야 할 것이 안 보인다.
- */
-.sheet-band {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border: 2px solid rgba(31, 111, 235, 0.75);
-  border-radius: 3px;
-  pointer-events: none;
-}
-
-/* 줄 수가 5가 아닌 단 — 여기부터 보라는 표시다 */
-.sheet-band.odd {
-  border-color: rgba(212, 42, 31, 0.85);
-  border-style: dashed;
-}
-
-.sheet-band .tag {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  padding: 0 5px;
-  border-radius: 3px;
-  background: rgba(31, 111, 235, 0.85);
-  color: #fff;
-  font-size: 0.7rem;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-.sheet-band.odd .tag {
-  background: rgba(212, 42, 31, 0.9);
-}
-
-/* 사람이 '괜찮다' 고 한 줄 — 승인한 곡과 같은 초록 칩을 쓴다 */
-.warn-chip.ok {
-  background: color-mix(in srgb, var(--ok) 20%, transparent);
-  color: var(--ok);
 }
 
 /* ── 이 PC 준비 상태 (설정 탭) ────────────────────────────────────

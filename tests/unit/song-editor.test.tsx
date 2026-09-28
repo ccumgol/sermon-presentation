@@ -12,8 +12,6 @@
  * |---|---|
  * | 빈 가사로 덮지 않는다 | 한국어 칸을 비우고 저장하면 그 곡 가사가 통째로 사라진다 |
  * | 지우기 전에 묻는다 | 되돌릴 수 없다 |
- * | 곡을 바꾸면 악보 보기가 꺼진다 | 검토 안 된 다음 곡 악보가 예고 없이 벽에 걸린다 |
- * | 악보 모양을 바꿔도 다시 송출하지 않는다 | 3절 부르다 1절로 튄다 |
  *
  * ## 틀(harness)
  *
@@ -31,7 +29,6 @@ const createSongApi = vi.fn();
 const deleteSong = vi.fn();
 const toggleFavoriteApi = vi.fn();
 const saveLyricsApi = vi.fn();
-const setSheetLayout = vi.fn();
 
 class FakeApiError extends Error {}
 
@@ -42,7 +39,6 @@ vi.mock('../../src/control/api.ts', () => ({
     deleteSong: (...a: unknown[]) => deleteSong(...a),
     toggleFavorite: (...a: unknown[]) => toggleFavoriteApi(...a),
     saveLyrics: (...a: unknown[]) => saveLyricsApi(...a),
-    setSheetLayout: (...a: unknown[]) => setSheetLayout(...a),
   },
   ApiError: FakeApiError,
 }));
@@ -60,7 +56,6 @@ const SONG = {
   ],
 } as unknown as Song;
 
-const SHEET = { songbookId: 'chanmi2000', number: 7, systemCount: 4, layout: 'shared', chosen: false } as never;
 
 const deps = {
   clearResult: vi.fn(),
@@ -97,29 +92,17 @@ function setup(maxChars?: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  song.mockResolvedValue({ song: SONG, availableLangs: ['ko', 'en'], sheet: SHEET });
+  song.mockResolvedValue({ song: SONG, availableLangs: ['ko', 'en'] });
 });
 
 // ─────────────────────────────────────────────────────────────
 describe('곡 열기', () => {
-  it('곡·악보·가사를 함께 받는다', async () => {
+  it('곡과 가사를 함께 받는다', async () => {
     const { result } = setup();
     await act(async () => { await result.current.openSong(7); });
 
     expect(result.current.song?.title).toBe('주께와 엎드려');
-    expect(result.current.sheet).toBe(SHEET);
     expect(result.current.draftLyrics).toContain('가사 한 줄');
-  });
-
-  /** 앞 곡에서 켜 둔 것이 남으면 **검토 안 된 다음 곡 악보**가 예고 없이 벽에 걸린다 */
-  it('곡을 바꾸면 악보 보기가 꺼진다', async () => {
-    const { result } = setup();
-    await act(async () => { await result.current.openSong(7); });
-    act(() => { result.current.setUseSheet(true); });
-    expect(result.current.useSheet).toBe(true);
-
-    await act(async () => { await result.current.openSong(8); });
-    expect(result.current.useSheet).toBe(false);
   });
 
   it('여는 순간 편집 상태를 닫는다', async () => {
@@ -193,7 +176,6 @@ describe('번호 즉시 송출용 열기', () => {
     song.mockResolvedValue({
       song: { ...SONG, langs: ['ko'] },
       availableLangs: ['ko'],
-      sheet: undefined,
     });
     const { result } = setup();
     act(() => { result.current.toggleLang('en'); });
@@ -208,7 +190,7 @@ describe('번호 즉시 송출용 열기', () => {
 
   /** 하나도 안 남으면 그 곡이 가진 첫 언어로 — 빈 배열로 보내면 화면이 빈다 */
   it('남는 것이 없으면 그 곡의 첫 언어를 쓴다', async () => {
-    song.mockResolvedValue({ song: { ...SONG, langs: ['en'] }, availableLangs: ['en'], sheet: undefined });
+    song.mockResolvedValue({ song: { ...SONG, langs: ['en'] }, availableLangs: ['en'] });
     const { result } = setup();
 
     let opened: { langs: string[] } | null = null;
@@ -338,47 +320,6 @@ describe('즐겨찾기', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────
-/**
- * **송출을 다시 하지 않는다.** 지금 뜬 덱을 다시 보내면 첫 슬라이드로 되돌아간다 —
- * 예배 중 3절을 부르다 1절로 튀는 것보다 다음 송출부터 반영되는 편이 안전하다.
- */
-describe('악보 모양 고르기', () => {
-  it('고르면 저장하고 다음 송출부터라고 알린다', async () => {
-    setSheetLayout.mockResolvedValue(undefined);
-    const { result } = setup();
-    await act(async () => { await result.current.openSong(7); });
-    await act(async () => { await result.current.chooseSheetLayout('sequential'); });
-
-    expect(setSheetLayout).toHaveBeenCalledWith('chanmi2000', 7, 'sequential');
-    expect(feedback.read().notice).toContain('다음 송출부터');
-  });
-
-  it('null 이면 자동으로 되돌렸다고 알린다', async () => {
-    setSheetLayout.mockResolvedValue(undefined);
-    const { result } = setup();
-    await act(async () => { await result.current.openSong(7); });
-    await act(async () => { await result.current.chooseSheetLayout(null); });
-
-    expect(feedback.read().notice).toContain('자동으로 되돌렸습니다');
-  });
-
-  it('악보가 없는 곡이면 아무 일도 하지 않는다', async () => {
-    song.mockResolvedValue({ song: SONG, availableLangs: ['ko'], sheet: undefined });
-    const { result } = setup();
-    await act(async () => { await result.current.openSong(7); });
-    await act(async () => { await result.current.chooseSheetLayout('shared'); });
-
-    expect(setSheetLayout).not.toHaveBeenCalled();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────
-/**
- * 편집 중에는 **고치고 있는 곡**을 보여야 줄나눔이 화면에서 어떻게 되는지 안다.
- * 아래 슬라이드 칸은 송출 중인 곡을 보여 주므로, 그것만 있으면 다른 곡을 편집하는
- * 동안 엉뚱한 곡이 남는다 (2026-08-29 사용자).
- */
 describe('편집 중 미리보기', () => {
   it('편집 중이 아니면 없다', async () => {
     const { result } = setup();

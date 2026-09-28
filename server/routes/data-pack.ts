@@ -16,7 +16,7 @@
  * git 에 없다. 이미 있으면 **건드리지 않는다** — 합치는 일은 이미 있는
  * '자료 가져오기(번들)' 가 한다 (검사도 그쪽에 있다).
  *
- * 성경·악보는 원본에서 만들어 낸 것이라 같은 자료면 같은 결과다. 그래도 덮기 전에
+ * 성경은 원본에서 만들어 낸 것이라 같은 자료면 같은 결과다. 그래도 덮기 전에
  * `snapshotDatabases()` 로 뜬다.
  *
  * ## 열려 있는 DB 를 덮지 않는다
@@ -34,7 +34,6 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import {
   PACK_DATABASES,
-  PACK_FOLDERS,
   holdsUserData,
   readManifest,
   type DataPackManifest,
@@ -131,7 +130,7 @@ export function inspectPack(): PackStatus {
 function planFor(dir: string): PackStatus['plan'] {
   const plan: PackStatus['plan'] = [];
 
-  for (const name of [...PACK_DATABASES, ...PACK_FOLDERS]) {
+  for (const name of PACK_DATABASES) {
     const source = path.join(dir, name);
     if (!existsSync(source)) continue;
 

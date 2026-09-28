@@ -138,20 +138,10 @@ describe('성경 본문', () => {
 });
 
 describe('찬양', () => {
-  it('★ 악보는 항목이 켠 것만 — 기본은 가사다 (2026-09-04 사용자 결정)', async () => {
-    const { resolve } = resolver();
-    await resolve(item({ id: 's', type: 'song', songId: 7, songTitle: '주 사랑', langs: ['ko'] }));
-    // 마지막 인자가 sheet 다
-    expect(songDeck).toHaveBeenCalledWith(7, ['ko'], '2', undefined, BOTTOM.behavior.maxCharsPerLine, false);
-
-    await resolve(item({ id: 's', type: 'song', songId: 7, songTitle: '주 사랑', langs: ['ko'], sheet: true }));
-    expect(songDeck).toHaveBeenLastCalledWith(7, ['ko'], '2', undefined, BOTTOM.behavior.maxCharsPerLine, true);
-  });
-
   it('★ 템플릿이 정한 행 폭을 넘긴다 — 없으면 운율 행이 엉뚱한 폭으로 묶인다', async () => {
     const { resolve } = resolver(null);
     await resolve(item({ id: 's', type: 'song', songId: 1, songTitle: 'ㄱ', langs: ['ko'] }));
-    expect(songDeck).toHaveBeenCalledWith(1, ['ko'], '2', undefined, undefined, false);
+    expect(songDeck).toHaveBeenCalledWith(1, ['ko'], '2', undefined, undefined);
   });
 
   it('꾸밈을 실어 보낸다', async () => {

@@ -84,7 +84,7 @@ export function DataPackCard(): React.JSX.Element {
       {!status?.found && (
         <>
           <p className="hintline muted">
-            다른 PC 에서 만든 <b>자료 꾸러미</b>(성경·가사·악보)를 이 PC 에 넣습니다.
+            다른 PC 에서 만든 <b>자료 꾸러미</b>(성경·가사)를 이 PC 에 넣습니다.
           </p>
           <ol className="hintline muted">
             <li>위의 <b>데이터 폴더 열기</b> 를 누릅니다</li>

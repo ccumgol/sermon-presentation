@@ -1,30 +1,11 @@
 /** 컨트롤 패널의 REST 호출. 모든 오류를 명시적으로 다룬다. */
 
 import type { EnvStatus } from '../../lib/env-check.ts';
-import type { SheetSummary } from '../../lib/sheet-attach.ts';
 
-
-/** 검토 목록 한 줄 — 그림 주소와 잡힌 단 경계가 함께 온다 */
-export interface SheetReviewItem {
-  songbookId: string;
-  number: number;
-  src: string;
-  width: number;
-  height: number;
-  systems: SheetSystem[];
-  /** 이 번호를 가진 곡 제목들. 같은 번호를 두 곡이 가질 수 있다 */
-  titles: string[];
-  reviewState?: SheetReviewState;
-}
-
-export interface SheetReviewList {
-  counts: { total: number; needsReview: number; reviewed: number };
-  items: SheetReviewItem[];
-}
 
 import type {
   ApiResponse, BookMeta, Deck, LangCode, Passage, ParseResult, PlanKind, ReviewQueue,
-  SearchResult, ServicePlan, SheetReviewState, SheetSystem, Song, Songbook, SongEntry,
+  SearchResult, ServicePlan, Song, Songbook, SongEntry,
   SongSearchHit, SongSearchResult, Template, Testament, Translation,
 } from '../../shared/types.ts';
 
@@ -209,7 +190,7 @@ export const api = {
   setSongEntries: (songId: number, entries: Array<{ songbookId: string; number?: number | null }>) =>
     send<Song>('PUT', `/api/songs/${songId}/entries`, { entries }),
   song: (id: number) =>
-    get<{ song: Song; availableLangs: LangCode[]; sheet?: SheetSummary }>(`/api/songs/${id}`),
+    get<{ song: Song; availableLangs: LangCode[] }>(`/api/songs/${id}`),
   songDeck: (
     id: number,
     langs: LangCode[],
@@ -217,14 +198,11 @@ export const api = {
     sectionId?: number,
     /** 템플릿이 지정한 표시 행 폭 — 운율 행을 이 폭에 맞춰 묶는다 */
     maxChars?: number,
-    /** 프로젝터에 악보를 낸다. 기본은 가사다 (검출이 아직 불완전하다) */
-    sheet?: boolean,
   ) =>
     get<{ deck: Deck; langs: LangCode[]; availableLangs: LangCode[]; missingLangs: LangCode[] }>(
       `/api/songs/${id}/deck?langs=${encodeURIComponent(langs.join(','))}&lines=${lines}` +
         (sectionId !== undefined ? `&section=${sectionId}` : '') +
-        (maxChars !== undefined ? `&maxChars=${maxChars}` : '') +
-        (sheet ? '&sheet=1' : ''),
+        (maxChars !== undefined ? `&maxChars=${maxChars}` : ''),
     ),
   favorites: (limit = 5) => get<SongSearchHit[]>(`/api/songs/favorites?limit=${limit}`),
   toggleFavorite: (id: number, value: boolean) =>
@@ -314,8 +292,6 @@ export const api = {
     get<{
       songs: number; templates: number; plans: number; settings: number; fonts: string[];
       readings: number; songbooks: number;
-      /** 악보 **상태** 개수 — 그림은 담기지 않는다 (폴더를 복사해야 한다) */
-      sheets: number;
       approximateBytes: number;
     }>('/api/backup/summary'),
   importBundle: (bundle: unknown, mode: 'merge' | 'replace') =>
@@ -325,8 +301,6 @@ export const api = {
       links: number;
       readings: number;
       songbooks: number;
-      /** 옮긴 악보 상태 — 그림은 폴더로 복사해야 한다 */
-      sheets: number;
       /** 이미 있어 건너뛴 곡 — 합치기를 여러 번 해도 늘지 않는다는 증거다 */
       songsExisting: number;
       skipped: string[];
@@ -368,31 +342,6 @@ export const api = {
   slideshow: (source: 'library' | 'data', folder: string) =>
     get<{ source: string; folder: string; files: BackgroundFile[] }>(
       `/api/backgrounds/slideshow?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(folder)}`,
-    ),
-
-  /** 사람이 봐야 하는 악보 목록 — 오선이 5줄로 잡히지 않은 장들 */
-  sheetsToReview: (book?: string) =>
-    get<SheetReviewList>(`/api/sheets/review${book ? `?book=${encodeURIComponent(book)}` : ''}`),
-
-  /** 한 장에 대한 판정. `null` 이면 '아직 안 봄' 으로 되돌린다 */
-  setSheetReview: (songbookId: string, number: number, state: SheetReviewState | null) =>
-    send<{ songbookId: string; number: number; state: SheetReviewState | null }>(
-      'PUT',
-      `/api/sheets/${encodeURIComponent(songbookId)}/${number}/review`,
-      { state },
-    ),
-
-  /**
-   * 악보 모양을 사람이 정한다. `null` 이면 **자동 짐작으로 되돌린다.**
-   *
-   * 곡이 아니라 **악보**(곡집·번호)에 붙는다 — 같은 악보를 여러 곡이 가리킬 수 있고,
-   * 모양은 악보가 어떻게 인쇄됐는지의 성질이다.
-   */
-  setSheetLayout: (songbookId: string, number: number, layout: 'shared' | 'sequential' | null) =>
-    send<{ songbookId: string; number: number; layout: 'shared' | 'sequential' | null }>(
-      'PUT',
-      `/api/sheets/${encodeURIComponent(songbookId)}/${number}/layout`,
-      { layout },
     ),
 
   templates: () => get<Template[]>('/api/templates'),

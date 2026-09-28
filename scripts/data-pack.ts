@@ -22,14 +22,13 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
   DATA_PACK_FORMAT,
   DATA_PACK_VERSION,
   PACK_DATABASES,
-  PACK_FOLDERS,
   formatBytes,
   type DataPackEntry,
   type DataPackManifest,
@@ -38,24 +37,6 @@ import { paths } from '../server/paths.ts';
 
 const outRoot = path.join(paths.appRoot, 'release');
 const outDir = path.join(outRoot, `sermon-data-${DATA_PACK_VERSION}`);
-
-function folderBytes(dir: string): { bytes: number; files: number } {
-  let bytes = 0;
-  let files = 0;
-  for (const name of readdirSync(dir)) {
-    const full = path.join(dir, name);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      const inner = folderBytes(full);
-      bytes += inner.bytes;
-      files += inner.files;
-    } else {
-      bytes += stat.size;
-      files += 1;
-    }
-  }
-  return { bytes, files };
-}
 
 function main(): void {
   console.log(`자료 꾸러미 ${DATA_PACK_VERSION} 를 만듭니다`);
@@ -87,18 +68,6 @@ function main(): void {
     const bytes = statSync(target).size;
     entries.push({ name, bytes });
     console.log(`  ✓ ${name}  ${formatBytes(bytes)}`);
-  }
-
-  for (const name of PACK_FOLDERS) {
-    const source = path.join(paths.dataDir, name);
-    if (!existsSync(source)) {
-      console.log(`  – ${name}/ — 없어서 건너뜁니다`);
-      continue;
-    }
-    cpSync(source, path.join(outDir, name), { recursive: true });
-    const { bytes, files } = folderBytes(source);
-    entries.push({ name, bytes, files });
-    console.log(`  ✓ ${name}/  ${formatBytes(bytes)} (${files.toLocaleString('ko-KR')}개)`);
   }
 
   const manifest: DataPackManifest = {
