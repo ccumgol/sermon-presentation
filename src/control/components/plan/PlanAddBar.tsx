@@ -38,6 +38,7 @@ export function PlanAddBar({
     songHits, songTotal, addPrimary, setAddPrimary, addSecondary, setAddSecondary,
     readingHits, readingBook, setReadingBook, readingCounts, readingTotal,
     pickedFolder, setPickedFolder, addRef,
+    pickedVideo, setPickedVideo, videos, videoDir,
     addFromInput, addLiturgy, addReading, addSong, addText,
   } = add;
 
@@ -66,6 +67,37 @@ export function PlanAddBar({
 
         {addKind === 'blank' ? (
           <button type="button" className="grow" onClick={() => addFromInput()}>공백 추가</button>
+        ) : addKind === 'video' ? (
+          /*
+            동영상 — 파일 **하나**를 고른다 (그림 폴더와 다르다).
+            그 주일에 틀 영상은 정해져 있고, 폴더의 아무거나가 아니다.
+          */
+          videos.length === 0 ? (
+            <span className="hintline muted grow">
+              쓸 수 있는 동영상이 없습니다. 이 폴더에 파일을 넣고 🎬 를 다시 누르세요 —{' '}
+              <code>{videoDir || '데이터 폴더/videos'}</code>
+            </span>
+          ) : (
+            <>
+              <select
+                className="grow"
+                value={pickedVideo}
+                onChange={(e) => setPickedVideo(e.target.value)}
+                aria-label="동영상"
+              >
+                <option value="">동영상을 고르세요</option>
+                {videos.map((file) => (
+                  <option key={file.name} value={file.name}>
+                    {file.risk === 'risky' ? '⚠ ' : ''}
+                    {file.name} ({Math.round(file.bytes / 1024 / 1024)}MB)
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={() => addFromInput()} disabled={pickedVideo.length === 0}>
+                추가
+              </button>
+            </>
+          )
         ) : addKind === 'slideshow' ? (
           /*
             폴더를 고른다 — **그림을 하나씩 고르지 않는다.**
@@ -211,6 +243,16 @@ export function PlanAddBar({
           </p>
         )}
         {isMultiline && <p className="hintline muted">Enter 로 추가 · Shift+Enter 줄바꿈</p>}
+
+        {/*
+          고른 영상이 못 열릴 수 있는 형식이면 **고르는 자리에서** 말한다.
+          예배 중에 안 나가는 것보다 지금 아는 편이 낫다.
+        */}
+        {addKind === 'video' &&
+          (() => {
+            const warning = videos.find((file) => file.name === pickedVideo)?.warning;
+            return warning ? <p className="hintline error">⚠ {warning}</p> : null;
+          })()}
 
         {addKind === 'order' && (
           <div className="candidates">

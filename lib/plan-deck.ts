@@ -67,6 +67,9 @@ export function describeItem(item: CueItem): string {
             ? '앱 폴더 전체'
             : '모아 둔 폴더 전체')
       );
+    case 'video':
+      // 아이콘은 목록이 붙인다 (슬라이드쇼와 같은 이유)
+      return item.label ?? item.file.replace(/\.[^.]+$/, '');
     case 'blank':
       return '(공백)';
     default:

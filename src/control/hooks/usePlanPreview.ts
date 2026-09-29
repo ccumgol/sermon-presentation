@@ -179,6 +179,41 @@ export function usePlanPreview(options: {
         };
       }
 
+      /*
+       * 동영상 (2026-09-29) — 한 항목이 **슬라이드 한 장**이다.
+       *
+       * 파일 이름을 순서표에 담는다. 슬라이드쇼(폴더)와 다른 점인데, 영상은
+       * '폴더에 넣은 것 아무거나' 가 아니라 **그 주일에 틀 그 영상 하나**라서다.
+       *
+       * 여기서 파일이 있는지 확인한다 — 없으면 예배 중이 아니라 **지금** 알아야 한다.
+       */
+      if (item.type === 'video') {
+        const { files } = await api.videos();
+        const found = files.find((file) => file.name === item.file);
+        if (!found) {
+          return {
+            slides: [],
+            labels: [],
+            error: `동영상 파일이 없습니다 (${item.file}) — 데이터 폴더의 videos/ 를 확인하세요`,
+          };
+        }
+        return {
+          slides: [
+            {
+              kind: 'video' as const,
+              src: found.url,
+              title: found.name,
+              ...(item.fit === 'cover' ? { fit: 'cover' as const } : {}),
+              ...(item.startAt ? { startAt: item.startAt } : {}),
+              ...(item.advanceOnEnd ? { advanceOnEnd: true } : {}),
+              ...(item.loop ? { loop: true } : {}),
+              ...(typeof item.volume === 'number' ? { volume: item.volume } : {}),
+            },
+          ],
+          labels: [found.name.replace(/\.[^.]+$/, '')],
+        };
+      }
+
       if (item.type === 'liturgy') {
         const lines = liturgyLines(item.textId, item.version, item.overrideLines);
         if (!lines) return { slides: [], labels: [], error: '본문을 찾지 못했습니다' };

@@ -793,6 +793,24 @@ export type CueItem =
    * **슬라이드를 만들지 않는다.** 덱에 들어가지 않으므로 항목 경계(groups)의
    * 인덱스에도 영향을 주지 않아야 한다 (lib/plan-deck.ts 참고).
    */
+  /**
+   * 동영상 — `데이터 폴더/videos/` 에 넣은 파일 하나.
+   *
+   * USB 로 받은 영상을 그 폴더에 넣기만 하면 목록에 나온다. 설정 탭의
+   * **데이터 폴더 열기**가 그 자리를 열어 준다.
+   */
+  | {
+      id: string;
+      type: 'video';
+      /** `videos/` 아래의 파일 이름 */
+      file: string;
+      label?: string;
+      fit?: BackgroundFit;
+      startAt?: number;
+      advanceOnEnd?: boolean;
+      loop?: boolean;
+      volume?: number;
+    }
   | {
       id: string;
       type: 'divider';
@@ -996,6 +1014,35 @@ export type SlidePayload =
       /** 기본 `contain` — 내용이므로 잘리면 안 된다 */
       fit?: BackgroundFit;
     }
+  /**
+   * 동영상 한 편 — 선교보고·안내 영상 (2026-09-29 사용자 요청).
+   *
+   * ## 소리는 한 화면에서만 난다
+   *
+   * 출력 페이지는 **동시에 여러 곳에서 돈다** — OBS · 조작 화면의 미리보기 ·
+   * 강사 모니터 · 프로젝터 · 자동분할 측정용. 전부 소리를 내면 메아리가 난다.
+   * 그래서 `layer === 'main'`(OBS) 에서만 소리를 켠다 (사용자 결정).
+   *
+   * **그림은 모든 화면에서 그대로 재생한다.** 미리보기만 따로 그리면
+   * '미리보기에선 괜찮았는데 화면에선 다르다' 가 생긴다 — 이 저장소의 오랜 규칙이다.
+   */
+  | {
+      kind: 'video';
+      /** 출력 페이지가 그대로 쓰는 주소 (`/videos/…`) */
+      src: string;
+      /** 화면 낭독기·조작 화면에 보일 이름. 파일 이름이 기본 */
+      title?: string;
+      /** 기본 `contain` — 영상은 잘리면 내용을 잃는다 */
+      fit?: BackgroundFit;
+      /** 이 초부터 시작한다. 없으면 처음부터 */
+      startAt?: number;
+      /** 끝나면 다음 슬라이드로 넘어간다 */
+      advanceOnEnd?: boolean;
+      /** 끝나면 처음부터 다시 (`advanceOnEnd` 와 함께 켜면 반복이 이긴다) */
+      loop?: boolean;
+      /** 0~1. 없으면 1 */
+      volume?: number;
+    }
   | { kind: 'blank' };
 
 export interface LiveState {
@@ -1072,6 +1119,21 @@ export type ServerMsg =
    * 새 슬라이드 종류를 못 그려 '아무 일도 안 일어나는' 상태를 미리 잡아 준다.
    */
   | { t: 'output:stale'; payload: { layer: string } }
+  /** 동영상 재생 상태를 조작 화면으로 넘긴다 (출력 페이지가 올린 것 그대로) */
+  | {
+      t: 'video:state';
+      payload: {
+        event: 'ready' | 'time' | 'ended' | 'error' | 'blocked';
+        layer: string;
+        at?: number;
+        duration?: number;
+        muted?: boolean;
+        advance?: boolean;
+        code?: number;
+        reason?: string;
+        src?: string;
+      };
+    }
   | { t: 'error'; message: string };
 
 export type ClientRole = 'control' | 'output';
@@ -1096,7 +1158,27 @@ export type ClientMsg =
   | { t: 'template:set'; id: number }
   | { t: 'style:set'; patch: Record<string, unknown> }
   | { t: 'measure:report'; payload: { overflow: boolean; height: number; revision: number } }
-  | { t: 'client:error'; payload: { message: string; stack?: string; url: string } };
+  | { t: 'client:error'; payload: { message: string; stack?: string; url: string } }
+  /**
+   * 동영상 재생 상태 (2026-09-29). 출력 페이지 → 서버 → 조작 화면.
+   *
+   * **`muted` 를 함께 보내는 것이 요점이다.** OBS 소리가 실제로 나가는지는
+   * 화면만 봐서는 알 수 없다 — 예배 **전에** 확인할 길이 여기밖에 없다.
+   */
+  | {
+      t: 'video';
+      payload: {
+        event: 'ready' | 'time' | 'ended' | 'error' | 'blocked';
+        layer: string;
+        at?: number;
+        duration?: number;
+        muted?: boolean;
+        advance?: boolean;
+        code?: number;
+        reason?: string;
+        src?: string;
+      };
+    };
 
 // ─────────────────────────────────────────────────────────────
 // API 공통 응답 형식 (~/.claude/rules/common/patterns.md)

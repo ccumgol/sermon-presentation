@@ -41,6 +41,7 @@ import { registerSongRoutes } from './routes/songs.ts';
 import { bibleMissingMessage, isPackagedApp } from '../lib/bible-missing.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTemplateRoutes } from './routes/templates.ts';
+import { registerVideoRoutes } from './routes/videos.ts';
 import { getState, initState } from './state.ts';
 import { appVersion } from './version.ts';
 import type { Template } from '../shared/types.ts';
@@ -244,6 +245,26 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   });
 
   /**
+   * 동영상 (`data/videos/`) — 선교보고·안내 영상 (2026-09-29 사용자 요청).
+   *
+   * **바이트 범위 요청이 되어야 한다.** 영상은 수백 MB 라 앞부분부터 흘려보내야
+   * 바로 재생되고, 되감기도 그걸로 한다. `@fastify/static` 이 이미 `206 Partial
+   * Content` 로 답하는 것을 확인했다 — 따로 할 일은 없다.
+   *
+   * 캐시를 막지 않는다. 같은 영상을 여러 화면(OBS·프로젝터·미리보기)이 함께 받으므로
+   * 재검증만 시키면 매번 다시 내려받아 예배 중에 네트워크와 디스크를 긁는다.
+   */
+  await app.register(fastifyStatic, {
+    root: paths.videosDir,
+    prefix: '/videos/',
+    decorateReply: false,
+    index: false,
+    setHeaders(res) {
+      res.header('Cache-Control', 'public, max-age=3600');
+    },
+  });
+
+  /**
    * 사용자가 모아 둔 배경 그림 폴더 (`~/Desktop/Data/Background`).
    *
    * **읽기만 한다** — 올리기·삭제·총량 상한은 `data/backgrounds/` 쪽 얘기다.
@@ -344,6 +365,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   await registerReadingRoutes(app);
   await registerBackupRoutes(app);
   await registerBackgroundRoutes(app);
+  await registerVideoRoutes(app);
 
   await registerTemplateRoutes(app, {
     onTemplateChanged: (template) => options.onTemplateChanged?.(template),

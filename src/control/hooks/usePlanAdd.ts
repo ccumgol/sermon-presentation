@@ -17,7 +17,7 @@
  * | 종류를 바꾸면 입력칸에 **포커스를 돌려준다** | 입력 요소가 교체되므로 그 뒤에 줘야 한다 |
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   buildPlanRows, insertIndexFor, newItemId, type PlanRow,
@@ -28,6 +28,15 @@ import { verseQuotes } from '../../../lib/verse-quotes.ts';
 import type { CueItem } from '../../../shared/types.ts';
 import { api, ApiError, type ReadingBook, type ReadingSummary } from '../api.ts';
 import type { PlanDraft } from './usePlanDraft.ts';
+
+/** 추가 바에서 고를 동영상 한 줄 */
+export interface VideoChoice {
+  name: string;
+  bytes: number;
+  url: string;
+  risk: 'ok' | 'risky';
+  warning?: string;
+}
 
 /**
  * 찬양 검색에서 한 번에 보여 줄 곡 수. '찬양' 탭(60)보다 적은 이유는
@@ -89,6 +98,28 @@ export function usePlanAdd(options: PlanAddOptions) {
   const [addSecondary, setAddSecondary] = useState<string[]>([]);
   /** 그림 폴더 항목을 만들 때 고른 폴더 (`source/folder`) */
   const [pickedFolder, setPickedFolder] = useState('');
+
+  /**
+   * 동영상 항목 (2026-09-29).
+   *
+   * 목록은 **고를 때 읽는다.** 예배 순서 탭을 열 때마다 읽으면 쓰지도 않을 폴더를
+   * 매번 훑게 되고, 반대로 USB 를 방금 꽂은 사람은 **켜 둔 채 파일을 넣으므로**
+   * 그때 다시 읽어야 목록에 나온다.
+   */
+  const [pickedVideo, setPickedVideo] = useState('');
+  const [videos, setVideos] = useState<VideoChoice[]>([]);
+  const [videoDir, setVideoDir] = useState('');
+
+  const reloadVideos = useCallback(async () => {
+    try {
+      const { files, dir } = await api.videos();
+      setVideos(files);
+      setVideoDir(dir);
+    } catch {
+      // 목록을 못 읽어도 다른 추가는 되어야 한다 — 빈 목록이 그 자리에서 안내를 띄운다
+      setVideos([]);
+    }
+  }, []);
 
   /** 교독문 검색 결과 — 입력에 따라 좁혀진다 */
   const [readingHits, setReadingHits] = useState<ReadingSummary[]>([]);
@@ -327,6 +358,12 @@ export function usePlanAdd(options: PlanAddOptions) {
       insertItem({ id: newItemId(), type: 'blank' });
       return;
     }
+    if (addKind === 'video') {
+      if (pickedVideo.length === 0) return;
+      insertItem({ id: newItemId(), type: 'video', file: pickedVideo, advanceOnEnd: true });
+      setPickedVideo('');
+      return;
+    }
     if (addKind === 'slideshow') {
       if (pickedFolder.length === 0) return;
       const [source, ...rest] = pickedFolder.split('/');
@@ -382,6 +419,8 @@ export function usePlanAdd(options: PlanAddOptions) {
    * 그래서 다시 그린 뒤(아래 effect)에 잡는다.
    */
   function pickKind(kind: AddKind): void {
+    // 동영상을 고를 때마다 폴더를 다시 읽는다 — 방금 USB 에서 넣은 파일이 보이게
+    if (kind === 'video') void reloadVideos();
     if (kind === addKind) {
       addRef.current?.focus(); // 요소가 그대로면 지금 잡아도 된다
       return;
@@ -486,6 +525,7 @@ export function usePlanAdd(options: PlanAddOptions) {
     readingHits, readingBook, setReadingBook, readingCounts, readingTotal,
     /** 그림 폴더 고르기 */
     pickedFolder, setPickedFolder,
+    pickedVideo, setPickedVideo, videos, videoDir, reloadVideos,
     /** 입력칸에 걸 ref */
     addRef,
     // ── 넣는 길들 ──

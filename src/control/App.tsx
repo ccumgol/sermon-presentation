@@ -32,7 +32,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function App(): React.JSX.Element {
   const {
     status, state, deck, template, connections,
-    outputErrors, dismissErrors, staleOutput, dismissStale, send,
+    outputErrors, dismissErrors, staleOutput, dismissStale, video, send,
   } = useLiveState();
 
   // 기본 탭은 예배 순서. 성경·찬양은 한 종류를 깊게 다룰 때 쓰고,
@@ -394,7 +394,7 @@ export function App(): React.JSX.Element {
         <ColumnResizer {...split.resizer} />
 
         <aside className="side">
-          <LivePreview state={state} deck={deck} />
+          <LivePreview state={state} deck={deck} video={video} />
 
           <div className="side-gap">
             <NextUp deck={deck} />

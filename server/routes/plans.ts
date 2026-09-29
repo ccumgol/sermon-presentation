@@ -390,6 +390,43 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
         break;
       }
 
+      case 'video': {
+        const video = item as Extract<CueItem, { type: 'video' }>;
+        /*
+         * 파일 이름도 **한 칸만** 받는다. 경로 구분자나 `..` 가 들어오면
+         * `videos/` 밖의 파일을 내주게 된다 — 폴더 이름과 같은 자리에서 막는다.
+         */
+        const file = safeFolderName(video.file);
+        if (file === undefined || file.length === 0) {
+          rejected.push(`${index + 1}번째 항목: 동영상 파일 이름이 올바르지 않습니다`);
+          continue;
+        }
+        /** 0~1 밖의 값은 버린다 — `video.volume` 에 그대로 들어가는 값이다 */
+        const volume =
+          typeof video.volume === 'number' && video.volume >= 0 && video.volume <= 1
+            ? video.volume
+            : undefined;
+        /** 음수나 NaN 은 `currentTime` 에 넣으면 던진다 */
+        const startAt =
+          typeof video.startAt === 'number' && Number.isFinite(video.startAt) && video.startAt > 0
+            ? video.startAt
+            : undefined;
+        items.push({
+          id,
+          type: 'video',
+          file,
+          ...(video.fit === 'cover' ? { fit: 'cover' as const } : {}),
+          ...(startAt !== undefined ? { startAt } : {}),
+          ...(video.advanceOnEnd ? { advanceOnEnd: true } : {}),
+          ...(video.loop ? { loop: true } : {}),
+          ...(volume !== undefined ? { volume } : {}),
+          ...(typeof video.label === 'string' && video.label.trim().length > 0
+            ? { label: video.label.trim() }
+            : {}),
+        });
+        break;
+      }
+
       default:
         rejected.push(`${index + 1}번째 항목: 알 수 없는 종류 '${String(item.type)}'`);
     }

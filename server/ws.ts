@@ -325,6 +325,27 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         // Phase 3 자동 분할에서 사용한다. 지금은 받아만 둔다.
         break;
 
+      case 'video': {
+        /*
+         * 동영상 상태를 조작 화면으로 넘긴다 (2026-09-29).
+         *
+         * **`main`(OBS) 것만 넘긴다.** 프로젝터·미리보기·강사 모니터도 같은 영상을
+         * 돌리므로 전부 넘기면 같은 초가 서너 번 올라와 표시가 떨린다. 그리고
+         * 사람이 알고 싶은 것은 **회중에게 나가는 화면**의 상태다.
+         *
+         * 다만 `blocked`·`error` 는 어느 화면에서 났든 넘긴다 — 프로젝터에서만
+         * 막히는 경우가 있고, 그것도 예배 전에 알아야 한다.
+         */
+        const interesting = msg.payload.event === 'blocked' || msg.payload.event === 'error';
+        if (client.layer === 'main' || interesting) {
+          broadcast({ t: 'video:state', payload: msg.payload }, ['control']);
+        }
+        if (interesting) {
+          log.warn(`동영상 ${msg.payload.event} (layer=${msg.payload.layer}) ${msg.payload.reason ?? msg.payload.src ?? ''}`);
+        }
+        break;
+      }
+
       case 'client:error':
         // 출력 페이지의 오류를 컨트롤 패널에 올려 예배 전에 발견하게 한다
         log.warn(`출력 페이지 오류: ${msg.payload.message}`);

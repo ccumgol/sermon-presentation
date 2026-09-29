@@ -453,6 +453,26 @@ body.blanked .slide {
 .image-slide img.fit-cover { width: 100%; height: 100%; object-fit: cover; }
 
 /*
+ * 동영상 슬라이드 (2026-09-29). 그림과 같은 짜임이다 — `full-bleed` 의 크기 규칙을
+ * 그대로 물려받으므로 여기서는 상자와 맞춤만 정한다.
+ *
+ * 바탕을 검게 둔다. `contain` 이면 위아래(또는 좌우)에 띠가 남는데, 그 자리가
+ * 투명하면 **뒤의 카메라 영상이 비친다** — 영상 속 장면처럼 보여 혼란스럽다.
+ */
+.video-slide {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+
+.video-slide video.fit-contain { max-width: 100%; max-height: 100%; object-fit: contain; }
+.video-slide video.fit-cover { width: 100%; height: 100%; object-fit: cover; }
+
+/*
  * 그림 슬라이드일 때만 무대 여백을 없앤다 — 안내 그림은 화면을 꽉 써야 한다.
  * 글자 슬라이드로 돌아가면 여백이 되살아난다 (render 가 클래스를 끈다).
  */

@@ -101,6 +101,16 @@ export const paths = {
    */
   backgroundsDir: path.join(DATA_DIR, 'backgrounds'),
   /**
+   * 동영상 — 선교보고·안내 영상 (2026-09-29 사용자 요청).
+   *
+   * **배경 폴더와 따로 둔다.** 배경 그림 목록에 200MB 짜리 영상이 섞여 나오면
+   * 고르기가 나빠지고, 배경은 잘라 채우는 것(`cover`)이 기본이지만 영상은
+   * 다 보여야 한다(`contain`) — 기본값부터 반대다.
+   *
+   * USB 에서 받은 파일을 여기 넣기만 하면 목록에 나온다.
+   */
+  videosDir: path.join(DATA_DIR, 'videos'),
+  /**
    * 빌드 리포트는 자기가 만든 DB 와 같은 위치에 둔다.
    * APP_ROOT 아래에 두었을 때, SERMON_DATA_DIR 을 바꿔 실행한 시험 빌드의 리포트가
    * 실제 리포트 폴더에 섞여 "어느 파일로 빌드했는지"를 잘못 알려주는 일이 있었다.
@@ -115,6 +125,7 @@ export const paths = {
 export function ensureDataDirs(): void {
   for (const dir of [
     paths.dataDir, paths.fontsDir, paths.backupsDir, paths.reportsDir, paths.backgroundsDir,
+    paths.videosDir,
   ]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }

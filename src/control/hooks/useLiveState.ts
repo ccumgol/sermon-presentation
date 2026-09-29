@@ -52,7 +52,25 @@ export interface LiveConnection {
    */
   staleOutput: string | null;
   dismissStale: () => void;
+  /**
+   * OBS 화면에서 도는 동영상의 상태 (2026-09-29).
+   *
+   * **`muted` 가 핵심이다.** 소리가 실제로 나가는지는 화면만 봐서는 알 수 없고,
+   * 예배 전에 확인할 길이 이것뿐이다.
+   */
+  video: VideoStatus | null;
   send: (msg: ClientMsg) => boolean;
+}
+
+export interface VideoStatus {
+  event: 'ready' | 'time' | 'ended' | 'error' | 'blocked';
+  layer: string;
+  at?: number;
+  duration?: number;
+  muted?: boolean;
+  advance?: boolean;
+  reason?: string;
+  at_ms: number;
 }
 
 function wsUrl(): string {
@@ -66,6 +84,7 @@ export function useLiveState(): LiveConnection {
   const [deck, setDeck] = useState<Deck | null>(null);
   const [outputErrors, setOutputErrors] = useState<OutputError[]>([]);
   const [staleOutput, setStaleOutput] = useState<string | null>(null);
+  const [video, setVideo] = useState<VideoStatus | null>(null);
   const [connections, setConnections] = useState<Connections>({ control: 0, output: 0, stage: 0, projector: 0 });
   const [template, setTemplate] = useState<Template | null>(null);
 
@@ -118,6 +137,17 @@ export function useLiveState(): LiveConnection {
             ...prev.slice(-4),
             { message: msg.payload.message, url: msg.payload.url, at: Date.now() },
           ]);
+        } else if (msg.t === 'video:state') {
+          /*
+           * `time` 은 초마다 온다. `muted`·`duration` 은 `ready` 에만 실리므로
+           * **앞의 값을 덮어쓰지 않고 이어 붙인다** — 안 그러면 재생이 시작되는
+           * 순간 '소리 나감' 표시가 사라진다.
+           */
+          setVideo((prev) => ({
+            ...(prev ?? {}),
+            ...msg.payload,
+            at_ms: Date.now(),
+          }));
         } else if (msg.t === 'output:stale') {
           setStaleOutput(msg.payload.layer);
         } else if (msg.t === 'error') {
@@ -180,6 +210,6 @@ export function useLiveState(): LiveConnection {
 
   return {
     status, state, deck, template, connections,
-    outputErrors, dismissErrors, staleOutput, dismissStale, send,
+    outputErrors, dismissErrors, staleOutput, dismissStale, video, send,
   };
 }

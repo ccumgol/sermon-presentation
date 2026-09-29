@@ -635,9 +635,189 @@
     el.blocks.appendChild(box);
   }
 
+  /*
+   * ── 동영상 (2026-09-29 사용자 요청) ─────────────────────────
+   *
+   * ## 소리는 OBS 에서만 난다 (사용자 결정)
+   *
+   * 이 페이지는 **동시에 여러 곳에서 돈다** — OBS(`main`) · 조작 화면의 미리보기 ·
+   * 강사 모니터 · 프로젝터 · 자동분할 측정용. 전부 소리를 내면 메아리가 난다.
+   * 그래서 `main` 만 소리를 켜고 나머지는 음소거한다.
+   *
+   * **그림은 모든 화면에서 그대로 재생한다.** 미리보기만 다르게 그리면
+   * '미리보기에선 괜찮았는데 화면에선 다르다' 가 생긴다 — 이 저장소의 오랜 규칙이다.
+   *
+   * ## 자동 재생이 거부될 수 있다
+   *
+   * 크롬 계열은 소리 있는 자동 재생을 막는다. OBS 의 CEF 는 대개 풀어 두지만
+   * 판에 따라 다르다. 그래서 `play()` 의 거부를 **삼키지 않고 서버에 알린다** —
+   * 조작 화면이 그것을 띄워야 예배 **전에** 알 수 있다.
+   */
+
+  /** 지금 화면에 있는 video 요소 (없으면 null) */
+  var videoEl = null;
+
+  /**
+   * **블랙 때문에** 세운 것인가.
+   *
+   * 이게 없으면 복구가 무조건 `play()` 를 불러서, **이미 끝난 영상이 처음부터 다시
+   * 나간다** (2026-09-29 브라우저 실측에서 걸렸다 — 6초짜리가 끝난 뒤 블랙을
+   * 걸었다 풀자 0초부터 다시 시작했다). 닫는 기도 중에 회중 화면에서 영상이
+   * 되살아나는 셈이다.
+   *
+   * 그래서 **우리가 세운 것만** 되돌린다. 사람이 이미 멈춰 둔 것, 끝난 것은 그대로 둔다.
+   */
+  var pausedByBlank = false;
+
+  /**
+   * **이 영상은 지금 돌고 있어야 하는가.**
+   *
+   * 크롬은 **창이 가려지면 소리 없는 영상을 스스로 멈춘다** (전력 절약).
+   * 실측에서 이렇게 거부됐다:
+   *
+   *   AbortError: The play() request was interrupted because
+   *               video-only background media was paused to save power
+   *
+   * 소리를 내는 OBS 화면(`main`)은 해당이 없지만 **프로젝터 창이 다른 창에 가리면**
+   * 회중 화면이 멈춘다. 그래서 '돌아야 한다' 는 뜻을 따로 들고 있다가
+   * 창이 다시 보일 때 이어 붙인다.
+   */
+  var wantPlaying = false;
+
+  /** 이 화면이 소리를 내는 자리인가 — OBS(main) 만이다 */
+  function carriesAudio() {
+    return opts.layer === 'main' && !opts.measure;
+  }
+
+  function reportVideo(event, extra) {
+    var payload = { event: event, layer: opts.layer };
+    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) payload[k] = extra[k];
+    sendMsg({ t: 'video', payload: payload });
+  }
+
+  function renderVideo(payload) {
+    clearChildren(el.blocks);
+    setOptional(el.heading, null);
+    setOptional(el.reference, null);
+    setOptional(el.credit, null);
+
+    var box = document.createElement('div');
+    box.className = 'video-slide';
+
+    var video = document.createElement('video');
+    video.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
+    video.src = payload.src;
+    video.setAttribute('playsinline', '');
+    video.preload = 'auto';
+    if (payload.loop) video.loop = true;
+    /*
+     * **음소거는 속성으로도 건다.** 크롬은 `muted` 속성이 마크업에 있을 때만
+     * '소리 없는 자동 재생' 으로 보고 막지 않는다. 프로퍼티만 세우면 늦는다.
+     */
+    if (!carriesAudio()) { video.muted = true; video.setAttribute('muted', ''); }
+    else if (typeof payload.volume === 'number') video.volume = Math.max(0, Math.min(1, payload.volume));
+
+    video.addEventListener('loadedmetadata', function () {
+      if (payload.startAt) {
+        try { video.currentTime = payload.startAt; } catch (err) { /* 되감기를 못 해도 재생은 한다 */ }
+      }
+      reportVideo('ready', { duration: video.duration, muted: video.muted });
+    });
+
+    // 영상이 안 열려도 **화면을 비우지 않는다** — 이전 화면을 두고 알리기만 한다
+    video.addEventListener('error', function () {
+      var code = video.error && video.error.code;
+      reportVideo('error', { code: code, src: payload.src });
+      pendingErrors.push({
+        message: '동영상을 열지 못했습니다 (' + payload.src + ')',
+        url: location.href,
+      });
+    });
+
+    video.addEventListener('ended', function () {
+      reportVideo('ended', { advance: !!payload.advanceOnEnd });
+    });
+
+    // 시간은 가끔만 올린다 — 예배 중에 초당 네 번씩 WS 를 두드릴 일이 아니다
+    var lastTick = 0;
+    video.addEventListener('timeupdate', function () {
+      var now = Date.now();
+      if (now - lastTick < 1000) return;
+      lastTick = now;
+      reportVideo('time', { at: video.currentTime, duration: video.duration });
+    });
+
+    box.appendChild(video);
+    el.blocks.appendChild(box);
+    videoEl = video;
+    pausedByBlank = false;
+    wantPlaying = false;
+
+    // 블랙 중에 새 영상이 걸리면 **소리부터 나면 안 된다** — 블랙이 풀릴 때 시작한다
+    if (el.body.classList.contains('blanked')) return;
+    playVideo();
+  }
+
+  /** 영상을 세우고 놓는다. 소리가 남지 않게 원본까지 끊는다 */
+  function stopVideo() {
+    if (!videoEl) return;
+    try {
+      videoEl.pause();
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    } catch (err) {
+      // 못 세워도 아래에서 참조를 놓는다 — 다음 렌더가 새로 만든다
+    }
+    videoEl = null;
+    pausedByBlank = false;
+    wantPlaying = false;
+  }
+
+  function playVideo() {
+    if (!videoEl) return;
+    wantPlaying = true;
+    var promise = videoEl.play();
+    if (!promise || typeof promise.catch !== 'function') return;
+    promise.catch(function (err) {
+      var name = String(err && err.name);
+      /*
+       * 거부를 **삼키지 않는다.** 다만 두 가지를 **갈라서** 말한다 —
+       * 엉뚱한 안내를 띄우면 사람이 엉뚱한 데를 고친다.
+       */
+      if (name === 'NotAllowedError') {
+        // 자동 재생 정책 — 소리 있는 재생이 막혔다. 사람이 손볼 데가 있다
+        reportVideo('blocked', { reason: name });
+        pendingErrors.push({
+          message:
+            '동영상 자동 재생이 막혔습니다. OBS 브라우저 소스 속성에서 ' +
+            '「OBS 를 통해 오디오 제어」를 켜 보세요.',
+          url: location.href,
+        });
+        return;
+      }
+      /*
+       * 그 밖(주로 `AbortError` — 창이 가려져 크롬이 멈춘 것)은 **손볼 데가 없다.**
+       * 창이 다시 보이면 아래 `visibilitychange` 가 이어 붙인다. 그래서 조작 화면에
+       * 올리기만 하고 '고치세요' 라고 하지 않는다.
+       */
+      reportVideo('blocked', { reason: name });
+    });
+  }
+
+  /*
+   * 창이 다시 보이면 멈춰 있던 것을 이어 붙인다 (위 `wantPlaying` 머리말).
+   * 블랙으로 세운 것은 건드리지 않는다 — 그건 사람이 푸는 것이다.
+   */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (!videoEl || !wantPlaying || pausedByBlank) return;
+    if (!videoEl.paused || videoEl.ended) return;
+    playVideo();
+  });
+
   var RENDERERS = {
     bible: renderBible, song: renderSong, text: renderText, order: renderOrder,
-    reading: renderReading, image: renderImage,
+    reading: renderReading, image: renderImage, video: renderVideo,
   };
 
   /**
@@ -752,6 +932,12 @@
    * **`blanked` 클래스는 건드리지 않는다** — 그것은 `B`(블랙)의 장치다.
    */
   function clearSlide() {
+    /*
+     * **영상을 먼저 세운다.** `clearChildren` 으로 요소만 떼면 크롬이 그것을
+     * 바로 거두지 않아 **소리가 잠깐 더 난다** — 회중에게 들린다.
+     * 세우고 원본을 끊은 뒤에 떼어 낸다.
+     */
+    stopVideo();
     clearChildren(el.blocks);
     setOptional(el.heading, null);
     setOptional(el.reference, null);
@@ -779,7 +965,8 @@
      * 가장자리에 붙지 않게 하는 장치다. 안내 그림에 그 여백을 주면
      * 정작 봐야 할 것이 작아진다.
      */
-    el.body.classList.toggle('full-bleed', !!payload && payload.kind === 'image');
+    // 영상도 그림과 같다 — 템플릿의 글자용 여백을 주면 정작 볼 것이 작아진다
+    el.body.classList.toggle('full-bleed', !!payload && (payload.kind === 'image' || payload.kind === 'video'));
     // 폰트·글자 크기도 슬라이드마다 다시 정한다 (지정이 없으면 지운다)
     applyItemStyle(payload && payload.style);
 
@@ -856,9 +1043,9 @@
      * 자동 축소가 또 줄이면 화면 가장자리에 흰 띠가 남는다 (실측 0.87배).
      * 축소는 '글자가 넘칠 때 줄인다' 는 장치라 그림에는 뜻이 없다.
      */
-    if (kind === 'image') {
+    if (kind === 'image' || kind === 'video') {
       el.slide.style.removeProperty('--fit-scale');
-      diag.fit = 'image';
+      diag.fit = kind;
       return { overflow: false, scale: 1 };
     }
 
@@ -918,8 +1105,26 @@
       }
     },
     applyTemplate: applyTemplate,
+    /**
+     * 블랙 — **소리도 함께 멈춘다** (2026-09-29 사용자 결정).
+     *
+     * 글자 슬라이드에서 블랙은 '화면만 가린다' 지만, 영상에서 그대로 두면
+     * **보이지 않는 영상이 계속 흐르고 소리만 나간다.** 복구했을 때 화면이
+     * 엉뚱한 데로 가 있게 되고, 설교 중에 소리가 새는 것이 더 나쁘다.
+     *
+     * 세우기만 하고 되감지 않으므로 복구하면 **그 자리에서 이어진다.**
+     */
     setBlank: function (on) {
       el.body.classList.toggle('blanked', !!on);
+      if (!videoEl) return;
+      if (on) {
+        // 돌고 있던 것만 세운다 — 끝났거나 이미 멈춘 것은 건드리지 않는다
+        pausedByBlank = !videoEl.paused && !videoEl.ended;
+        if (pausedByBlank) videoEl.pause();
+      } else if (pausedByBlank) {
+        pausedByBlank = false;
+        playVideo();
+      }
     },
     diag: diag,
     drainErrors: function () {

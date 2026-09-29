@@ -344,6 +344,17 @@ export const api = {
       `/api/backgrounds/slideshow?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(folder)}`,
     ),
 
+  /**
+   * 동영상 목록 (2026-09-29). `데이터 폴더/videos/` 에 넣은 파일들.
+   *
+   * `risk`·`warning` 이 함께 온다 — 못 열릴 수 있는 형식을 **예배 전에** 알린다.
+   */
+  videos: () =>
+    get<{
+      files: Array<{ name: string; bytes: number; url: string; risk: 'ok' | 'risky'; warning?: string }>;
+      dir: string;
+    }>('/api/videos'),
+
   templates: () => get<Template[]>('/api/templates'),
   createTemplate: (template: Partial<Template>) => send<Template>('POST', '/api/templates', template),
   currentTemplate: () => get<Template>('/api/template/current'),
