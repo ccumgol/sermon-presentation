@@ -26,7 +26,6 @@
  * 다시 연다.
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import { copyFileSync, cpSync, existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
@@ -34,7 +33,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import {
   PACK_DATABASES,
-  holdsUserData,
+  isUntouched,
+  planAction,
   readManifest,
   type DataPackManifest,
 } from '../../lib/data-pack.ts';
@@ -135,70 +135,13 @@ function planFor(dir: string): PackStatus['plan'] {
     if (!existsSync(source)) continue;
 
     const target = path.join(paths.dataDir, name);
-    if (!existsSync(target)) {
-      plan.push({ name, action: 'install' });
-    } else if (!holdsUserData(name)) {
-      plan.push({ name, action: 'replace' });
-    } else if (isUntouched(target, name)) {
-      /*
-       * 앱은 처음 뜰 때 **빈 DB 를 만든다.** 파일이 있다고 건너뛰면 새 PC 에서
-       * 가사가 안 들어간다 — 이 기능이 쓰이는 바로 그 자리다 (2026-09-12 실측).
-       */
-      plan.push({ name, action: 'install', reason: '이 PC 에 만들어 둔 것이 없습니다' });
-    } else {
-      plan.push({
-        name,
-        action: 'skip',
-        reason: '이 PC 에 이미 자료가 있습니다 — 손본 것이 사라지지 않게 건드리지 않습니다',
-      });
-    }
+    const exists = existsSync(target);
+    // 판정은 `lib/data-pack.ts` 하나만 쓴다 — 두 곳에 적으면 화면이 말하는 것과
+    // 실제로 하는 일이 갈라진다
+    plan.push({ name, ...planAction(name, exists, exists && isUntouched(target, name)) });
   }
 
   return plan;
-}
-
-/**
- * 이 DB 에 **사람이 만든 흔적이 하나도 없는가** — 없으면 넣어도 잃을 것이 없다.
- *
- * ⚠️ **'행이 0개' 로는 못 가른다.** 앱은 첫 기동에 기본 예배 유형 넷을 넣고,
- * 그 유형들은 **항목까지 들고 있다** (2026-09-12 실측: 주일예배 11개 · 수요예배 6개 …).
- * 그래서 표마다 '사람이 만든 것' 이 무엇인지 골라 센다.
- *
- * | | 갓 만든 PC | 쓰던 PC (실측) |
- * |---|---:|---:|
- * | `kind='plan'` 순서표 | 0 | 3 |
- * | 템플릿 | 0 | 4 |
- * | 교독문 | 0 | 213 |
- * | 설정 | 0 | 3 |
- *
- * 못 읽으면 **비었다고 보지 않는다.** 이유가 무엇이든 그 상태에서 덮는 것보다
- * 건너뛰고 사람이 보게 하는 편이 낫다.
- */
-function isUntouched(file: string, name: string): boolean {
-  const counts: string[] =
-    name === 'songs.sqlite'
-      ? ['SELECT count(*) AS c FROM songs']
-      : [
-          // 기본으로 깔린 유형(`template`)은 사람이 만든 것이 아니다
-          "SELECT count(*) AS c FROM service_plans WHERE kind <> 'template'",
-          'SELECT count(*) AS c FROM templates',
-          'SELECT count(*) AS c FROM responsive_readings',
-          'SELECT count(*) AS c FROM settings',
-        ];
-
-  let db: DatabaseSync | undefined;
-  try {
-    db = new DatabaseSync(file, { readOnly: true });
-    for (const sql of counts) {
-      const row = db.prepare(sql).get() as unknown as { c: number } | undefined;
-      if ((row?.c ?? 0) > 0) return false;
-    }
-    return true;
-  } catch {
-    return false;
-  } finally {
-    db?.close();
-  }
 }
 
 /** 이 PC 에서 온 요청인가 — 파일을 통째로 바꾸는 일이다 */
