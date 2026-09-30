@@ -594,6 +594,24 @@ describe('템플릿과 오류 전달', () => {
     expect(got.payload.layer).toBe('projector');
   });
 
+  it('못 연 영상은 **어느 파일인지** 로그에 남는다', async () => {
+    /*
+     * `blocked` 는 «왜»(reason)가, `error` 는 «어느 파일»(src)이 단서다.
+     * 로그에 아무것도 안 남으면 예배 뒤에 무엇이 안 열렸는지 알 길이 없다.
+     */
+    const main = await connect({ t: 'hello', role: 'output', layer: 'main' });
+    const control = await connect({ t: 'hello', role: 'control' });
+    const from = control.received.length;
+
+    main.send({
+      t: 'video',
+      payload: { event: 'error', layer: 'main', code: 4, src: '/videos/없는영상.mp4' },
+    });
+
+    await control.waitFor((m) => m.t === 'video:state', '못 연 영상', from);
+    expect(warnings.some((line) => line.includes('없는영상.mp4'))).toBe(true);
+  });
+
   it('pushTemplate 이 모든 화면에 간다', async () => {
     const output = await connect({ t: 'hello', role: 'output', layer: 'main' });
     const before = output.got('template').length;

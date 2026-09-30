@@ -96,7 +96,18 @@ export default defineConfig({
          * ratchet 을 내리는 것은 원래 하지 않는 일이다. 기능을 덜어낸 경우에만
          * 예외로 두고, **왜 내렸는지 여기 적는다.**
          */
-        'server/**': { lines: 84, functions: 85, branches: 78, statements: 83 },
+        /*
+         * 2026-09-29 에 **다시 올렸다** (84/85/78/83 → 85/86/78/83.5 수준).
+         *
+         * 동영상 기능을 넣으면서 `routes/videos.ts` 에 검사가 없어 **문턱이 깨졌다**
+         * (함수 84.98 · 분기 77.61). 검사를 더하지 않고 문턱을 내리는 것은 ratchet 을
+         * 없애는 것과 같아서, 빠진 곳에 검사를 붙였다:
+         *   · `routes/videos.ts` 0 → 94.7 (폴더를 훑는 길 — 예배 중 무엇을 고를 수
+         *     있는지가 여기서 정해진다. 끊어진 바로가기 하나에 목록이 죽지 않는 것까지)
+         *   · `ws.ts` 의 동영상 조작·상태 중계
+         * 실측 문장 83.95 · 분기 78.05 · 함수 86.41 · 줄 85.49.
+         */
+        'server/**': { lines: 85, functions: 86, branches: 78, statements: 83 },
         /**
          * `src/` 는 **낮은 데서 올려 가는 문턱**이다 (ratchet).
          *
@@ -119,7 +130,15 @@ export default defineConfig({
          * 남은 것은 **아직 검사가 없는 화면들**이다 — BiblePanel · SongPanel(JSX) ·
          * TemplatePanel · SongbookManager 등.
          */
-        'src/**': { lines: 37, functions: 30, branches: 34, statements: 37 },
+        /*
+         * 2026-09-29 실측 문장 38.73 · 분기 34.86 · 함수 31.14 · 줄 40.00.
+         *
+         * 사용설명서(`src/control/help/`)와 동영상 상태 줄에 검사가 붙어 올랐다.
+         * 상태 줄 검사는 숫자 때문이 아니라 **실제로 틀렸던 자리**라서 붙였다 —
+         * 전력 절약으로 멈춘 것을 '자동 재생이 막혔습니다' 로 띄워 재생 단추까지
+         * 숨겼다 (2026-09-29).
+         */
+        'src/**': { lines: 38, functions: 30, branches: 34, statements: 38 },
       },
     },
   },
