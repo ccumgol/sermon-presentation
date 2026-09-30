@@ -394,7 +394,7 @@ export function App(): React.JSX.Element {
         <ColumnResizer {...split.resizer} />
 
         <aside className="side">
-          <LivePreview state={state} deck={deck} video={video} />
+          <LivePreview state={state} deck={deck} video={video} send={send} connected={connected} />
 
           <div className="side-gap">
             <NextUp deck={deck} />

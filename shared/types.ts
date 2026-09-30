@@ -1128,12 +1128,16 @@ export type ServerMsg =
         at?: number;
         duration?: number;
         muted?: boolean;
+        /** 지금 서 있는가 — 조작 화면이 ▶/⏸ 를 가려 그린다 */
+        paused?: boolean;
         advance?: boolean;
         code?: number;
         reason?: string;
         src?: string;
       };
     }
+  /** 동영상 조작을 출력 화면으로 넘긴다 */
+  | { t: 'video:cmd'; action: 'play' | 'pause' | 'stop' }
   | { t: 'error'; message: string };
 
 export type ClientRole = 'control' | 'output';
@@ -1165,6 +1169,19 @@ export type ClientMsg =
    * **`muted` 를 함께 보내는 것이 요점이다.** OBS 소리가 실제로 나가는지는
    * 화면만 봐서는 알 수 없다 — 예배 **전에** 확인할 길이 여기밖에 없다.
    */
+  /**
+   * 동영상 조작 (2026-09-29 사용자 요청) — 조작 화면 → 서버 → 출력 화면.
+   *
+   * 서버는 **상태를 들고 있지 않고 그대로 넘긴다.** 재생 위치라는 상태는
+   * video 요소가 이미 들고 있고, 그것이 진실이다. 서버에 또 두면 두 개가 갈린다.
+   *
+   * | | 무엇 |
+   * |---|---|
+   * | `play` | 그 자리에서 이어 재생 |
+   * | `pause` | 그 자리에 선다 |
+   * | `stop` | 서고 **처음으로 되감는다** |
+   */
+  | { t: 'video:control'; action: 'play' | 'pause' | 'stop' }
   | {
       t: 'video';
       payload: {
@@ -1173,6 +1190,8 @@ export type ClientMsg =
         at?: number;
         duration?: number;
         muted?: boolean;
+        /** 지금 서 있는가 — 조작 화면이 ▶/⏸ 를 가려 그린다 */
+        paused?: boolean;
         advance?: boolean;
         code?: number;
         reason?: string;

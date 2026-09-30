@@ -512,6 +512,88 @@ describe('템플릿과 오류 전달', () => {
    * **진짜 템플릿을 쓴다.** 모양만 흉내 낸 객체를 넘겼더니 `templateToCssVars` 가
    * `anchor` 를 읽다 죽었다 — 검사가 실제 경로를 지나지 않았다는 뜻이다.
    */
+  /*
+   * ── 동영상 (2026-09-29) ───────────────────────────────────────
+   *
+   * 재생 위치는 **video 요소가 들고 있고 그것이 진실이다.** 서버는 조작을 넘기고
+   * 상태를 되돌려 주기만 한다. 여기서는 그 통로가 맞는지만 본다.
+   */
+
+  it('재생 조작은 출력 화면으로 가고, 조작 화면으로는 돌아오지 않는다', async () => {
+    const output = await connect({ t: 'hello', role: 'output', layer: 'main' });
+    const projector = await connect({ t: 'hello', role: 'output', layer: 'projector' });
+    const control = await connect({ t: 'hello', role: 'control' });
+    const controlFrom = control.received.length;
+
+    control.send({ t: 'video:control', action: 'pause' });
+
+    const gone = (await output.waitFor((m) => m.t === 'video:cmd', 'OBS 로 간 조작')) as Extract<
+      ServerMsg,
+      { t: 'video:cmd' }
+    >;
+    expect(gone.action).toBe('pause');
+    /*
+     * **프로젝터도 함께 서야 한다.** 소리는 OBS 에서만 나지만 그림은 모든 화면에
+     * 나가므로, 프로젝터만 계속 돌면 회중이 보는 화면이 갈린다.
+     */
+    await projector.waitFor((m) => m.t === 'video:cmd', '프로젝터로 간 조작');
+
+    /*
+     * 조작 화면에 메아리로 돌아오면 단추 모양이 제멋대로 바뀐다.
+     *
+     * **'안 왔다' 는 그냥 보면 안 된다** — 아직 안 온 것과 구별이 안 된다.
+     * 뒤이어 보낸 것의 응답을 기다려 **서버가 앞의 것을 이미 처리했음**을 못 박고,
+     * 그때까지도 메아리가 없으면 오지 않는 것이다.
+     */
+    control.send({ t: 'blank', on: true });
+    await control.waitFor((m) => m.t === 'state' && m.payload.blank === true, '뒤이은 조작', controlFrom);
+    expect(control.received.slice(controlFrom).filter((m) => m.t === 'video:cmd')).toEqual([]);
+  });
+
+  it('OBS 화면의 재생 상태만 조작 화면에 올린다', async () => {
+    const control = await connect({ t: 'hello', role: 'control' });
+    const main = await connect({ t: 'hello', role: 'output', layer: 'main' });
+    const projector = await connect({ t: 'hello', role: 'output', layer: 'projector' });
+    const from = control.received.length;
+
+    // 프로젝터 것은 올라오면 안 된다 — 같은 초가 두 번 올라와 표시가 떤다
+    projector.send({ t: 'video', payload: { event: 'time', layer: 'projector', at: 99 } });
+    main.send({ t: 'video', payload: { event: 'time', layer: 'main', at: 12, muted: false } });
+
+    const got = (await control.waitFor(
+      (m) => m.t === 'video:state',
+      '재생 상태',
+      from,
+    )) as Extract<ServerMsg, { t: 'video:state' }>;
+    expect(got.payload.layer).toBe('main');
+    expect(got.payload.at).toBe(12);
+
+    const all = control.received.slice(from).filter((m) => m.t === 'video:state');
+    expect(all.some((m) => (m as Extract<ServerMsg, { t: 'video:state' }>).payload.at === 99)).toBe(false);
+  });
+
+  it('막히거나 못 연 것은 **어느 화면 것이든** 올린다', async () => {
+    /*
+     * 프로젝터에서만 막히는 경우가 있고, 그것도 예배 전에 알아야 한다.
+     * 시간 보고와 달리 이쪽은 층을 가리지 않는다.
+     */
+    const control = await connect({ t: 'hello', role: 'control' });
+    const projector = await connect({ t: 'hello', role: 'output', layer: 'projector' });
+    const from = control.received.length;
+
+    projector.send({
+      t: 'video',
+      payload: { event: 'blocked', layer: 'projector', reason: 'NotAllowedError' },
+    });
+
+    const got = (await control.waitFor((m) => m.t === 'video:state', '막힘', from)) as Extract<
+      ServerMsg,
+      { t: 'video:state' }
+    >;
+    expect(got.payload.event).toBe('blocked');
+    expect(got.payload.layer).toBe('projector');
+  });
+
   it('pushTemplate 이 모든 화면에 간다', async () => {
     const output = await connect({ t: 'hello', role: 'output', layer: 'main' });
     const before = output.got('template').length;

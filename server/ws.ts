@@ -325,6 +325,17 @@ export function createWsHub(server: Server, log: Logger): WsHub {
         // Phase 3 자동 분할에서 사용한다. 지금은 받아만 둔다.
         break;
 
+      case 'video:control':
+        /*
+         * 그대로 **출력 화면들에** 넘긴다. 서버는 재생 위치를 들고 있지 않다 —
+         * 그것은 video 요소가 들고 있고 그쪽이 진실이다. 서버에 또 두면 갈린다.
+         *
+         * 모든 출력에 보낸다: 프로젝터도 함께 서야 한다. 소리는 OBS 에서만 나지만
+         * **그림은 모든 화면에 나가기 때문이다.**
+         */
+        broadcast({ t: 'video:cmd', action: msg.action }, ['output']);
+        break;
+
       case 'video': {
         /*
          * 동영상 상태를 조작 화면으로 넘긴다 (2026-09-29).

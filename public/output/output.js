@@ -684,6 +684,16 @@
    */
   var wantPlaying = false;
 
+  /**
+   * 지금 걸려 있는 영상의 주소 — **같은 것을 다시 만들지 않기 위해** 들고 있다.
+   *
+   * `applyState` 는 상태 메시지마다 `render` 를 부른다. 블랙을 누르면 새 상태가
+   * 오는데, 그때 요소를 새로 만들면 **영상이 0 초로 돌아간다** (2026-09-29 사용자
+   * 보고 — 블랙을 풀면 처음부터 나갔다). 글자 슬라이드는 다시 그려도 표가 안 나지만
+   * 영상은 **재생 위치라는 상태를 스스로 들고 있어서** 다시 만들면 그것을 잃는다.
+   */
+  var videoKey = null;
+
   /** 이 화면이 소리를 내는 자리인가 — OBS(main) 만이다 */
   function carriesAudio() {
     return opts.layer === 'main' && !opts.measure;
@@ -696,6 +706,21 @@
   }
 
   function renderVideo(payload) {
+    /*
+     * **같은 영상이면 그대로 둔다** (위 `videoKey` 머리말).
+     *
+     * 보이는 것(맞춤·소리 크기)만 손보고 요소는 건드리지 않는다.
+     * 여기서 `play()` 를 부르지 않는 것도 중요하다 — 사람이 일시정지해 둔 것이
+     * 상태 메시지 하나에 다시 돌아가면 안 된다.
+     */
+    if (videoEl && videoKey === payload.src) {
+      videoEl.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
+      if (carriesAudio() && typeof payload.volume === 'number') {
+        videoEl.volume = Math.max(0, Math.min(1, payload.volume));
+      }
+      return;
+    }
+
     clearChildren(el.blocks);
     setOptional(el.heading, null);
     setOptional(el.reference, null);
@@ -721,7 +746,7 @@
       if (payload.startAt) {
         try { video.currentTime = payload.startAt; } catch (err) { /* 되감기를 못 해도 재생은 한다 */ }
       }
-      reportVideo('ready', { duration: video.duration, muted: video.muted });
+      reportVideo('ready', { duration: video.duration, muted: video.muted, paused: video.paused });
     });
 
     // 영상이 안 열려도 **화면을 비우지 않는다** — 이전 화면을 두고 알리기만 한다
@@ -734,6 +759,14 @@
       });
     });
 
+    // 멈추면 `timeupdate` 가 오지 않는다 — 단추 모양이 굳지 않게 여기서 알린다
+    video.addEventListener('pause', function () {
+      reportVideo('time', { at: video.currentTime, duration: video.duration, paused: true });
+    });
+    video.addEventListener('play', function () {
+      reportVideo('time', { at: video.currentTime, duration: video.duration, paused: false });
+    });
+
     video.addEventListener('ended', function () {
       reportVideo('ended', { advance: !!payload.advanceOnEnd });
     });
@@ -744,12 +777,13 @@
       var now = Date.now();
       if (now - lastTick < 1000) return;
       lastTick = now;
-      reportVideo('time', { at: video.currentTime, duration: video.duration });
+      reportVideo('time', { at: video.currentTime, duration: video.duration, paused: video.paused });
     });
 
     box.appendChild(video);
     el.blocks.appendChild(box);
     videoEl = video;
+    videoKey = payload.src;
     pausedByBlank = false;
     wantPlaying = false;
 
@@ -769,6 +803,7 @@
       // 못 세워도 아래에서 참조를 놓는다 — 다음 렌더가 새로 만든다
     }
     videoEl = null;
+    videoKey = null;
     pausedByBlank = false;
     wantPlaying = false;
   }
@@ -802,6 +837,30 @@
        */
       reportVideo('blocked', { reason: name });
     });
+  }
+
+  /**
+   * 사람이 누른 재생·일시정지·멈춤 (2026-09-29 사용자 요청).
+   *
+   * **`pausedByBlank` 을 함께 끈다.** 블랙으로 세워 둔 영상을 사람이 손으로
+   * 일시정지했다면, 블랙을 풀 때 제멋대로 다시 돌아서는 안 된다 —
+   * 마지막에 사람이 시킨 것이 이긴다.
+   */
+  function controlVideo(action) {
+    if (!videoEl) return;
+    if (action === 'play') {
+      pausedByBlank = false;
+      playVideo();
+      return;
+    }
+    pausedByBlank = false;
+    wantPlaying = false;
+    videoEl.pause();
+    if (action === 'stop') {
+      // '멈춤' 은 처음으로 되감는다 — '일시정지' 와 다른 점이 이것뿐이다
+      try { videoEl.currentTime = 0; } catch (err) { /* 되감기를 못 해도 서 있기는 한다 */ }
+    }
+    reportVideo('time', { at: videoEl.currentTime, duration: videoEl.duration, paused: true });
   }
 
   /*
@@ -1262,6 +1321,8 @@
         reportMeasure();
       } else if (msg.t === 'template') {
         applyTemplate(msg.payload);
+      } else if (msg.t === 'video:cmd') {
+        controlVideo(msg.action);
       }
     };
 

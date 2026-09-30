@@ -68,6 +68,8 @@ export interface VideoStatus {
   at?: number;
   duration?: number;
   muted?: boolean;
+  /** 지금 서 있는가 — ▶ 와 ⏸ 를 가려 그린다 */
+  paused?: boolean;
   advance?: boolean;
   reason?: string;
   at_ms: number;
@@ -145,6 +147,9 @@ export function useLiveState(): LiveConnection {
            */
           setVideo((prev) => ({
             ...(prev ?? {}),
+            // 이유는 **이번 소식의 것만** 쓴다. 안 지우면 지난 거부 사유가 눌어붙어
+            // 멀쩡히 도는 영상에 옛 경고가 계속 붙는다
+            reason: undefined,
             ...msg.payload,
             at_ms: Date.now(),
           }));

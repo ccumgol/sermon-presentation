@@ -3129,3 +3129,24 @@ button.link-inline {
   color: var(--live);
   font-weight: 600;
 }
+
+/* 재생 조작 — 상태 줄 오른쪽에 붙는다 */
+.video-buttons {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.video-buttons button {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+/*
+ * '멈춤' 은 처음으로 되감는다 — 되돌릴 수 없는 쪽이라 색으로 가른다.
+ * 예배 중에 '일시정지' 대신 이것을 누르면 회중 화면이 처음으로 간다.
+ */
+.video-buttons button.stop {
+  color: var(--live);
+}
