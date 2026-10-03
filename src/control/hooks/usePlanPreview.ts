@@ -175,7 +175,13 @@ export function usePlanPreview(options: {
             alt: file.name,
             ...(item.fit === 'cover' ? { fit: 'cover' as const } : {}),
           })),
-          labels: files.map((file) => file.name.replace(/\.[^.]+$/, '')),
+          /*
+           * PDF 꾸러미는 **쪽 번호**로 적는다. 파일 이름(`0001`)이 그대로 보이면
+           * 오퍼레이터가 «몇 쪽인가» 를 머리로 바꿔야 한다 — 예배 중에 할 일이 아니다.
+           */
+          labels: files.map((file, index) =>
+            item.source === 'deck' ? `${index + 1}쪽` : file.name.replace(/\.[^.]+$/, ''),
+          ),
         };
       }
 

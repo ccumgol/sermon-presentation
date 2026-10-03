@@ -779,8 +779,15 @@ export type CueItem =
   | {
       id: string;
       type: 'slideshow';
-      /** `library` = 사용자 폴더(읽기 전용) · `data` = 앱이 관리하는 배경 폴더 */
-      source: 'library' | 'data';
+      /**
+       * `library` = 사용자 폴더(읽기 전용) · `data` = 앱이 관리하는 배경 폴더
+       * · `deck` = **PDF 를 바꾼 쪽 그림** (`data/decks/<이름>/`, 2026-10-03)
+       *
+       * `deck` 을 따로 만들지 않고 여기에 붙인 이유: 하는 일이 **똑같다** —
+       * 폴더의 그림을 차례로 보여 준다. 새 슬라이드 종류를 만들면 **출력 페이지**
+       * (예배 중에 도는 코드)를 건드려야 하는데, 얻는 것이 없다.
+       */
+      source: 'library' | 'data' | 'deck';
       /** 그 폴더 아래의 하위 폴더 이름. 비우면 폴더 바로 밑 */
       folder: string;
       /** 기본 `contain` — 안내문은 잘리면 읽을 수 없다 */

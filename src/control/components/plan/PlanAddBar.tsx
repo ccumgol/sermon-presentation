@@ -39,6 +39,7 @@ export function PlanAddBar({
     readingHits, readingBook, setReadingBook, readingCounts, readingTotal,
     pickedFolder, setPickedFolder, addRef,
     pickedVideo, setPickedVideo, videos, videoDir,
+    pickedDeck, setPickedDeck, decks, deckDir, convertDeck, converting, deckError,
     addFromInput, addLiturgy, addReading, addSong, addText,
   } = add;
 
@@ -67,6 +68,69 @@ export function PlanAddBar({
 
         {addKind === 'blank' ? (
           <button type="button" className="grow" onClick={() => addFromInput()}>공백 추가</button>
+        ) : addKind === 'pdf' ? (
+          /*
+            PDF — 고르면 **바꿔 둔 적이 있는지** 함께 보여 준다.
+            아직이면 「쪽 그림 만들기」가 뜨고, 다 됐으면 바로 추가할 수 있다.
+            파일을 올리지 않는다 — 사람이 폴더에 넣고 앱이 읽는다 (보안 S-1).
+          */
+          decks.length === 0 ? (
+            <span className="hintline muted grow">
+              쓸 수 있는 PDF 가 없습니다. 이 폴더에 넣고 📄 를 다시 누르세요 —{' '}
+              <code>{deckDir || '데이터 폴더/decks'}</code>
+              <br />
+              파워포인트·키노트는 그 프로그램에서 <b>PDF 로 내보내기</b> 하세요.
+            </span>
+          ) : (
+            (() => {
+              const chosen = decks.find((deck) => deck.name === pickedDeck);
+              const busy = converting !== null;
+              return (
+                <>
+                  <select
+                    className="grow"
+                    value={pickedDeck}
+                    onChange={(e) => setPickedDeck(e.target.value)}
+                    aria-label="PDF"
+                    disabled={busy}
+                  >
+                    <option value="">PDF 를 고르세요</option>
+                    {decks.map((deck) => (
+                      <option key={deck.name} value={deck.name}>
+                        {deck.name} ({deck.pages > 0 ? `${deck.pages}쪽 준비됨` : '아직 안 바꿈'})
+                      </option>
+                    ))}
+                  </select>
+                  {chosen && chosen.pages === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => void convertDeck(chosen.name, chosen.pdfUrl)}
+                      disabled={busy}
+                    >
+                      쪽 그림 만들기
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => addFromInput()}
+                      disabled={busy || pickedDeck.length === 0}
+                    >
+                      추가
+                    </button>
+                  )}
+                  {chosen && chosen.pages > 0 && !busy && (
+                    <button
+                      type="button"
+                      onClick={() => void convertDeck(chosen.name, chosen.pdfUrl)}
+                      title="PDF 를 고쳤으면 다시 만드세요. 옛 쪽은 지워집니다"
+                    >
+                      다시 만들기
+                    </button>
+                  )}
+                </>
+              );
+            })()
+          )
         ) : addKind === 'video' ? (
           /*
             동영상 — 파일 **하나**를 고른다 (그림 폴더와 다르다).
@@ -253,6 +317,19 @@ export function PlanAddBar({
             const warning = videos.find((file) => file.name === pickedVideo)?.warning;
             return warning ? <p className="hintline error">⚠ {warning}</p> : null;
           })()}
+
+        {/*
+          바꾸는 동안 **몇 쪽까지 됐는지** 보여 준다. 100쪽짜리는 한참 걸리는데
+          아무 표시가 없으면 멈춘 줄 알고 다시 누른다.
+        */}
+        {addKind === 'pdf' && converting && (
+          <p className="hintline">
+            {converting.name} — {converting.total > 0
+              ? `${converting.page} / ${converting.total}쪽`
+              : '여는 중…'}
+          </p>
+        )}
+        {addKind === 'pdf' && deckError && <p className="hintline error">⚠ {deckError}</p>}
 
         {addKind === 'order' && (
           <div className="candidates">

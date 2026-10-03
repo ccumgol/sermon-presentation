@@ -173,8 +173,16 @@ export function listBackgroundFolders(): { library: BackgroundFolder[]; data: Ba
  * 폴더 이름은 부르는 쪽이 이미 걸렀다고 보지 않는다 — **여기서 다시 막는다.**
  * 두 곳에서 따로 막으면 한쪽이 뒤처진다 (`safeBackgroundName` 과 같은 규칙).
  */
-export function listSlideshow(source: 'library' | 'data', folder: string): BackgroundFile[] {
+export function listSlideshow(source: 'library' | 'data' | 'deck', folder: string): BackgroundFile[] {
   if (folder.includes('/') || folder.includes('\\') || folder.startsWith('.')) return [];
+  /*
+   * `deck` 은 PDF 를 바꾼 쪽 그림이다 (2026-10-03). 폴더 **안**만 본다 —
+   * 꾸러미 이름이 곧 폴더라 뿌리를 훑을 일이 없고, 훑으면 PDF 원본까지 걸린다.
+   */
+  if (source === 'deck') {
+    if (folder.length === 0) return [];
+    return scanFolder(path.join(paths.decksDir, folder), `/decks/${encodeURIComponent(folder)}/`);
+  }
   const root = source === 'data' ? paths.backgroundsDir : paths.backgroundSourceDir;
   const prefix = source === 'data' ? '/backgrounds/' : '/background-library/';
   return folder.length === 0
@@ -197,7 +205,8 @@ export async function registerBackgroundRoutes(app: FastifyInstance): Promise<vo
   app.get<{ Querystring: { source?: string; folder?: string } }>(
     '/api/backgrounds/slideshow',
     async (request) => {
-      const source = request.query.source === 'data' ? 'data' : 'library';
+      const source =
+        request.query.source === 'data' ? 'data' : request.query.source === 'deck' ? 'deck' : 'library';
       return ok({ source, folder: request.query.folder ?? '', files: listSlideshow(source, request.query.folder ?? '') });
     },
   );

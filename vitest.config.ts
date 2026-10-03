@@ -50,7 +50,14 @@ export default defineConfig({
        * `src/` 커버리지 0 이 **숫자로 보이지 않았다.** 재지 않으면 늘지도 않는다.
        */
       include: ['lib/**/*.ts', 'server/**/*.ts', 'src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/**/*.d.ts', 'src/control/main.tsx'],
+      /*
+       * `pdfPages.ts` 는 **jsdom 에서 잴 수 없다** (2026-10-03). PDF 를 그리려면
+       * 진짜 canvas 2D 렌더러와 pdf.js 작업자 스레드가 있어야 하는데 jsdom 에는
+       * 둘 다 없다. 흉내로 감싸면 **흉내를 검사하는 것**이 되어 값이 없다.
+       * 대신 실제 브라우저에서 5쪽 PDF 를 끝까지 바꿔 확인했다
+       * (1920×1080 WebP · 쪽 차례 · 출력 화면 렌더까지).
+       */
+      exclude: ['src/**/*.d.ts', 'src/control/main.tsx', 'src/control/pdfPages.ts'],
       /**
        * 문턱을 **묶음별로** 준다.
        *
@@ -106,6 +113,11 @@ export default defineConfig({
          *     있는지가 여기서 정해진다. 끊어진 바로가기 하나에 목록이 죽지 않는 것까지)
          *   · `ws.ts` 의 동영상 조작·상태 중계
          * 실측 문장 83.95 · 분기 78.05 · 함수 86.41 · 줄 85.49.
+         *
+         * 2026-10-03 PDF 꾸러미를 넣으며 다시 쟀다 — 문장 84.00 · 분기 78.03 ·
+         * 함수 86.34 · 줄 85.68. `routes/decks.ts` 는 **울타리마다 검사를 붙였다**
+         * (루프백·원본 확인·용량·이름·WebP 앞머리). 업로드를 다시 여는 자리라
+         * 울타리가 서 있는지가 곧 보안 S-1 의 재발 여부다.
          */
         'server/**': { lines: 85, functions: 86, branches: 78, statements: 83 },
         /**
@@ -139,6 +151,7 @@ export default defineConfig({
          * 숨겼다 (2026-09-29).
          */
         'src/**': { lines: 38, functions: 30, branches: 34, statements: 38 },
+        // 2026-10-03 실측: 문장 38.50 · 분기 34.63 · 함수 30.77 · 줄 39.75
       },
     },
   },

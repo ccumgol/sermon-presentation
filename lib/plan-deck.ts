@@ -55,6 +55,8 @@ export function describeItem(item: CueItem): string {
     case 'divider':
       return item.label;
     case 'slideshow':
+      // PDF 꾸러미는 폴더 이름이 곧 꾸러미 이름이다 (`decks/선교보고/`)
+      if (item.source === 'deck') return item.label ?? item.folder;
       /*
        * **아이콘을 붙이지 않는다.** 목록이 `ITEM_ICONS` 로 이미 붙인다 —
        * 여기서 또 넣으면 `🖼🖼 그림 폴더` 가 된다 (2026-08-30 화면에서 걸렸다).

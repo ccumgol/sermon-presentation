@@ -339,7 +339,7 @@ export const api = {
     }>('/api/backgrounds'),
 
   /** 슬라이드쇼 한 폴더의 그림 — 순서표가 폴더만 담으므로 띄울 때 읽는다 */
-  slideshow: (source: 'library' | 'data', folder: string) =>
+  slideshow: (source: 'library' | 'data' | 'deck', folder: string) =>
     get<{ source: string; folder: string; files: BackgroundFile[] }>(
       `/api/backgrounds/slideshow?source=${encodeURIComponent(source)}&folder=${encodeURIComponent(folder)}`,
     ),
@@ -354,6 +354,24 @@ export const api = {
       files: Array<{ name: string; bytes: number; url: string; risk: 'ok' | 'risky'; warning?: string }>;
       dir: string;
     }>('/api/videos'),
+
+  /**
+   * PDF 꾸러미 목록 (2026-10-03). `데이터 폴더/decks/` 에 넣은 PDF 와,
+   * 이미 바꿔 둔 쪽 수가 함께 온다.
+   */
+  decks: () =>
+    get<{
+      decks: Array<{ name: string; pdfUrl: string; bytes: number; pages: number; pageBytes: number }>;
+      dir: string;
+    }>('/api/decks'),
+
+  /** 쪽 하나를 보낸다. `reset` 은 첫 쪽에서만 — 옛 결과를 지운다 */
+  putDeckPage: (name: string, page: number, data: string, reset: boolean) =>
+    send<{ name: string; page: number; bytes: number }>(
+      'POST',
+      `/api/decks/${encodeURIComponent(name)}/pages`,
+      { page, data, reset },
+    ),
 
   templates: () => get<Template[]>('/api/templates'),
   createTemplate: (template: Partial<Template>) => send<Template>('POST', '/api/templates', template),

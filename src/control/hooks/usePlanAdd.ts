@@ -29,6 +29,16 @@ import type { CueItem } from '../../../shared/types.ts';
 import { api, ApiError, type ReadingBook, type ReadingSummary } from '../api.ts';
 import type { PlanDraft } from './usePlanDraft.ts';
 
+/** 추가 바에서 고를 PDF 꾸러미 한 줄 */
+export interface DeckChoice {
+  name: string;
+  pdfUrl: string;
+  bytes: number;
+  /** 이미 바꿔 둔 쪽 수. 0 이면 아직 안 바꾼 것이다 */
+  pages: number;
+  pageBytes: number;
+}
+
 /** 추가 바에서 고를 동영상 한 줄 */
 export interface VideoChoice {
   name: string;
@@ -109,6 +119,60 @@ export function usePlanAdd(options: PlanAddOptions) {
   const [pickedVideo, setPickedVideo] = useState('');
   const [videos, setVideos] = useState<VideoChoice[]>([]);
   const [videoDir, setVideoDir] = useState('');
+
+  /**
+   * PDF 꾸러미 (2026-10-03). 동영상과 같은 길이다 — 고를 때 폴더를 다시 읽는다.
+   *
+   * `converting` 은 지금 바꾸는 중인 꾸러미 이름이다. 100쪽짜리는 한참 걸리므로
+   * **몇 쪽까지 됐는지** 보여 줘야 한다 — 멈춘 것으로 보이면 사람이 다시 누른다.
+   */
+  const [pickedDeck, setPickedDeck] = useState('');
+  const [decks, setDecks] = useState<DeckChoice[]>([]);
+  const [deckDir, setDeckDir] = useState('');
+  const [converting, setConverting] = useState<{ name: string; page: number; total: number } | null>(null);
+  const [deckError, setDeckError] = useState<string | null>(null);
+
+  const reloadDecks = useCallback(async () => {
+    try {
+      const { decks: found, dir } = await api.decks();
+      setDecks(found);
+      setDeckDir(dir);
+    } catch {
+      setDecks([]);
+    }
+  }, []);
+
+  /**
+   * 고른 PDF 를 쪽 그림으로 바꾼다.
+   *
+   * **한 쪽씩 보낸다.** 전부 모아 한 번에 보내면 100쪽이 메모리에 쌓이고,
+   * 끊기면 아무것도 안 남는다. 첫 쪽에만 `reset` 을 실어 옛 결과를 지운다 —
+   * 안 지우면 20쪽이던 것을 10쪽으로 바꿨을 때 뒤의 10장이 남는다.
+   */
+  const convertDeck = useCallback(
+    async (name: string, pdfUrl: string) => {
+      setDeckError(null);
+      setConverting({ name, page: 0, total: 0 });
+      try {
+        const { convertPdf } = await import('../pdfPages.ts');
+        await convertPdf(
+          pdfUrl,
+          async (image, progress) => {
+            await api.putDeckPage(name, image.page, image.data, image.page === 1);
+            setConverting({ name, page: progress.page, total: progress.total });
+          },
+          (progress) => setConverting({ name, page: progress.page, total: progress.total }),
+        );
+        await reloadDecks();
+        setPickedDeck(name);
+      } catch (err) {
+        setDeckError(err instanceof Error ? err.message : 'PDF 를 바꾸지 못했습니다');
+      } finally {
+        setConverting(null);
+      }
+    },
+    [reloadDecks],
+  );
 
   const reloadVideos = useCallback(async () => {
     try {
@@ -358,6 +422,13 @@ export function usePlanAdd(options: PlanAddOptions) {
       insertItem({ id: newItemId(), type: 'blank' });
       return;
     }
+    if (addKind === 'pdf') {
+      if (pickedDeck.length === 0) return;
+      // 꾸러미 이름이 곧 폴더다 — 그림은 `decks/<이름>/` 안에 있다
+      insertItem({ id: newItemId(), type: 'slideshow', source: 'deck', folder: pickedDeck });
+      setPickedDeck('');
+      return;
+    }
     if (addKind === 'video') {
       if (pickedVideo.length === 0) return;
       insertItem({ id: newItemId(), type: 'video', file: pickedVideo, advanceOnEnd: true });
@@ -421,6 +492,7 @@ export function usePlanAdd(options: PlanAddOptions) {
   function pickKind(kind: AddKind): void {
     // 동영상을 고를 때마다 폴더를 다시 읽는다 — 방금 USB 에서 넣은 파일이 보이게
     if (kind === 'video') void reloadVideos();
+    if (kind === 'pdf') void reloadDecks();
     if (kind === addKind) {
       addRef.current?.focus(); // 요소가 그대로면 지금 잡아도 된다
       return;
@@ -526,6 +598,7 @@ export function usePlanAdd(options: PlanAddOptions) {
     /** 그림 폴더 고르기 */
     pickedFolder, setPickedFolder,
     pickedVideo, setPickedVideo, videos, videoDir, reloadVideos,
+    pickedDeck, setPickedDeck, decks, deckDir, reloadDecks, convertDeck, converting, deckError,
     /** 입력칸에 걸 ref */
     addRef,
     // ── 넣는 길들 ──

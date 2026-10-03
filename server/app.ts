@@ -42,6 +42,7 @@ import { bibleMissingMessage, isPackagedApp } from '../lib/bible-missing.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTemplateRoutes } from './routes/templates.ts';
 import { registerVideoRoutes } from './routes/videos.ts';
+import { registerDeckRoutes } from './routes/decks.ts';
 import { getState, initState } from './state.ts';
 import { appVersion } from './version.ts';
 import type { Template } from '../shared/types.ts';
@@ -265,6 +266,21 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   });
 
   /**
+   * PDF 와 그것을 바꾼 쪽 그림 (`data/decks/`) — 2026-10-03.
+   *
+   * 조작 화면이 원본 PDF 를 **여기서 읽어** 쪽을 그린다. 바꾼 그림도 여기서 나간다.
+   */
+  await app.register(fastifyStatic, {
+    root: paths.decksDir,
+    prefix: '/decks/',
+    decorateReply: false,
+    index: false,
+    setHeaders(res) {
+      res.header('Cache-Control', 'public, max-age=3600');
+    },
+  });
+
+  /**
    * 사용자가 모아 둔 배경 그림 폴더 (`~/Desktop/Data/Background`).
    *
    * **읽기만 한다** — 올리기·삭제·총량 상한은 `data/backgrounds/` 쪽 얘기다.
@@ -366,6 +382,7 @@ export async function buildApp(options: BuildAppOptions): Promise<BuiltApp> {
   await registerBackupRoutes(app);
   await registerBackgroundRoutes(app);
   await registerVideoRoutes(app);
+  await registerDeckRoutes(app);
 
   await registerTemplateRoutes(app, {
     onTemplateChanged: (template) => options.onTemplateChanged?.(template),

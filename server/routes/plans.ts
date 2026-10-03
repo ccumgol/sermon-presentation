@@ -367,7 +367,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
 
       case 'slideshow': {
         const show = item as Extract<CueItem, { type: 'slideshow' }>;
-        const source = show.source === 'data' ? 'data' : 'library';
+        const source = show.source === 'data' ? 'data' : show.source === 'deck' ? 'deck' : 'library';
         /*
          * 폴더 이름은 **한 칸만** 받는다. `..` 이나 경로 구분자가 들어오면 배경 폴더
          * 밖을 읽게 된다 — 그림 이름을 거르는 것(`safeBackgroundName`)과 같은 이유다.

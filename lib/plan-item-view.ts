@@ -88,7 +88,7 @@ export function shortEntryLabel(entries: readonly SongEntry[]): string {
 /** 추가 바에서 고를 수 있는 항목 종류 */
 export type AddKind =
   | 'bible' | 'song' | 'liturgy' | 'reading' | 'order' | 'notice' | 'quote' | 'slideshow'
-  | 'video' | 'blank' | 'divider';
+  | 'video' | 'pdf' | 'blank' | 'divider';
 
 export const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: string; hint: string }> = [
   { kind: 'bible', icon: '📖', label: '성경', hint: '요 3:16 · 시 23 · 롬 8:28-30' },
@@ -100,6 +100,7 @@ export const ADD_KINDS: ReadonlyArray<{ kind: AddKind; icon: string; label: stri
   { kind: 'quote', icon: '💬', label: '인용구', hint: '설교 중 띄울 성경 절 — 창 1:1-6 을 넣으면 낱개 6줄이 됩니다' },
   { kind: 'slideshow', icon: '🖼', label: '그림 폴더', hint: '폴더를 고르면 그 안의 그림이 순서대로 — 한 장이면 그대로 걸립니다' },
   { kind: 'video', icon: '🎬', label: '동영상', hint: '데이터 폴더의 videos/ 에 넣은 파일 — 소리는 OBS 로 나갑니다' },
+  { kind: 'pdf', icon: '📄', label: 'PDF', hint: '데이터 폴더의 decks/ 에 넣은 PDF — 쪽마다 한 장이 됩니다 (파워포인트·키노트는 PDF 로 내보내세요)' },
   { kind: 'blank', icon: '⬛', label: '공백', hint: '화면을 비웁니다' },
   { kind: 'divider', icon: '▾', label: '구분', hint: '예배 부름 · 찬양 · 말씀 …' },
 ];

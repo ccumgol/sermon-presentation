@@ -111,6 +111,21 @@ export const paths = {
    */
   videosDir: path.join(DATA_DIR, 'videos'),
   /**
+   * PDF 와 그것을 쪽마다 그림으로 바꾼 것 (2026-10-03 사용자 결정).
+   *
+   * ```
+   * decks/
+   *   선교보고.pdf          ← 사람이 넣는다
+   *   선교보고/             ← 앱이 만든다
+   *     0001.webp …
+   * ```
+   *
+   * **올려 받지 않는다.** 업로드는 보안 S-1(총량 제한이 없어 디스크가 차면 가사를
+   * 잃는다) 때문에 2026-08-18 에 통째로 걷어낸 자리다. 자료 꾸러미·동영상과 같은
+   * 길로 간다 — 사람이 폴더에 넣고 서버가 읽는다.
+   */
+  decksDir: path.join(DATA_DIR, 'decks'),
+  /**
    * 빌드 리포트는 자기가 만든 DB 와 같은 위치에 둔다.
    * APP_ROOT 아래에 두었을 때, SERMON_DATA_DIR 을 바꿔 실행한 시험 빌드의 리포트가
    * 실제 리포트 폴더에 섞여 "어느 파일로 빌드했는지"를 잘못 알려주는 일이 있었다.
@@ -125,7 +140,7 @@ export const paths = {
 export function ensureDataDirs(): void {
   for (const dir of [
     paths.dataDir, paths.fontsDir, paths.backupsDir, paths.reportsDir, paths.backgroundsDir,
-    paths.videosDir,
+    paths.videosDir, paths.decksDir,
   ]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
