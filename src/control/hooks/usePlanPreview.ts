@@ -21,7 +21,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { splitOrderText } from '../../../lib/plan-deck.ts';
 import { quoteSlides } from '../../../lib/verse-quotes.ts';
 import { paginateByMeasure } from '../../../lib/paginator.ts';
-import { textVariantLabel } from '../../../lib/plan-item-view.ts';
+import { textVariantLabel, pickFit } from '../../../lib/plan-item-view.ts';
 import {
   DEFAULT_LITURGY_PER_SLIDE,
   liturgyLines,
@@ -173,7 +173,7 @@ export function usePlanPreview(options: {
             kind: 'image' as const,
             src: file.url,
             alt: file.name,
-            ...(item.fit === 'cover' ? { fit: 'cover' as const } : {}),
+            ...(pickFit(item.fit) ? { fit: pickFit(item.fit)! } : {}),
           })),
           /*
            * PDF 꾸러미는 **쪽 번호**로 적는다. 파일 이름(`0001`)이 그대로 보이면
@@ -209,7 +209,7 @@ export function usePlanPreview(options: {
               kind: 'video' as const,
               src: found.url,
               title: found.name,
-              ...(item.fit === 'cover' ? { fit: 'cover' as const } : {}),
+              ...(pickFit(item.fit) ? { fit: pickFit(item.fit)! } : {}),
               ...(item.startAt ? { startAt: item.startAt } : {}),
               ...(item.advanceOnEnd ? { advanceOnEnd: true } : {}),
               ...(item.loop ? { loop: true } : {}),

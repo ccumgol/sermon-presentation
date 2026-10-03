@@ -170,6 +170,53 @@ export function PlanItemEditor({
             </>
           )}
 
+          {/*
+            화면 맞춤 — 그림 폴더·PDF·동영상 (2026-10-03 사용자 요청).
+
+            **여태 고를 길이 아예 없었다.** 타입에는 `fit` 이 있었지만 화면에
+            내준 적이 없어서 전부 기본값(다 보이게)으로만 나갔다. 16:9 가 아닌
+            자료를 띄우면 여백이 생기는데 손쓸 방법이 없었다.
+          */}
+          {(current.type === 'slideshow' || current.type === 'video') && (
+            <div className="row detail-controls">
+              <label title="16:9 가 아닌 자료를 화면에 어떻게 앉힐지">화면 맞춤</label>
+              <span className="candidates">
+                {(
+                  [
+                    ['contain', '다 보이게', '잘리지 않습니다 — 남는 자리에 여백이 생깁니다'],
+                    ['cover', '채우기 (잘림)', '비율을 지키고 넘치는 쪽을 자릅니다'],
+                    ['fill', '채우기 (늘림)', '비율을 무시하고 꽉 채웁니다 — 그림이 늘어납니다'],
+                  ] as const
+                ).map(([value, label, hint]) => {
+                  // 기본값은 '다 보이게' 다 — 값이 없으면 그것이 켜진 것으로 보인다
+                  const active = (current.fit ?? 'contain') === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      className={active ? 'primary' : undefined}
+                      title={hint}
+                      onClick={() =>
+                        patchItems(
+                          items.map((i) =>
+                            i.id === current.id
+                              ? // 기본값은 **지운다** — 순서표에 쓸데없는 값을 남기지 않는다
+                                value === 'contain'
+                                ? { ...i, fit: undefined }
+                                : { ...i, fit: value }
+                              : i,
+                          ),
+                        )
+                      }
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </span>
+            </div>
+          )}
+
           {current.type === 'song' && (
             <div className="row detail-controls">
               {/*

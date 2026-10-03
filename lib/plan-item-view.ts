@@ -8,7 +8,7 @@
  * React 를 쓰지 않는다. 화면을 그리는 것은 `src/control/` 에 남는다.
  */
 
-import type { CueItem, ItemTextStyle, SlidePayload, SongEntry } from '../shared/types.ts';
+import type { BackgroundFit, CueItem, ItemTextStyle, SlidePayload, SongEntry } from '../shared/types.ts';
 import { isSectionStart, verseNumberPrefix } from './song-slides.ts';
 
 /** 성경 탭과 같은 한도 — 세 역본을 넘기면 한 화면에 들어가지 않는다 */
@@ -240,4 +240,18 @@ export function itemMeta(item: CueItem): string {
     default:
       return '';
   }
+}
+
+/**
+ * 순서표에 담거나 화면으로 보낼 **화면 맞춤** 값을 고른다 (2026-10-03).
+ *
+ * 기본값(`contain`)과 모르는 값은 **`undefined`** 로 떨어뜨린다 — 기본값을 굳이
+ * 적어 두면 순서표가 지저분해지고, 모르는 값은 그리는 쪽에서 어차피 기본으로 간다.
+ *
+ * 이 함수가 생긴 이유: 전에는 네 곳이 저마다 `fit === 'cover'` 만 통과시켰다.
+ * 그래서 `fill` 을 더했을 때 **고르면 켜지는데 저장하면 사라졌다** —
+ * 한 곳에 모아 두지 않으면 값이 늘 때마다 같은 자리를 네 번 고쳐야 한다.
+ */
+export function pickFit(raw: unknown): BackgroundFit | undefined {
+  return raw === 'cover' || raw === 'fill' ? raw : undefined;
 }

@@ -6,7 +6,7 @@
  */
 
 import { MAX_LANGS } from '../../lib/lang-select.ts';
-import { isHymnalSongbook } from '../../lib/plan-item-view.ts';
+import { isHymnalSongbook, pickFit } from '../../lib/plan-item-view.ts';
 import { PREVIEW_MAX } from '../../lib/verse-quotes.ts';
 import type { FastifyInstance } from 'fastify';
 
@@ -382,7 +382,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           type: 'slideshow',
           source,
           folder,
-          ...(show.fit === 'cover' ? { fit: 'cover' as const } : {}),
+          ...(pickFit(show.fit) ? { fit: pickFit(show.fit)! } : {}),
           ...(typeof show.label === 'string' && show.label.trim().length > 0
             ? { label: show.label.trim() }
             : {}),
@@ -415,7 +415,7 @@ export function normalizeItems(raw: unknown): { items: CueItem[]; rejected: stri
           id,
           type: 'video',
           file,
-          ...(video.fit === 'cover' ? { fit: 'cover' as const } : {}),
+          ...(pickFit(video.fit) ? { fit: pickFit(video.fit)! } : {}),
           ...(startAt !== undefined ? { startAt } : {}),
           ...(video.advanceOnEnd ? { advanceOnEnd: true } : {}),
           ...(video.loop ? { loop: true } : {}),

@@ -618,6 +618,24 @@
    * 배경이 아니라 **내용**이므로 기본이 `contain` 이다. 안내문은 잘리면 읽을 수 없다
    * (배경은 화면을 채워야 하므로 `cover` 가 기본이다 — 반대다).
    */
+  /**
+   * 화면 맞춤 → CSS 클래스 (2026-10-03 사용자 요청).
+   *
+   * | | 무엇 |
+   * |---|---|
+   * | `contain` | 다 보이게 (기본). 모르는 값이 와도 여기로 떨어진다 |
+   * | `cover` | 채운다 · 비율 지킴 · **잘림** |
+   * | `fill` | 채운다 · **비율 무시** · 늘어남 |
+   *
+   * 모르는 값을 `contain` 으로 떨어뜨리는 것이 중요하다 — 옛 순서표나 손으로 고친
+   * 값이 들어와도 **잘리거나 찌그러지지 않는다.** 여백이 생기는 쪽이 덜 나쁘다.
+   */
+  function fitClass(fit) {
+    if (fit === 'cover') return 'fit-cover';
+    if (fit === 'fill') return 'fit-fill';
+    return 'fit-contain';
+  }
+
   function renderImage(payload) {
     clearChildren(el.blocks);
     setOptional(el.heading, null);
@@ -629,7 +647,7 @@
     var img = document.createElement('img');
     img.alt = payload.alt || '';
     img.src = payload.src;
-    img.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
+    img.className = fitClass(payload.fit);
 
     box.appendChild(img);
     el.blocks.appendChild(box);
@@ -714,7 +732,7 @@
      * 상태 메시지 하나에 다시 돌아가면 안 된다.
      */
     if (videoEl && videoKey === payload.src) {
-      videoEl.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
+      videoEl.className = fitClass(payload.fit);
       if (carriesAudio() && typeof payload.volume === 'number') {
         videoEl.volume = Math.max(0, Math.min(1, payload.volume));
       }
@@ -730,7 +748,7 @@
     box.className = 'video-slide';
 
     var video = document.createElement('video');
-    video.className = payload.fit === 'cover' ? 'fit-cover' : 'fit-contain';
+    video.className = fitClass(payload.fit);
     video.src = payload.src;
     video.setAttribute('playsinline', '');
     video.preload = 'auto';

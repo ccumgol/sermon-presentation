@@ -18,8 +18,19 @@
 
 import { MAX_DECK_PAGES } from '../../lib/deck-files.ts';
 
-/** 긴 변 기준. 1920 이면 프로젝터·OBS 어디에 내도 충분하고 용량이 과하지 않다 */
-const TARGET_WIDTH = 1920;
+/**
+ * **긴 변** 기준 (2026-10-03 에 바로잡았다).
+ *
+ * 전에는 **가로만** 1920 에 맞췄다. 가로 자료는 그래서 멀쩡했지만 **A4 세로 쪽이
+ * 1920×2717** 이 됐다 — 1080p 화면에 «맞추기» 로 넣으면 763×1080 만 쓰이므로
+ * **픽셀의 2.5배가 버려진다** (실측). 그 줄의 주석은 «긴 변을 맞춘다» 라고
+ * 적혀 있었는데 코드가 그렇지 않았다.
+ *
+ * 긴 변 기준이면 A4 세로가 1357×1920 이 된다. «가득 채우기(잘림)» 로 쓸 때는
+ * 1.4배 확대라 조금 무르지만, **문서 쪽을 잘라 쓰는 일은 드물다** — 그 쪽은
+ * 내용을 잃는 선택이다. 흔한 쪽(맞추기)을 위해 용량을 줄이는 편이 낫다.
+ */
+const TARGET_LONG_EDGE = 1920;
 
 /** 0~1. 0.82 는 사진 슬라이드에서 눈에 띄는 손상 없이 확실히 작아지는 값이다 */
 const QUALITY = 0.82;
@@ -96,9 +107,11 @@ export async function convertPdf(
 
     for (let page = 1; page <= total; page += 1) {
       const rendered = await doc.getPage(page);
-      // 원래 크기를 재서 목표 폭에 맞춘다 — 4:3 이든 16:9 든 긴 변을 맞춘다
+      // 원래 크기를 재서 **긴 변**을 목표에 맞춘다 (가로 자료든 세로 자료든)
       const base = rendered.getViewport({ scale: 1 });
-      const viewport = rendered.getViewport({ scale: TARGET_WIDTH / base.width });
+      const viewport = rendered.getViewport({
+        scale: TARGET_LONG_EDGE / Math.max(base.width, base.height),
+      });
 
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(viewport.width);
