@@ -82,6 +82,13 @@ function main(): void {
   console.log('');
   console.log(`  모두 ${formatBytes(total)}`);
   console.log('');
+  /*
+   * **안 담기는 것을 먼저 말한다** (2026-10-08 사용자 결정).
+   * 받는 쪽은 순서표가 가리키는 영상·PDF 가 없어 놀라게 된다 — 미리 알려 둔다.
+   */
+  console.log('  ※ 동영상(videos/)과 PDF(decks/)는 담기지 않습니다 — 그 PC 에서 쓰는 것이라');
+  console.log('    받는 쪽에서 자기 파일을 그 폴더에 넣으세요 (폴더는 앱이 만들어 둡니다).');
+  console.log('');
   console.log('  받는 PC 에서: 앱의 **설정 탭 → 데이터 폴더 열기** 를 누르고,');
   console.log(`  이 폴더를 그 안에 **install** 이라는 이름으로 넣은 뒤`);
   console.log('  설정 탭의 **자료 설치** 를 누르세요.');

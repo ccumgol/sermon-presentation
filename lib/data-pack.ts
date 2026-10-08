@@ -36,6 +36,24 @@ export const DATA_PACK_FORMAT = 'sermon-data-pack';
 /** 꾸러미에 담기는 DB — 이름이 곧 데이터 폴더에서의 이름이다 */
 export const PACK_DATABASES = ['bible.sqlite', 'songs.sqlite', 'app.sqlite'] as const;
 
+/**
+ * **폴더는 담지 않는다** (2026-10-08 사용자 결정).
+ *
+ * 전에는 악보(`sheets/`)를 담았고, 1.1.0 에서 악보 기능을 없애며 폴더 항목이
+ * 통째로 빠졌다. 그 뒤에 `videos/`(동영상)와 `decks/`(PDF 쪽 그림)가 생겼는데
+ * **일부러 담지 않는다** — 그 주일 그 PC 에서 쓰는 것이고, 받는 쪽은 자기 영상·
+ * PDF 를 쓰기 때문이다.
+ *
+ * ⚠️ **빠뜨린 것이 아니다.** 「폴더가 안 담기네」 하고 되살리지 말 것.
+ * 되살리려면 그것은 **사용자 결정을 뒤집는 일**이다.
+ *
+ * 받는 쪽에서 생기는 일: 순서표(`app.sqlite`)는 영상·PDF 를 **이름으로 가리키므로**,
+ * 그 항목은 오는데 파일이 없어 «동영상 파일이 없습니다» 가 뜬다. 그래서
+ * **설치 계획 표와 안내문이 미리 말해 준다** (`DataPackCard` · `scripts/data-pack.ts`).
+ * 폴더 자체는 앱이 켜질 때 만든다 (`ensureDataDirs`).
+ */
+export const PACK_SKIPPED_FOLDERS = ['videos', 'decks'] as const;
+
 export interface DataPackEntry {
   name: string;
   bytes: number;

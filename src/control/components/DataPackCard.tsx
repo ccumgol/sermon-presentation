@@ -141,6 +141,17 @@ export function DataPackCard(): React.JSX.Element {
             바꾸기 전에 <b>지금 자료를 백업</b>합니다 (<code>backups/</code>).
             백업이 실패하면 아무것도 바꾸지 않고 멈춥니다.
           </p>
+
+          {/*
+            **안 담기는 것을 말해 준다** (2026-10-08 사용자 결정).
+            순서표는 동영상·PDF 를 이름으로 가리키므로, 받은 쪽에서 그 항목을 열면
+            «파일이 없습니다» 가 뜬다. 미리 알면 놀라지 않는다.
+          */}
+          <p className="hintline muted">
+            <b>동영상과 PDF 는 담기지 않습니다.</b> 순서표에 그 항목이 있으면 받은 뒤
+            <code>videos/</code> · <code>decks/</code> 에 파일을 직접 넣으세요
+            (폴더는 이미 만들어져 있습니다).
+          </p>
         </>
       )}
 
