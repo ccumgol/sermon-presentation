@@ -484,7 +484,7 @@ WebSocket (실제 조작 경로)
 
 ---
 
-## 10. 의존성 경고가 다시 생겼다 — 🔴 열림 (2026-11-05, Agent C)
+## 10. 의존성 경고가 다시 생겼다 — ✅ 해결 (2026-11-05, Agent C · 판 1.4.3)
 
 **S-4 로 2026-09-07 에 `npm audit` 0건을 만들었는데, 그 뒤 새 권고가 나와 다시 생겼다.**
 코드가 나빠진 것이 아니라 바깥에서 새로 찾아진 것이다 — 그래서 한 번 0 으로 만든 것으로
@@ -512,3 +512,36 @@ Host·Origin 검사), 앱 창은 우리 페이지만 연다(S-6). 그래서 **�
 `tsc` · `vitest` · `vite build` · `--coverage` → 격리 서버로 기동·WS·S-2 의 403 →
 `electron` 은 설치판을 **실제로 띄워** 확인(CLAUDE.md '설치판에서만 나타나는 함정').
 S-4 때와 같은 방법이다.
+
+### 조치 (같은 날, 사용자 승인)
+
+`npm audit fix`(호환 범위, `--force` 없이) + `vitest`·`@vitest/coverage-v8` 짝을 4.1.12 로.
+`audit fix` 가 vitest 를 못 올린 것은 두 패키지가 판을 맞춰야 해서다 — 짝으로 올리니 풀렸다.
+
+| | 전 | 후 |
+|---|---|---|
+| `npm audit --omit=dev` (배포 코드) | 7건 (높음 1) | **0건** |
+| `fastify` · `@fastify/static` | 5.12.3 · 10.1.3 | 5.12.8 · 10.1.10 |
+| `electron` (설치판) | 44.2.0 (높음) | 44.10.2 (경고 없음) |
+| `npm audit` 전체 | 21건 | **6건 (전부 보통)** |
+
+**남긴 6건 — `electron-builder` 쪽 (`app-builder-lib` · `dmg-builder` · `minimatch` …).**
+설치 파일을 **만드는** 도구라 받는 PC 에는 실리지 않고, 우리 PC 에서 우리 파일만 다룬다.
+npm 이 내놓는 '해결' 은 26.x 를 **25.1.0 으로 내리는** 것이라(큰 판을 거꾸로) 받지 않았다.
+electron-builder 가 고친 판을 내면 그때 올린다.
+
+**확인** (S-4 때와 같은 방법):
+- `tsc` 0 · `vitest` 2,109 · `vite build` · `--coverage` 문턱 통과
+- 격리 서버 7870: 정적 파일(조작·출력·프로젝터) · 찬양 검색 · **S-2 의 거부 셋**(나쁜 Origin
+  POST 403 · 위조 Host 로 내보내기 403 · 경로 이탈 403) · WS 루프백 열림 / 나쁜 Origin **401** ·
+  브라우저로 요 3:16 을 송출해 출력 페이지에 뜨는 것, 콘솔 오류 0
+- **설치판을 실제로 띄웠다**: `dist:mac` 으로 만든 1.4.3 `.app`(arm64)을 격리 데이터 폴더와
+  포트 7871 로 실행 — 실린 것이 `electron` 44.10.2 · `fastify` 5.12.8 인 것을 앱 안에서 확인,
+  `/api/info` 가 1.4.3, 조작·출력·프로젝터 200, 나쁜 Origin 403, `crash.log` 없음.
+  사용자의 `/Applications` 앱과 `Application Support` 자료는 건드리지 않았다
+
+**새로 생긴 경고 하나 (고치지 않음)**: fastify 5.12.8 이 기동 때
+`FSTDEP023 disableRequestLogging option is deprecated` 를 찍는다(`server/app.ts:75`).
+**fastify 6 에서야 없어지는** 옵션이고 우리는 `^5` 에 묶여 있어 지금은 깨지지 않는다.
+새 `logController` API 로 바꾸는 것은 코드 변경이라 fastify 6 으로 올릴 때 함께 한다.
+

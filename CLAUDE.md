@@ -18,7 +18,7 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 전에 누가 무엇을 했는지 찾을 때 | [docs/work-log.md](docs/work-log.md) (작업 이력 전체) · [docs/CHANGELOG.md](docs/CHANGELOG.md) (요약) |
 | 데이터가 이상할 때 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) — 원본 자료 자체의 문제 목록 |
 | 찬양 자료를 밖에서 정리해 올 때 | [docs/SONG-IMPORT-FORMAT.md](docs/SONG-IMPORT-FORMAT.md) — 반입 형식 규격 |
-| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 조치. 2026-09-07 로 모두 닫았다가 **2026-11-05 에 §10(의존성 경고) 하나가 새로 열렸다** — 새로 여는 것이 있으면 여기에 적는다 |
+| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 조치. **모든 항목이 닫혀 있다** (마지막: §10 의존성 경고, 2026-11-05 · 1.4.3). 의존성 경고는 바깥에서 새로 생기니 가끔 `npm audit --omit=dev` 를 잰다 — 새로 여는 것이 있으면 여기에 적는다 |
 | 설치·구조를 알아야 할 때 | [README.md](README.md) |
 | **무엇이 언제 달라졌는지** 알아야 할 때 | [docs/VERSION-HISTORY.md](docs/VERSION-HISTORY.md) — 판별 변경 요약. **커밋할 때 함께 고친다** |
 | 배포판(맥·윈도우)을 만들 때 | [docs/PACKAGING.md](docs/PACKAGING.md) — 만드는 법과 **겪은 함정** |

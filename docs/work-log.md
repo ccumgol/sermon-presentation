@@ -2048,6 +2048,25 @@ WebSocket 만 자동 재연결하고 **JS 는 메모리에 있던 것 그대로*
 > **순서는 최신순**이다. 원래는 세 군데(진행 중 칸 · 로드맵 아래 · 8.1 절차 아래)에 흩어져
 > 있었고 그 안에서도 순서가 뒤섞여 있어 날짜로 다시 늘어놓았다. 새로 끝난 기록은 **맨 위**에 넣는다.
 
+- [완료 2026-11-05 / Agent C] 의존성 경고 조치 — SECURITY-AUDIT §10 (사용자 승인)
+  계획: `npm audit fix`(호환 범위, --force 없이) → 무엇이 바뀌었는지 lock 비교 →
+        tsc · vitest · vite build · --coverage → 격리 서버(7870)로 기동·WS·S-2 의 403 →
+        electron 은 설치판을 만들어 실제로 띄운다 → 판 1.4.3
+  ① 완료: `npm audit fix` + vitest 짝을 4.1.12 로 → **배포 코드 0건**.
+     fastify 5.12.3 → 5.12.8 · @fastify/static 10.1.3 → 10.1.10 · electron 44.2.0 → 44.10.2.
+     남은 6건(보통)은 전부 electron-builder 쪽 — npm 의 '해결' 이 25.1.0 으로 **내리는** 것이라 받지 않음.
+  ② 완료: tsc · vitest 2,109 · vite build · --coverage 문턱 · 격리 서버 7870
+     (정적 파일 · 찬양 검색 · S-2 의 403 셋 · 경로 이탈 403 · WS 열림/나쁜 Origin 401 ·
+     브라우저로 요 3:16 송출 → 출력 페이지에 뜸, 콘솔 오류 0)
+  ③ 완료: 판 **1.4.3** · 맥 `_core` 두 개(arm64 134MB · x64 141MB, release/).
+     빌드한 .app 을 격리 데이터 폴더·포트 7871 로 띄움 — 앱 안의 electron 44.10.2 ·
+     fastify 5.12.8 확인, /api/info 1.4.3, 화면 셋 200, 나쁜 Origin 403, crash.log 없음.
+     사용자의 /Applications 앱 · Application Support 자료 · 7777 은 건드리지 않았다.
+  발견: fastify 5.12.8 이 `disableRequestLogging` 폐지 예고(FSTDEP023)를 찍는다 —
+     fastify 6 에서야 없어진다. 고치지 않고 SECURITY-AUDIT §10 에 적었다.
+  못 한 것: `_full` · 윈도우 설치 파일은 만들지 않았다(나눠 줄 때 CI `build.yml`).
+  다음 단계: (없음)
+
 - [완료 2026-11-05 / Agent C] 협업 문서 정리 (사용자 요청)
   왜: 협업 설정을 점검해 보니 장치(AGENTS.md → CLAUDE.md 바로가기 · 착수 기록 규칙 ·
       8.1 이어받기 절차 · CI · 커밋에 Agent 이름)는 다 있는데, **매번 읽는 문서가 낡아**
