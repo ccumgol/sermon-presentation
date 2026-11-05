@@ -12,13 +12,13 @@ OBS 브라우저 소스로 송출한다. **예배 중에 도는 코드다** — 
 | 언제 | 무엇을 |
 |---|---|
 | **작업을 시작할 때 (매번)** | [docs/collaboration-report.md](docs/collaboration-report.md) — 작업 보드·진행 중 로그·인계 메모. **여기에 착수 기록을 쓴다** |
-| **무엇부터 할지 정할 때** | [docs/PLAN-next-2026-09-08.md](docs/PLAN-next-2026-09-08.md) — 우선순위와 착수 방법. **사용자 결정이 필요해 시작할 수 없는 것**도 갈라 두었다 |
+| **무엇부터 할지 정할 때** | [collaboration-report §6](docs/collaboration-report.md#6-인계-메모--다음-agent-에게) — 실측 수치와 우선순위. **따르기 전에 다시 잰다**(두 번 낡았다). 방법(R-4 · jsdom 함정)은 [PLAN-next](docs/PLAN-next-2026-09-08.md) |
 | 화면·기능이 왜 그렇게 생겼는지 알아야 할 때 | [PLAN.md](PLAN.md) (설계 근거) · [docs/USER-GUIDE.md](docs/USER-GUIDE.md) (탭별 사용법) |
 | 무언가 안 될 때 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — 증상 → 원인 → 조치. **먼저 여기를 본다** |
 | 전에 누가 무엇을 했는지 찾을 때 | [docs/work-log.md](docs/work-log.md) (작업 이력 전체) · [docs/CHANGELOG.md](docs/CHANGELOG.md) (요약) |
 | 데이터가 이상할 때 | [docs/KNOWN-DATA-ISSUES.md](docs/KNOWN-DATA-ISSUES.md) — 원본 자료 자체의 문제 목록 |
 | 찬양 자료를 밖에서 정리해 올 때 | [docs/SONG-IMPORT-FORMAT.md](docs/SONG-IMPORT-FORMAT.md) — 반입 형식 규격 |
-| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 조치. **2026-09-07 로 모든 항목이 닫혔다** — 새로 여는 것이 있으면 여기에 적는다 |
+| 보안을 건드릴 때 | [docs/SECURITY-AUDIT.md](docs/SECURITY-AUDIT.md) — 확인된 위험과 조치. 2026-09-07 로 모두 닫았다가 **2026-11-05 에 §10(의존성 경고) 하나가 새로 열렸다** — 새로 여는 것이 있으면 여기에 적는다 |
 | 설치·구조를 알아야 할 때 | [README.md](README.md) |
 | **무엇이 언제 달라졌는지** 알아야 할 때 | [docs/VERSION-HISTORY.md](docs/VERSION-HISTORY.md) — 판별 변경 요약. **커밋할 때 함께 고친다** |
 | 배포판(맥·윈도우)을 만들 때 | [docs/PACKAGING.md](docs/PACKAGING.md) — 만드는 법과 **겪은 함정** |
