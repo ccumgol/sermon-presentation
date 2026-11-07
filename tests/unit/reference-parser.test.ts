@@ -416,4 +416,11 @@ describe("끝을 '장' 으로 쓴 범위 (copyBible 리뷰에서 찾은 것)", (
     const result = parseReference('마 5:3-12; 6:9-7장');
     expect(result.ok && result.ranges).toEqual([range(40, 5, 3, 5, 12), range(40, 6, 9, 7, null)]);
   });
+
+  it("쉼표 뒤 구간에도 적용된다 — '요 3:16,18-4장' 은 3:16 과 3:18 부터 4장 끝까지", () => {
+    const result = parseReference('요 3:16,18-4장');
+    expect(result.ok && result.ranges).toEqual([range(43, 3, 16, 3, 16), range(43, 3, 18, 4, null)]);
+    const plain = parseReference('요 3:16, 18-20');
+    expect(plain.ok && plain.ranges).toEqual([range(43, 3, 16, 3, 16), range(43, 3, 18, 3, 20)]);
+  });
 });

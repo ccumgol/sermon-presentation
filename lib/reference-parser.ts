@@ -160,7 +160,7 @@ function parseTail(bookCode: number, tail: string): TailResult {
     const range =
       i === 0 || part.includes(':')
         ? parseFullPart(bookCode, part, toChapterEnd)
-        : parseContinuation(bookCode, part, previous);
+        : parseContinuation(bookCode, part, previous, toChapterEnd);
 
     if (!range.ok) return range;
 
@@ -227,7 +227,12 @@ function parseFullPart(bookCode: number, part: string, toChapterEnd = false): Pa
   return { ok: true, range: { book: bookCode, startChapter, startVerse, endChapter, endVerse } };
 }
 
-function parseContinuation(bookCode: number, part: string, previous: VerseRange | undefined): PartResult {
+function parseContinuation(
+  bookCode: number,
+  part: string,
+  previous: VerseRange | undefined,
+  toChapterEnd = false,
+): PartResult {
   if (!previous || previous.startVerse === null) {
     // 앞 구간이 장 단위였다면 후속 숫자도 장으로 본다
     return parseFullPart(bookCode, part);
@@ -238,8 +243,13 @@ function parseContinuation(bookCode: number, part: string, previous: VerseRange 
   if (hasUnsafeNumber(m)) return fail('SYNTAX', `'${part}' 의 숫자를 읽을 수 없습니다`);
 
   const startVerse = Number(m[1]);
-  const endVerse = m[2] !== undefined ? Number(m[2]) : startVerse;
   const chapter = previous.endChapter;
+
+  // '요 3:16,18-4장' — 끝에 '장' 이 붙어 있으면 대시 뒤 숫자는 장이다 (3:18 부터 4장 끝까지)
+  if (toChapterEnd && m[2] !== undefined) {
+    return { ok: true, range: { book: bookCode, startChapter: chapter, startVerse, endChapter: Number(m[2]), endVerse: null } };
+  }
+  const endVerse = m[2] !== undefined ? Number(m[2]) : startVerse;
 
   return {
     ok: true,

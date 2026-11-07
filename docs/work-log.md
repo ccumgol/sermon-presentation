@@ -2048,6 +2048,13 @@ WebSocket 만 자동 재연결하고 **JS 는 메모리에 있던 것 그대로*
 > **순서는 최신순**이다. 원래는 세 군데(진행 중 칸 · 로드맵 아래 · 8.1 절차 아래)에 흩어져
 > 있었고 그 안에서도 순서가 뒤섞여 있어 날짜로 다시 늘어놓았다. 새로 끝난 기록은 **맨 위**에 넣는다.
 
+- [완료 2026-11-06 / Agent C] 참조 파서: 쉼표 뒤 구간에도 끝 '장' 적용 ('요 3:16,18-4장')
+  계획: parseContinuation 에 toChapterEnd 를 넘겨, 'N-M' + 끝 '장' 이면 앞 장 N절부터 M장 끝까지.
+        R-7(1.4.5) 리뷰에서 빠진 경우. copyBible Swift·desktop 과 같은 규칙
+  다음 단계: 검사 먼저(RED) → 고침 → tsc·vitest·vite build·coverage → 1.4.6 → 커밋
+  ① 완료: 검사 먼저 — 실패 확인 → parseContinuation 에 toChapterEnd. tsc · vitest 2,117 ·
+     vite build · --coverage 문턱 통과. 판 **1.4.6**
+
 - [완료 2026-11-06 / Agent C] 참조 파서: 끝을 '장' 으로 쓴 범위 ('창 1장-2장' · '요 3:16-4장')
   계획: parseTail 이 끝의 ':'(=장)를 기억해 마지막 구간에 넘긴다. 'N:-M' 은 장 범위,
         'N:V-M' + 끝 '장' 은 M장 끝까지(endVerse null). copyBible Swift·desktop 과 같은 규칙
