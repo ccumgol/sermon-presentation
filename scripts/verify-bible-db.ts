@@ -499,15 +499,13 @@ for (const t of translations) {
   );
 }
 
-// ── 13. 원본 KJV 의 앞부분 잘림 (알려진 원본 결함) ─────────────
+// ── 13. KJV 앞부분 잘림 (2026-11-06 해결) ────────────────────
 //
-// 원본 KJV.db 자체에 절 앞부분이 잘려 저장된 행이 있다.
-// 예: 시 23:1 이 "of David. The LORD [is] my shepherd" — "A Psalm " 가 없다.
-// 우리 빌드가 만든 문제가 아니고(원본에서 동일하게 확인) 데이터만으로 복원할 수 없다.
-// 실패로 처리하면 영구히 빨간불이 되므로, 건수를 추적해 늘어나면 알아채도록 경고로 둔다.
+// 옛 KJV.db 에는 절 앞부분이 잘린 행이 158건 있었다 (시 23:1 "of David. The LORD …").
+// 2026-10-31 에 KJV.db 가 CrossWire KJV 로 바뀌어 0건이 됐다 — docs/KNOWN-DATA-ISSUES.md §1.
+// 이제 한 건이라도 생기면 원본이나 빌드가 다시 망가진 것이므로 실패로 본다.
 {
-  // 현재 확인된 건수. 이보다 늘어나면 빌드가 새 문제를 만들었다는 뜻이므로 실패로 본다.
-  const KNOWN_KJV_TRUNCATED = 158;
+  const KNOWN_KJV_TRUNCATED = 0;
 
   const count = (
     db
@@ -524,11 +522,11 @@ for (const t of translations) {
   const detail =
     `${count}건 (기준치 ${KNOWN_KJV_TRUNCATED}건)\n` +
     samples.map((s) => `${s.book} ${s.chapter}:${s.verse}: ${s.t}`).join('\n') +
-    '\n원본 KJV.db 의 결함이며 데이터만으로 복원할 수 없습니다. docs/KNOWN-DATA-ISSUES.md 참고.';
+    '\nKJV.db 가 옛 본문으로 되돌아갔는지 확인하세요. docs/KNOWN-DATA-ISSUES.md §1 참고.';
 
   record(
-    `KJV 앞부분 잘린 절 ${count}건 (원본 결함)`,
-    count > KNOWN_KJV_TRUNCATED ? 'fail' : 'warn',
+    `KJV 앞부분 잘린 절 ${count}건`,
+    count > KNOWN_KJV_TRUNCATED ? 'fail' : 'pass',
     detail,
   );
 }

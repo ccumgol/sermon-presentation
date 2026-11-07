@@ -2048,6 +2048,15 @@ WebSocket 만 자동 재연결하고 **JS 는 메모리에 있던 것 그대로*
 > **순서는 최신순**이다. 원래는 세 군데(진행 중 칸 · 로드맵 아래 · 8.1 절차 아래)에 흩어져
 > 있었고 그 안에서도 순서가 뒤섞여 있어 날짜로 다시 늘어놓았다. 새로 끝난 기록은 **맨 위**에 넣는다.
 
+- [완료 2026-11-06 / Agent C] data/bible.sqlite 다시 빌드 — KJV 를 CrossWire 본문(2026-10-31 교체된 KJV.db)으로
+  계획: VACUUM INTO 로 백업(data/backups/) → npm run bible:build → bible:verify → 역본별로 백업과 비교
+        (KJV 외 역본이 바뀌었는지) → vitest. 지금 DB 는 2026-08-12 빌드라 옛 KJV(괄호 문장 누락·시편 표제 조각)
+  다음 단계: 빌드 (백업 완료 data/backups/bible-before-kjv-crosswire-2026-11-06T23-35-21.sqlite)
+  ① 완료: VACUUM INTO 백업(integrity ok · 342,317절 · 12역본) → bible:build 3초 → 바뀐 것은 KJV 3,676절뿐,
+     다른 역본·소제목·절 수 그대로. 시 23:1 · 창 19:20 확인
+  ② 완료: verify 의 KJV 잘림 기준치 158 → 0 (이제 1건이라도 실패), KNOWN-DATA-ISSUES §1 해결 표시.
+     verify 통과 46 / 경고 1(원래 있던 사본상 없는 절) · tsc · vitest 2,117 · vite build · 커버리지. 판 **1.4.7**
+
 - [완료 2026-11-06 / Agent C] 참조 파서: 쉼표 뒤 구간에도 끝 '장' 적용 ('요 3:16,18-4장')
   계획: parseContinuation 에 toChapterEnd 를 넘겨, 'N-M' + 끝 '장' 이면 앞 장 N절부터 M장 끝까지.
         R-7(1.4.5) 리뷰에서 빠진 경우. copyBible Swift·desktop 과 같은 규칙
