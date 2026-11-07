@@ -27,6 +27,12 @@ const RANGE_RE = /^(\d+)(?::(\d+))?(?:-(?:(\d+):)?(\d+))?$/;
 /** 콤마로 이어붙인 후속 구간 — 앞 구간의 책·장을 물려받는다 */
 const CONTINUATION_RE = /^(\d+)(?:-(\d+))?$/;
 
+/** 'N:-M' — '창 1장-2장' · '창 1장-2' 를 다듬은 모양. 장 범위다 */
+const CHAPTER_DASH_RE = /^(\d+):-(\d+)$/;
+
+/** 'N:V-M' 인데 끝에 '장'(':')이 붙어 있던 것 — '요 3:16-4장' 은 4장 끝까지다 */
+const VERSE_TO_CHAPTER_RE = /^(\d+):(\d+)-(\d+)$/;
+
 /**
  * 입력을 정규화한다.
  * 한글 표기(장/절/편)를 콜론 형태로 바꾸고, 각종 전각·유사 기호를 통일한다.
@@ -137,8 +143,9 @@ function parseTail(bookCode: number, tail: string): TailResult {
     return fail('CHAPTER_REQUIRED', `${book.nameKo} 는 ${book.chapters}장까지 있습니다 — 장 번호를 입력하세요`);
   }
 
-  // '3:' (3장 전체)
-  const cleaned = tail.endsWith(':') ? tail.slice(0, -1) : tail;
+  // '3:' (3장 전체). 끝의 ':' 는 '장' 이었다 — '요 3:16-4장' 이면 끝 숫자가 장이다
+  const endsWithChapter = tail.endsWith(':');
+  const cleaned = endsWithChapter ? tail.slice(0, -1) : tail;
 
   const parts = cleaned.split(',').map((p) => p.trim()).filter((p) => p.length > 0);
   if (parts.length === 0) return fail('SYNTAX', `'${tail}' 를 해석할 수 없습니다`);
@@ -149,9 +156,10 @@ function parseTail(bookCode: number, tail: string): TailResult {
     const part = parts[i]!;
     const previous = out[out.length - 1];
 
+    const toChapterEnd = endsWithChapter && i === parts.length - 1;
     const range =
       i === 0 || part.includes(':')
-        ? parseFullPart(bookCode, part)
+        ? parseFullPart(bookCode, part, toChapterEnd)
         : parseContinuation(bookCode, part, previous);
 
     if (!range.ok) return range;
@@ -171,7 +179,23 @@ type PartResult = { ok: true; range: VerseRange } | ParseFailure;
 const hasUnsafeNumber = (m: RegExpExecArray): boolean =>
   m.slice(1).some((group) => group !== undefined && !Number.isSafeInteger(Number(group)));
 
-function parseFullPart(bookCode: number, part: string): PartResult {
+/** 끝을 '장' 으로 쓴 범위. 해당하지 않으면 null */
+function parseChapterEndedPart(bookCode: number, part: string, toChapterEnd: boolean): PartResult | null {
+  const dash = CHAPTER_DASH_RE.exec(part);
+  const toEnd = dash ? null : toChapterEnd ? VERSE_TO_CHAPTER_RE.exec(part) : null;
+  const m = dash ?? toEnd;
+  if (!m) return null;
+  if (hasUnsafeNumber(m)) return fail('SYNTAX', `'${part}' 의 숫자를 읽을 수 없습니다`);
+  const startChapter = Number(m[1]);
+  return dash
+    ? { ok: true, range: { book: bookCode, startChapter, startVerse: null, endChapter: Number(m[2]), endVerse: null } }
+    : { ok: true, range: { book: bookCode, startChapter, startVerse: Number(m[2]), endChapter: Number(m[3]), endVerse: null } };
+}
+
+function parseFullPart(bookCode: number, part: string, toChapterEnd = false): PartResult {
+  const chapterEnded = parseChapterEndedPart(bookCode, part, toChapterEnd);
+  if (chapterEnded) return chapterEnded;
+
   const m = RANGE_RE.exec(part);
   if (!m) return fail('SYNTAX', `'${part}' 형식을 알 수 없습니다`);
   if (hasUnsafeNumber(m)) return fail('SYNTAX', `'${part}' 의 숫자를 읽을 수 없습니다`);

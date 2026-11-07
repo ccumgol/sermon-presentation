@@ -390,3 +390,30 @@ describe('입력 안전 — 숫자 (copyBible 리뷰에서 찾은 것)', () => {
     }
   });
 });
+
+describe("끝을 '장' 으로 쓴 범위 (copyBible 리뷰에서 찾은 것)", () => {
+  it("'창 1장-2장' 과 '창 1장-2' 는 장 범위다", () => {
+    expect(single('창 1장-2장')).toEqual(range(1, 1, null, 2, null));
+    expect(single('창 1장-2')).toEqual(range(1, 1, null, 2, null));
+  });
+
+  it("'요 3:16-4장' 은 3장 16절부터 4장 끝까지다", () => {
+    expect(single('요 3:16-4장')).toEqual(range(43, 3, 16, 4, null));
+    expect(single('요 3장 16절-4장')).toEqual(range(43, 3, 16, 4, null));
+    expect(single('창 1:1-2:')).toEqual(range(1, 1, 1, 2, null));
+  });
+
+  it("끝에 '장' 이 없으면 지금처럼 같은 장 안의 절 범위다", () => {
+    expect(single('요 3:16-17')).toEqual(range(43, 3, 16, 3, 17));
+  });
+
+  it('표기는 장 끝까지를 그대로 보여 준다', () => {
+    const result = parseReference('요 3:16-4장');
+    expect(result.ok && result.referenceAbbr).toBe('요 3:16-4장');
+  });
+
+  it('복수 구간의 마지막에만 적용된다', () => {
+    const result = parseReference('마 5:3-12; 6:9-7장');
+    expect(result.ok && result.ranges).toEqual([range(40, 5, 3, 5, 12), range(40, 6, 9, 7, null)]);
+  });
+});

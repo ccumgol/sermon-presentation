@@ -2048,6 +2048,14 @@ WebSocket 만 자동 재연결하고 **JS 는 메모리에 있던 것 그대로*
 > **순서는 최신순**이다. 원래는 세 군데(진행 중 칸 · 로드맵 아래 · 8.1 절차 아래)에 흩어져
 > 있었고 그 안에서도 순서가 뒤섞여 있어 날짜로 다시 늘어놓았다. 새로 끝난 기록은 **맨 위**에 넣는다.
 
+- [완료 2026-11-06 / Agent C] 참조 파서: 끝을 '장' 으로 쓴 범위 ('창 1장-2장' · '요 3:16-4장')
+  계획: parseTail 이 끝의 ':'(=장)를 기억해 마지막 구간에 넘긴다. 'N:-M' 은 장 범위,
+        'N:V-M' + 끝 '장' 은 M장 끝까지(endVerse null). copyBible Swift·desktop 과 같은 규칙
+  다음 단계: 검사 먼저(RED) → 고침 → tsc·vitest·vite build·coverage → 1.4.5 → 커밋
+  ① 완료: 검사 5개 먼저 — 4개 실패 확인 (나머지 하나는 바뀌지 않아야 하는 경우)
+  ② 완료: CHAPTER_DASH_RE · VERSE_TO_CHAPTER_RE + parseChapterEndedPart. tsc · vitest 2,116 ·
+     vite build · --coverage 문턱 통과. 판 **1.4.5**
+
 - [완료 2026-11-06 / Agent C] 참조 파서: 전각 숫자(１２３)를 보통 숫자로 + 너무 큰 숫자는 SYNTAX
   계획: lib/reference-parser.ts normalizeInput 에 전각 숫자 변환, parseFullPart·parseContinuation 에
         Number.isSafeInteger 검사. 복사본(copyBible Swift·desktop JS)에 먼저 넣은 것과 같은 규칙.
