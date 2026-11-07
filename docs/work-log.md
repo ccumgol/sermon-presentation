@@ -2048,6 +2048,15 @@ WebSocket 만 자동 재연결하고 **JS 는 메모리에 있던 것 그대로*
 > **순서는 최신순**이다. 원래는 세 군데(진행 중 칸 · 로드맵 아래 · 8.1 절차 아래)에 흩어져
 > 있었고 그 안에서도 순서가 뒤섞여 있어 날짜로 다시 늘어놓았다. 새로 끝난 기록은 **맨 위**에 넣는다.
 
+- [완료 2026-11-06 / Agent C] KJV 1769년판 표기를 키보드로 찾게 — 전문검색 접기(Cæsar ← Caesar, Beth-el ← Bethel)
+  계획: lib/search-fold.ts(비교용 접기) → 빌드가 verses_fts 를 접은 글자로 만든다(contentless, 화면 글자는 verses 그대로)
+        → server 검색어도 같은 접기 → verify 에 Caesar·Bethel 검사 → 백업 뒤 bible:build. copyBible 과 같은 규칙
+  다음 단계: 백업 → bible:build (검사 RED 확인, lib·빌드·서버·verify 고침 완료)
+  ① 완료: 검사 5개 먼저(RED: Caesar 2건) → lib/search-fold.ts · 빌드 indexForSearch(contentless FTS) · 서버 검색어 접기 ·
+     verify 14번 검사. 백업 data/backups/bible-before-fts-fold-2026-11-06T23-41-52.sqlite → bible:build — 본문·소제목 변경 0, 검색 색인만
+  ② 완료: Caesar 24 · Bethel 59 (NIV love 526 등 기존 검색 수 그대로) · verify 통과 47 / 경고 1 · tsc · vitest 2,122 ·
+     vite build · 커버리지. 판 **1.4.8**
+
 - [완료 2026-11-06 / Agent C] data/bible.sqlite 다시 빌드 — KJV 를 CrossWire 본문(2026-10-31 교체된 KJV.db)으로
   계획: VACUUM INTO 로 백업(data/backups/) → npm run bible:build → bible:verify → 역본별로 백업과 비교
         (KJV 외 역본이 바뀌었는지) → vitest. 지금 DB 는 2026-08-12 빌드라 옛 KJV(괄호 문장 누락·시편 표제 조각)

@@ -11,6 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { bibleMissingMessage } from '../../lib/bible-missing.ts';
 import { formatRanges } from '../../lib/reference-parser.ts';
+import { foldForSearch } from '../../lib/search-fold.ts';
 import type {
   BookMeta,
   Passage,
@@ -299,8 +300,9 @@ function searchFts(term: string, options: SearchOptions): { rows: HitRow[]; tota
   const limit = options.limit ?? SEARCH_LIMIT;
   const testamentFilter = options.testament === 'OT' ? 'AND v.book <= 39' : options.testament === 'NT' ? 'AND v.book >= 40' : '';
 
-  // FTS5 질의 문법 문자를 제거해 구문 오류와 의도치 않은 연산자 해석을 막는다
-  const sanitized = term.replace(/["*():^-]/g, ' ').trim().normalize('NFC');
+  // 색인과 같은 방식으로 먼저 접는다 (Caesar → Cæsar, Beth-el·Bethel → Beth-el). 하이픈을 공백으로
+  // 바꾸기 전에 해야 'Beth-el' 이 한 낱말로 남는다. 그다음 FTS5 질의 문법 문자를 지운다.
+  const sanitized = foldForSearch(term.normalize('NFC')).replace(/["*():^-]/g, ' ').trim();
   if (sanitized.length === 0) return { rows: [], total: 0 };
   const match = sanitized
     .split(/\s+/)

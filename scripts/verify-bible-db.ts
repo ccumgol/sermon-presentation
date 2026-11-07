@@ -531,6 +531,26 @@ for (const t of translations) {
   );
 }
 
+// ── 14. KJV 1769년판 표기를 키보드 입력으로 찾는가 (전문검색 접기) ──
+//
+// 색인에는 lib/search-fold.ts 로 접은 글자가 들어 있어야 한다. 접지 않은 채 빌드되면
+// 'Caesar'·'Bethel' 이 몇 건밖에 안 나온다 (Cæsar·Beth-el 로 적힌 절을 못 찾는다).
+{
+  const ftsCount = (word: string): number =>
+    (
+      db
+        .prepare("SELECT count(*) AS c FROM verses_fts f JOIN verses v ON v.id=f.rowid WHERE f.text MATCH ? AND v.translation_id='kjv'")
+        .get(`"${word}"`) as { c: number }
+    ).c;
+  const caesar = ftsCount('caesar');
+  const bethel = ftsCount('bethel');
+  record(
+    `KJV 접어 찾기: 'Caesar' ${caesar}건 · 'Bethel' ${bethel}건`,
+    caesar >= 20 && bethel >= 20 ? 'pass' : 'fail',
+    '전문검색 색인이 검색용으로 접히지 않았습니다 (scripts/build-bible-db.ts 의 indexForSearch).',
+  );
+}
+
 db.close();
 
 // ── 결과 ───────────────────────────────────────────────────────

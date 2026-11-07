@@ -134,6 +134,17 @@ describe.skipIf(!hasBibleDb)('검색 전략', () => {
     expect(result.hits[0]?.reference).toMatch(/^\S+ \d+:\d+$/);
   });
 
+  it('KJV 1769년판 표기를 키보드 입력으로 찾는다 (Cæsar·Beth-el·brother’s)', () => {
+    const caesar = bible.search('Caesar', { translationId: 'kjv' });
+    expect(caesar.total).toBeGreaterThan(20);
+    // 원본은 Caesar·Cæsar 를 섞어 쓴다 — 둘 다 찾고, 화면 글자는 원본 그대로 둔다
+    expect(caesar.hits.some((h) => h.text.includes('Cæsar'))).toBe(true);
+    expect(caesar.hits.some((h) => h.text.includes('Caesar'))).toBe(true);
+    expect(bible.search('Bethel', { translationId: 'kjv' }).hits.some((h) => h.book === 1 && h.chapter === 28 && h.verse === 19)).toBe(true);
+    expect(bible.search('Beth-el', { translationId: 'kjv' }).total).toBe(bible.search('Bethel', { translationId: 'kjv' }).total);
+    expect(bible.search("brother's keeper", { translationId: 'kjv' }).hits.some((h) => h.book === 1 && h.chapter === 4 && h.verse === 9)).toBe(true);
+  });
+
   it('영어는 어절 검색을 쓴다', () => {
     const result = bible.search('love', { translationId: 'niv' });
     expect(result.strategy).toBe('fts');

@@ -16,6 +16,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { BOOKS } from '../lib/books.ts';
 import { ensureDataDirs, paths } from '../server/paths.ts';
 import { findDuplicateFix, pickVariant, SOURCES, type SourceSpec, type SourceVariant } from './bible-sources.ts';
+import { foldForSearch } from '../lib/search-fold.ts';
 import { readSource, type RawVerse } from './source-reader.ts';
 
 interface BuildStat {
@@ -117,6 +118,21 @@ function log(message: string): void {
   process.stdout.write(`${message}\n`);
 }
 
+/** verses 의 본문을 검색용으로 접어(Cæsar → Caesar, Beth-el → Bethel) 전문검색 색인에 넣는다 */
+function indexForSearch(db: DatabaseSync): void {
+  const insert = db.prepare('INSERT INTO verses_fts(rowid, text) VALUES (?, ?)');
+  db.exec('BEGIN');
+  try {
+    for (const row of db.prepare('SELECT id, text FROM verses').iterate() as Iterable<{ id: number; text: string }>) {
+      insert.run(row.id, foldForSearch(row.text));
+    }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
 /** FTS5 토크나이저 후보를 순서대로 시도한다. 환경에 따라 옵션 지원이 다르다. */
 function createFts(db: DatabaseSync): string {
   const candidates = [
@@ -127,7 +143,8 @@ function createFts(db: DatabaseSync): string {
   for (const tokenize of candidates) {
     try {
       db.exec(
-        `CREATE VIRTUAL TABLE verses_fts USING fts5(text, content='verses', content_rowid='id', tokenize='${tokenize}')`,
+        // contentless: 색인에는 검색용으로 접은 글자(lib/search-fold.ts)를 넣고, 화면 글자는 verses 에서 읽는다
+        `CREATE VIRTUAL TABLE verses_fts USING fts5(text, content='', tokenize='${tokenize}')`,
       );
       return tokenize;
     } catch {
@@ -454,7 +471,7 @@ try {
 
   log('전문검색 인덱스 생성 중…');
   const tokenizer = createFts(db);
-  db.exec("INSERT INTO verses_fts(rowid, text) SELECT id, text FROM verses");
+  indexForSearch(db);
 
   db.exec(INDEXES);
 
