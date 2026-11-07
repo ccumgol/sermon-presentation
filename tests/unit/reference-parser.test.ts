@@ -375,3 +375,18 @@ describe('formatRanges', () => {
     expect(formatRanges([range(43, 3, 16)], 'abbr')).toBe('요 3:16');
   });
 });
+
+describe('입력 안전 — 숫자 (copyBible 리뷰에서 찾은 것)', () => {
+  it('전각 숫자는 보통 숫자로 읽는다 (한글 입력기에서 쉽게 들어온다)', () => {
+    expect(normalizeInput('창 １:１')).toBe('창 1:1');
+    expect(single('요 ３：１６')).toEqual(range(43, 3, 16));
+  });
+
+  it('정수로 정확히 읽을 수 없을 만큼 큰 장·절 번호는 SYNTAX 로 거절한다', () => {
+    for (const input of ['창 99999999999999999999', '창 1:99999999999999999999', '창 1:1,99999999999999999999']) {
+      const result = parseReference(input);
+      expect(result.ok, input).toBe(false);
+      if (!result.ok) expect(result.error, input).toBe('SYNTAX');
+    }
+  });
+});

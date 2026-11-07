@@ -2048,6 +2048,15 @@ WebSocket 만 자동 재연결하고 **JS 는 메모리에 있던 것 그대로*
 > **순서는 최신순**이다. 원래는 세 군데(진행 중 칸 · 로드맵 아래 · 8.1 절차 아래)에 흩어져
 > 있었고 그 안에서도 순서가 뒤섞여 있어 날짜로 다시 늘어놓았다. 새로 끝난 기록은 **맨 위**에 넣는다.
 
+- [완료 2026-11-06 / Agent C] 참조 파서: 전각 숫자(１２３)를 보통 숫자로 + 너무 큰 숫자는 SYNTAX
+  계획: lib/reference-parser.ts normalizeInput 에 전각 숫자 변환, parseFullPart·parseContinuation 에
+        Number.isSafeInteger 검사. 복사본(copyBible Swift·desktop JS)에 먼저 넣은 것과 같은 규칙.
+        tests/unit/reference-parser.test.ts 에 검사 추가
+  다음 단계: 검사 먼저(RED) → 고침 → tsc·vitest·vite build·coverage → 1.4.4 · VERSION-HISTORY → 커밋
+  ① 완료: 검사 2개 먼저 — 실패 확인(전각 숫자 · 큰 숫자 2건 모두 ×)
+  ② 완료: normalizeInput 전각 숫자 변환 · hasUnsafeNumber 로 SYNTAX. tsc · vitest 2,111 ·
+     vite build · --coverage 문턱 통과. 판 **1.4.4**
+
 - [완료 2026-11-05 / Agent C] 의존성 경고 조치 — SECURITY-AUDIT §10 (사용자 승인)
   계획: `npm audit fix`(호환 범위, --force 없이) → 무엇이 바뀌었는지 lock 비교 →
         tsc · vitest · vite build · --coverage → 격리 서버(7870)로 기동·WS·S-2 의 403 →

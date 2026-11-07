@@ -33,6 +33,8 @@ const CONTINUATION_RE = /^(\d+)(?:-(\d+))?$/;
  */
 export function normalizeInput(raw: string): string {
   return raw
+    // 전각 숫자(０-９)는 한글 입력기에서 쉽게 들어온다 — 보통 숫자로 바꾼다
+    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
     .replace(/[：]/g, ':')
     .replace(/[～~–—−]/g, '-')
     .replace(/[，、]/g, ',')
@@ -165,9 +167,14 @@ function parseTail(bookCode: number, tail: string): TailResult {
 
 type PartResult = { ok: true; range: VerseRange } | ParseFailure;
 
+/** 정수로 정확히 읽을 수 없을 만큼 큰 숫자가 있는가 (copyBible Swift 판은 Int 범위를 넘으면 멈췄다) */
+const hasUnsafeNumber = (m: RegExpExecArray): boolean =>
+  m.slice(1).some((group) => group !== undefined && !Number.isSafeInteger(Number(group)));
+
 function parseFullPart(bookCode: number, part: string): PartResult {
   const m = RANGE_RE.exec(part);
   if (!m) return fail('SYNTAX', `'${part}' 형식을 알 수 없습니다`);
+  if (hasUnsafeNumber(m)) return fail('SYNTAX', `'${part}' 의 숫자를 읽을 수 없습니다`);
 
   const startChapter = Number(m[1]);
   const startVerse = m[2] !== undefined ? Number(m[2]) : null;
@@ -204,6 +211,7 @@ function parseContinuation(bookCode: number, part: string, previous: VerseRange 
 
   const m = CONTINUATION_RE.exec(part);
   if (!m) return fail('SYNTAX', `'${part}' 형식을 알 수 없습니다`);
+  if (hasUnsafeNumber(m)) return fail('SYNTAX', `'${part}' 의 숫자를 읽을 수 없습니다`);
 
   const startVerse = Number(m[1]);
   const endVerse = m[2] !== undefined ? Number(m[2]) : startVerse;
